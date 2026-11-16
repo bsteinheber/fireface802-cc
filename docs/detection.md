@@ -87,10 +87,13 @@ wahrscheinlich kein Zugriff auf den USB-Bus besteht.
 - String-Deskriptoren (Hersteller, Produktname, Seriennummer) werden
   **nicht** gelesen, weil das ein geöffnetes Gerät und Control-Transfers
   erfordern würde.
-- Der Test `check_forbidden_usb_calls` durchsucht alle Quelldateien nach
-  libusb-Funktionen zum Öffnen von Geräten, Beanspruchen von Interfaces,
-  Ablösen von Kerneltreibern, Zurücksetzen, Konfigurationswechsel und
-  Transfers. Wird eine davon gefunden, schlägt der Test fehl.
+- Der Test `check_forbidden_usb_calls` stellt sicher, dass Funktionen zum
+  Öffnen, Beanspruchen und Übertragen nur im Kommunikationsmodul
+  `src/usb_comm.c` vorkommen (siehe [usb_comm.md](usb_comm.md)). Ablösen von
+  Kerneltreibern, Zurücksetzen und Konfigurationswechsel sind überall
+  verboten. `ff802-detect` linkt das Kommunikationsmodul nicht. Der Test
+  `detect_binary_symbols` prüft mit `nm`, dass die fertige Binärdatei weder
+  `libusb_open` noch Claim- oder Transfer-Funktionen importiert.
 - Root-Rechte sind nicht nötig. Die Enumeration liest nur Informationen,
   die für alle Benutzer lesbar sind.
 

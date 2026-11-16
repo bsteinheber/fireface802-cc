@@ -8,37 +8,40 @@ Linux-Werkzeug zur Umschaltung des **ursprünglichen RME Fireface 802**
 | Phase | Inhalt | Stand |
 |-------|--------|-------|
 | 1  | Kodierung der Registerbefehle und Tests | abgeschlossen |
-| 2a | Diagnoseprogramm `ff802-detect`: lesende Geräteerkennung über libusb | abgeschlossen |
-| 2b | Senden des Umschaltbefehls | **nicht implementiert** |
+| 2a | Diagnoseprogramm `ff802-detect`: lesende Geräteerkennung | abgeschlossen, auf dem Host getestet |
+| 2b | Umschaltprogramm `ff802-cc` mit Diagnosemodus, simuliert getestet | abgeschlossen, **noch kein echter Schreibzugriff** |
 
-Das Projekt enthält bisher **keinen Code, der Daten an ein USB-Gerät sendet**.
+Im Standard-Build kann **kein Programm Daten an das Gerät senden**. Die
+Schreibfunktion wird nur mit `-DFF802_ENABLE_USB_WRITE=ON` einkompiliert
+(siehe [docs/usb_comm.md](docs/usb_comm.md)).
 
 ## Aufbau
 
 ```
-include/ff802/reg_codec.h   Registerkodierung (Adresse, Wert, Parität, LE)
-include/ff802/cc_mode.h     Befehl für Register 0x3D44 (CC an/aus)
-include/ff802/device_id.h   USB-Kennungen und Zuordnung VID:PID -> Modus
-include/ff802/detect.h      Erkennung und Bericht auf einfachen Gerätedatensätzen
-include/ff802/usb_enum.h    Lesende libusb-Enumeration (einziges libusb-Modul)
-src/                        Implementierung der Bibliotheken
-tools/ff802_detect.c        Kommandozeilenprogramm ff802-detect
-tests/                      CTest-Tests und Sicherheitsprüfung
-docs/protocol.md            Beschreibung der Protokollkodierung
-docs/detection.md           Beschreibung der Geräteerkennung
+include/ff802/reg_codec.h    Registerkodierung (Adresse, Wert, Parität, LE)
+include/ff802/cc_mode.h      Befehl für Register 0x3D44 (CC an/aus)
+include/ff802/device_id.h    USB-Kennungen und Zuordnung VID:PID -> Modus
+include/ff802/detect.h       Erkennung und Bericht auf einfachen Gerätedatensätzen
+include/ff802/usb_enum.h     Lesende libusb-Enumeration
+include/ff802/usb_backend.h  Abstrakte USB-Schnittstelle, Layout-Prüfung
+include/ff802/cc_switch.h    Ablaufsteuerung der Umschaltung
+include/ff802/usb_comm.h     libusb-Backend für die Kommunikation (einziges Modul mit Schreibzugriff)
+src/                         Implementierung
+tools/ff802_detect.c         Programm ff802-detect (schreibfrei)
+tools/ff802_cc.c             Programm ff802-cc
+tests/                       CTest-Tests, simuliertes USB-Backend, Sicherheitsprüfungen
+docs/                        Protokoll, Erkennung, Kommunikation
 ```
 
-Bibliotheken:
-
-| Bibliothek       | Inhalt                         | libusb |
-|------------------|--------------------------------|--------|
-| `ff802_protocol` | `reg_codec`, `cc_mode`         | nein   |
-| `ff802_detect`   | `device_id`, `detect`          | nein   |
-| `ff802_usb`      | `usb_enum` (nur Enumeration)   | ja     |
+| Bibliothek | Inhalt | libusb | darf schreiben |
+|------------|--------|:------:|:--------------:|
+| `ff802_protocol` | `reg_codec`, `cc_mode` | nein | – |
+| `ff802_detect` | `device_id`, `detect` | nein | – |
+| `ff802_switch` | `usb_backend`, `cc_switch` | nein | nur über Backend |
+| `ff802_usb` | `usb_enum` | ja | nein |
+| `ff802_comm` | `usb_comm` | ja | nur mit `FF802_ENABLE_USB_WRITE=ON` |
 
 ## Bauen und Testen (im Dev-Container)
-
-Die Entwicklung erfolgt ausschließlich im Dev-Container (`.devcontainer/`).
 
 ```sh
 cmake -S . -B build
@@ -46,69 +49,66 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-- Compiler-Warnungen werden standardmäßig als Fehler behandelt. Abschalten
-  lässt sich das mit `-DFF802_WERROR=OFF`.
-- Ohne libusb oder mit `-DFF802_BUILD_TOOLS=OFF` werden nur die reinen
-  Bibliotheken und ihre Tests gebaut.
+| CMake-Option | Standard | Bedeutung |
+|--------------|----------|-----------|
+| `FF802_ENABLE_USB_WRITE` | `OFF` | Claim und Bulk-Write einkompilieren |
+| `FF802_BUILD_TOOLS` | `ON` | Programme bauen (benötigt libusb) |
+| `FF802_WERROR` | `ON` | Warnungen als Fehler |
 
-## Diagnoseprogramm auf dem Kubuntu-Host ausführen
+## Programme auf dem Kubuntu-Host
 
-Das im Container gebaute Programm liegt im eingebundenen Projektverzeichnis
-und kann direkt auf dem Host gestartet werden, ohne Entwicklungswerkzeuge
-und ohne Root-Rechte:
+Die im Container gebauten Programme liegen im eingebundenen
+Projektverzeichnis und laufen ohne Entwicklungswerkzeuge und ohne
+Root-Rechte.
 
 ```sh
+# Geräteerkennung (öffnet kein Gerät)
 /home/bernhard/Develop/fireface802-cc/build/ff802-detect
+
+# Diagnose vor der Umschaltung (öffnet das Gerät, beansprucht nichts, sendet nichts)
+/home/bernhard/Develop/fireface802-cc/build/ff802-cc check
+
+# Umschaltung (im Standard-Build gesperrt)
+/home/bernhard/Develop/fireface802-cc/build/ff802-cc enable
 ```
 
-Beispielausgabe:
+| Exit | `ff802-detect` | `ff802-cc` |
+|:----:|----------------|------------|
+| 0 | Gerät gefunden | Prüfung bestanden bzw. Befehl übertragen |
+| 1 | kein Gerät | kein passendes Gerät |
+| 2 | Fehler | Bedienfehler |
+| 3 | – | Vorbedingung nicht erfüllt, nichts gesendet |
+| 4 | – | Übertragung fehlgeschlagen, Gerätezustand unbekannt |
+| 5 | – | nicht gesendet (abgebrochen oder Schreiben gesperrt) |
 
-```
-Scanned 26 USB device(s).
-Bus 003 Device 018: ID 2a39:3fcd mode=proprietary port=3-2.4.1.1.3 bcdDevice=0.01
-  Fireface 802, proprietary USB mode
-Found 1 Fireface 802 device(s).
-```
+`ff802-cc check` braucht Schreibrechte auf die Gerätedatei. Ohne udev-Regel
+meldet es `access to the USB device denied`. Eine udev-Regel wird nicht
+automatisch installiert (siehe [docs/usb_comm.md](docs/usb_comm.md)).
 
-Rückgabewerte: `0` Fireface 802 gefunden, `1` keins gefunden,
-`2` Bedienfehler oder Enumeration fehlgeschlagen.
-
-**Voraussetzungen auf dem Host:**
-
-- Laufzeitbibliothek `libusb-1.0-0` (Paket `libusb-1.0-0`, keine
-  Entwicklungsdateien). Sie ist auf Kubuntu normalerweise vorinstalliert.
-  Prüfen lässt sich das mit `ldd build/ff802-detect`.
-- glibc ab Version 2.34 (Kubuntu 22.04 oder neuer), x86-64.
-
-Das Programm ist dynamisch gelinkt. Eine statische Variante ist mit den
-Ubuntu-Paketen nicht möglich, weil es keine statische `libudev` gibt.
+**Voraussetzungen auf dem Host:** Laufzeitbibliothek `libusb-1.0-0`
+(normalerweise vorinstalliert) und glibc ab 2.34 (Kubuntu 22.04 oder
+neuer), x86-64.
 
 ## Tests
 
 | Test | Inhalt |
 |------|--------|
-| `test_reg_codec` | Byte-Reihenfolge, Bit-Layout, Parität, Fehlerfälle, Erkennung aller Einzelbit-Fehler |
-| `test_cc_mode` | Byte-genauer Vergleich mit den Windows-Aufzeichnungen `01 00 44 BD` und `00 00 44 3D` |
-| `test_device_id` | Zuordnung VID:PID zum Modus, ähnliche, aber falsche Kennungen |
-| `test_detect` | Erkennung und Bericht mit simulierten Gerätelisten (ohne Hardware) |
-| `check_forbidden_usb_calls` | Schlägt fehl, wenn eine Quelldatei libusb-Funktionen zum Öffnen, Beanspruchen, Zurücksetzen oder für Transfers verwendet |
-| `cli_*` | `--help`, `--version`, unbekannte Argumente (ohne USB-Zugriff) |
+| `test_reg_codec`, `test_cc_mode` | Registerkodierung, Windows-Aufzeichnungen |
+| `test_device_id`, `test_detect` | Geräteerkennung mit simulierten Gerätelisten |
+| `test_usb_backend` | Layout-Prüfung, Bestätigungswort, `--device`-Syntax, Exit-Codes |
+| `test_cc_switch` | Kompletter Ablauf gegen ein simuliertes USB-Backend: Reihenfolge, genau ein Schreibversuch, Freigabe aller Ressourcen, alle Fehlerfälle |
+| `test_write_gate` | Backend meldet die konfigurierte Schreibfähigkeit |
+| `check_forbidden_usb_calls` | Quelltextprüfung: Schreib-APIs nur in `src/usb_comm.c`, verbotene APIs nirgends |
+| `detect_binary_symbols`, `cc_binary_symbols` | Prüfung der importierten Symbole der fertigen Programme mit `nm` |
+| `cli_*`, `cc_cli_*` | Kommandozeilen beider Programme ohne USB-Zugriff |
 
-Keiner der automatisierten Tests benötigt angeschlossene USB-Hardware.
-
-## Sicherheitshinweise
-
-- `ff802-detect` liest nur die beim Enumerieren zwischengespeicherten
-  Gerätedeskriptoren. Es öffnet kein Gerät, beansprucht kein Interface,
-  löst keinen Kernel-Treiber ab, setzt nichts zurück und sendet keine Daten.
-- Der Dev-Container läuft ohne Privilegien und ohne durchgereichte Geräte.
-  Siehe auch den Hinweis zu `/sys` in [docs/detection.md](docs/detection.md).
-- Ob die Umschaltung unter Linux funktioniert, ist noch nicht getestet.
+Keiner der automatisierten Tests greift auf USB-Hardware zu.
 
 ## Dokumentation
 
 - [docs/protocol.md](docs/protocol.md): Registerprotokoll
 - [docs/detection.md](docs/detection.md): Geräteerkennung
+- [docs/usb_comm.md](docs/usb_comm.md): Kommunikation, Sicherheitsmechanismen, Risiken
 
 ## Lizenz
 
