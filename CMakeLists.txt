@@ -28,7 +28,8 @@ endfunction()
 
 # Pure protocol library: no USB, no I/O.
 add_library(ff802_protocol STATIC
-    src/reg_codec.c)
+    src/reg_codec.c
+    src/cc_mode.c)
 target_include_directories(ff802_protocol PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include)
 ff802_set_warnings(ff802_protocol)

@@ -9,3 +9,4 @@ function(ff802_add_test name)
 endfunction()
 
 ff802_add_test(test_reg_codec)
+ff802_add_test(test_cc_mode)
