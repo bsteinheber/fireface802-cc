@@ -106,3 +106,6 @@ if(FF802_HAVE_TOOLS)
                 -P ${CMAKE_CURRENT_SOURCE_DIR}/check_binary_symbols.cmake)
     endif()
 endif()
+
+# Static checks of the ALSA UCM profile (no sound card needed).
+add_subdirectory(audio)
