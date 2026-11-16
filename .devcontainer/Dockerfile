@@ -8,6 +8,7 @@ RUN apt-get update \
        cmake \
        pkg-config \
        libusb-1.0-0-dev \
+       libasound2-dev \
        git \
        ca-certificates \
     && rm -rf /var/lib/apt/lists/*
