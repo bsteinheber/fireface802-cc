@@ -10,7 +10,8 @@ ausschließlich das **ursprüngliche Fireface 802** (nicht das 802 FS).
 
 ## USB-Rahmenbedingungen (nur zur Einordnung)
 
-Im proprietären Modus verwendet das Gerät folgende Parameter. Sie werden
+Im proprietären Modus verwendet das Gerät folgende Parameter. Wie das Gerät
+erkannt wird, beschreibt [detection.md](detection.md). Die Parameter werden
 erst in einer späteren Entwicklungsphase benötigt. Der hier beschriebene
 Protokollteil kommt ohne USB-Zugriffe aus.
 
