@@ -1,0 +1,8 @@
+# Out-of-source build directories
+build/
+build-*/
+
+# Editor and tool artefacts
+.vscode/
+*.swp
+*~

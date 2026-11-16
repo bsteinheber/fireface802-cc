@@ -1,0 +1,14 @@
+{
+    "name": "Fireface 802 CC Development",
+    "build": {
+        "dockerfile": "Dockerfile"
+    },
+    "workspaceFolder": "/workspaces/fireface802-cc",
+    "containerUser": "developer",
+    "remoteUser": "developer",
+    "updateRemoteUserUID": false,
+    "runArgs": [
+        "--cap-drop=ALL",
+        "--security-opt=no-new-privileges:true"
+    ]
+}
