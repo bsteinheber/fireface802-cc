@@ -37,7 +37,8 @@ ff802_set_warnings(ff802_protocol)
 # Pure device detection logic: classification, matching, reporting.
 # Works on plain device records and does not depend on libusb.
 add_library(ff802_detect STATIC
-    src/device_id.c)
+    src/device_id.c
+    src/detect.c)
 target_include_directories(ff802_detect PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include)
 ff802_set_warnings(ff802_detect)
