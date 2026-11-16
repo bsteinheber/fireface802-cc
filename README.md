@@ -9,7 +9,8 @@ Linux-Werkzeug zur Umschaltung des **ursprünglichen RME Fireface 802**
 |-------|--------|-------|
 | 1  | Kodierung der Registerbefehle und Tests | abgeschlossen |
 | 2a | Diagnoseprogramm `ff802-detect`: lesende Geräteerkennung | abgeschlossen, auf dem Host getestet |
-| 2b | Umschaltprogramm `ff802-cc` mit Diagnosemodus, simuliert getestet | abgeschlossen, **noch kein echter Schreibzugriff** |
+| 2b | Umschaltprogramm `ff802-cc` mit Diagnosemodus | abgeschlossen, Umschaltung auf dem Host erfolgreich getestet |
+| 3 (Prototyp) | ALSA-UCM-Profil mit sechs Stereo-Ausgängen für den CC-Modus | im Repository, **nicht installiert, Kanalzuordnung unbestätigt** |
 
 Im Standard-Build kann **kein Programm Daten an das Gerät senden**. Die
 Schreibfunktion wird nur mit `-DFF802_ENABLE_USB_WRITE=ON` einkompiliert
@@ -30,7 +31,10 @@ src/                         Implementierung
 tools/ff802_detect.c         Programm ff802-detect (schreibfrei)
 tools/ff802_cc.c             Programm ff802-cc
 tests/                       CTest-Tests, simuliertes USB-Backend, Sicherheitsprüfungen
-docs/                        Protokoll, Erkennung, Kommunikation
+tests/audio/                 statische Tests des UCM-Profils, simulierter Test von T1
+audio/ucm2/                  ALSA-UCM-Profil (Aufbau wie /usr/share/alsa/ucm2)
+tools/hw-test/               Skripte für Host-Tests (nur nach Freigabe ausführen)
+docs/                        Protokoll, Erkennung, Kommunikation, UCM-Profil
 ```
 
 | Bibliothek | Inhalt | libusb | darf schreiben |
@@ -101,14 +105,18 @@ neuer), x86-64.
 | `check_forbidden_usb_calls` | Quelltextprüfung: Schreib-APIs nur in `src/usb_comm.c`, verbotene APIs nirgends |
 | `detect_binary_symbols`, `cc_binary_symbols` | Prüfung der importierten Symbole der fertigen Programme mit `nm` |
 | `cli_*`, `cc_cli_*` | Kommandozeilen beider Programme ohne USB-Zugriff |
+| `ucm_profile_static` | Struktur und Inhalt des UCM-Profils gegen eine eigene Erwartungstabelle |
+| `ucm_alsa_syntax` | Syntax des UCM-Profils mit dem alsa-lib-Parser (braucht `libasound2-dev`, sonst übersprungen) |
+| `ucm_t1_script` | Host-Test-Skript T1 gegen nachgebautes UCM-Verzeichnis, procfs und `alsaucm` |
 
-Keiner der automatisierten Tests greift auf USB-Hardware zu.
+Keiner der automatisierten Tests greift auf USB-Hardware oder eine Soundkarte zu.
 
 ## Dokumentation
 
 - [docs/protocol.md](docs/protocol.md): Registerprotokoll
 - [docs/detection.md](docs/detection.md): Geräteerkennung
 - [docs/usb_comm.md](docs/usb_comm.md): Kommunikation, Sicherheitsmechanismen, Risiken
+- [docs/audio_ucm.md](docs/audio_ucm.md): ALSA-UCM-Profil, Host-Test T1, Lautstärkesicherheit
 
 ## Lizenz
 
