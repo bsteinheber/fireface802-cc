@@ -26,6 +26,13 @@ function(ff802_set_warnings target)
     endif()
 endfunction()
 
+# Pure protocol library: no USB, no I/O.
+add_library(ff802_protocol STATIC
+    src/reg_codec.c)
+target_include_directories(ff802_protocol PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include)
+ff802_set_warnings(ff802_protocol)
+
 include(CTest)
 
 if(BUILD_TESTING)
