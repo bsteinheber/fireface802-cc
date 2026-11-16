@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(fireface802-cc
-    VERSION 0.2.0
+    VERSION 0.3.0
     DESCRIPTION "Switch the original RME Fireface 802 between proprietary USB and class-compliant mode"
     LANGUAGES C)
 
@@ -55,6 +55,15 @@ ff802_set_warnings(ff802_switch)
 # Command-line tools need libusb. Without it, only the pure libraries and
 # their tests are built.
 option(FF802_BUILD_TOOLS "Build the libusb based command-line tools" ON)
+
+# Safety gate: without this option the binaries cannot claim a USB
+# interface or perform a USB write. Keep OFF until a real write test has
+# been explicitly approved.
+option(FF802_ENABLE_USB_WRITE "Compile in USB claim and bulk write support" OFF)
+if(FF802_ENABLE_USB_WRITE)
+    message(WARNING "FF802_ENABLE_USB_WRITE=ON: ff802-cc can send commands to the device")
+endif()
+
 set(FF802_HAVE_TOOLS OFF)
 if(FF802_BUILD_TOOLS)
     find_package(PkgConfig)

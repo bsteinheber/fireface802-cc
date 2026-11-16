@@ -1,12 +1,13 @@
 # Read-only libusb enumeration backend.
 add_library(ff802_usb STATIC
     ${PROJECT_SOURCE_DIR}/src/usb_enum.c)
+target_include_directories(ff802_usb PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(ff802_usb
-    PUBLIC ff802_detect
-    PRIVATE PkgConfig::LIBUSB)
+    PUBLIC ff802_detect PkgConfig::LIBUSB)
 ff802_set_warnings(ff802_usb)
 
 # Diagnostic tool. Placed directly in the build directory for easy access.
+# Must stay write-free: it does not link the communication module.
 add_executable(ff802-detect ff802_detect.c)
 target_link_libraries(ff802-detect PRIVATE ff802_usb ff802_detect)
 target_compile_definitions(ff802-detect PRIVATE
@@ -15,4 +16,28 @@ set_target_properties(ff802-detect PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 ff802_set_warnings(ff802-detect)
 
-install(TARGETS ff802-detect RUNTIME DESTINATION bin)
+# USB communication backend: the only module allowed to open, claim and
+# write. Claim and write are compiled in only with FF802_ENABLE_USB_WRITE.
+add_library(ff802_comm STATIC
+    ${PROJECT_SOURCE_DIR}/src/usb_comm.c)
+target_include_directories(ff802_comm PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(ff802_comm
+    PUBLIC ff802_switch
+    PRIVATE ff802_usb PkgConfig::LIBUSB)
+if(FF802_ENABLE_USB_WRITE)
+    target_compile_definitions(ff802_comm PRIVATE FF802_ENABLE_USB_WRITE=1)
+else()
+    target_compile_definitions(ff802_comm PRIVATE FF802_ENABLE_USB_WRITE=0)
+endif()
+ff802_set_warnings(ff802_comm)
+
+# Mode switch tool.
+add_executable(ff802-cc ff802_cc.c)
+target_link_libraries(ff802-cc PRIVATE ff802_comm ff802_switch)
+target_compile_definitions(ff802-cc PRIVATE
+    FF802_VERSION="${PROJECT_VERSION}")
+set_target_properties(ff802-cc PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+ff802_set_warnings(ff802-cc)
+
+install(TARGETS ff802-detect ff802-cc RUNTIME DESTINATION bin)

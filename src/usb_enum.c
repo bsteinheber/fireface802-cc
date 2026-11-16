@@ -5,17 +5,18 @@
  * list get/free, and the descriptor/topology getters below. Since libusb
  * 1.0.16 the device descriptor is cached at enumeration time, so reading
  * it causes no bus traffic. The test check_forbidden_usb_calls enforces
- * that no device-opening or transfer API is used anywhere in the sources.
+ * that no device-opening or transfer API is used in this file.
  */
 #include "ff802/usb_enum.h"
+#include "usb_internal.h"
 
 #include <stdlib.h>
 
 #include <libusb.h>
 
-static void fill_record(libusb_device *dev,
-                        const struct libusb_device_descriptor *desc,
-                        ff802_usb_dev *rec)
+void ff802_usb_fill_record(libusb_device *dev,
+                           const struct libusb_device_descriptor *desc,
+                           ff802_usb_dev *rec)
 {
     uint8_t ports[FF802_MAX_PORT_DEPTH];
 
@@ -70,7 +71,7 @@ int ff802_usb_enumerate(ff802_usb_dev **devs, size_t *count)
         /* A device whose descriptor cannot be read is skipped. */
         if (libusb_get_device_descriptor(list[i], &desc) != LIBUSB_SUCCESS)
             continue;
-        fill_record(list[i], &desc, &recs[used++]);
+        ff802_usb_fill_record(list[i], &desc, &recs[used++]);
     }
 
     *devs = recs;
