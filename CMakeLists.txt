@@ -43,6 +43,15 @@ target_include_directories(ff802_detect PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include)
 ff802_set_warnings(ff802_detect)
 
+# Pure CC switch sequence on an abstract USB backend (no libusb).
+add_library(ff802_switch STATIC
+    src/usb_backend.c
+    src/cc_switch.c)
+target_include_directories(ff802_switch PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(ff802_switch PUBLIC ff802_protocol ff802_detect)
+ff802_set_warnings(ff802_switch)
+
 # Command-line tools need libusb. Without it, only the pure libraries and
 # their tests are built.
 option(FF802_BUILD_TOOLS "Build the libusb based command-line tools" ON)

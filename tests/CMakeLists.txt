@@ -13,6 +13,14 @@ ff802_add_test(test_cc_mode ff802_protocol)
 ff802_add_test(test_device_id ff802_detect)
 ff802_add_test(test_detect ff802_detect)
 
+# Tests using the simulated USB backend.
+foreach(name test_usb_backend test_cc_switch)
+    add_executable(${name} ${name}.c fake_usb.c)
+    target_link_libraries(${name} PRIVATE ff802_switch)
+    ff802_set_warnings(${name})
+    add_test(NAME ${name} COMMAND ${name})
+endforeach()
+
 # Static safety check over all sources (no compiler involved).
 add_test(NAME check_forbidden_usb_calls
     COMMAND ${CMAKE_COMMAND} -DSOURCE_DIR=${PROJECT_SOURCE_DIR}
