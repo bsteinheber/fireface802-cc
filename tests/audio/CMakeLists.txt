@@ -29,3 +29,9 @@ else()
     set_tests_properties(ucm_alsa_syntax PROPERTIES
         SKIP_REGULAR_EXPRESSION "alsa-lib development files not found")
 endif()
+
+# Simulated test of the host test script T1 (fake UCM tree, fake procfs,
+# fake alsaucm). Never touches the real ALSA configuration.
+add_test(NAME ucm_t1_script
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/test_ucm_t1.sh
+            ${PROJECT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}/t1-scratch)
