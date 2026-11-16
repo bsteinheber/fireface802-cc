@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(fireface802-cc
-    VERSION 0.1.0
+    VERSION 0.2.0
     DESCRIPTION "Switch the original RME Fireface 802 between proprietary USB and class-compliant mode"
     LANGUAGES C)
 
@@ -42,6 +42,23 @@ add_library(ff802_detect STATIC
 target_include_directories(ff802_detect PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include)
 ff802_set_warnings(ff802_detect)
+
+# Command-line tools need libusb. Without it, only the pure libraries and
+# their tests are built.
+option(FF802_BUILD_TOOLS "Build the libusb based command-line tools" ON)
+set(FF802_HAVE_TOOLS OFF)
+if(FF802_BUILD_TOOLS)
+    find_package(PkgConfig)
+    if(PKG_CONFIG_FOUND)
+        pkg_check_modules(LIBUSB IMPORTED_TARGET libusb-1.0>=1.0.22)
+    endif()
+    if(LIBUSB_FOUND)
+        set(FF802_HAVE_TOOLS ON)
+        add_subdirectory(tools)
+    else()
+        message(WARNING "libusb-1.0 not found: command-line tools are not built")
+    endif()
+endif()
 
 include(CTest)
 
