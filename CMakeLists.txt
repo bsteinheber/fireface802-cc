@@ -52,6 +52,48 @@ target_include_directories(ff802_switch PUBLIC
 target_link_libraries(ff802_switch PUBLIC ff802_protocol ff802_detect)
 ff802_set_warnings(ff802_switch)
 
+# Loopback measurement core of ff802-chanmap (hardware test T2): signal
+# generation, guards, detection, flow, reservation, report. No ALSA here,
+# so the complete flow is testable against a simulated device.
+add_library(ff802_chanmap STATIC
+    src/chanmap_dsp.c
+    src/chanmap_measure.c
+    src/chanmap_card.c
+    src/chanmap_reserve.c
+    src/chanmap_report.c)
+target_include_directories(ff802_chanmap PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(ff802_chanmap PUBLIC m)
+# POSIX/GNU functions (fork, prctl, nanosleep); the correlation runs fast
+# enough for the tests only when optimised, also in Debug builds.
+set_target_properties(ff802_chanmap PROPERTIES C_EXTENSIONS ON)
+target_compile_options(ff802_chanmap PRIVATE -O2)
+ff802_set_warnings(ff802_chanmap)
+
+# ALSA backend and the ff802-chanmap program need alsa-lib.
+find_package(PkgConfig QUIET)
+if(PKG_CONFIG_FOUND)
+    pkg_check_modules(ALSA QUIET IMPORTED_TARGET GLOBAL alsa)
+endif()
+set(FF802_HAVE_CHANMAP_TOOL OFF)
+if(ALSA_FOUND)
+    set(FF802_HAVE_CHANMAP_TOOL ON)
+    add_library(ff802_chanmap_alsa STATIC src/chanmap_alsa.c)
+    target_link_libraries(ff802_chanmap_alsa PUBLIC ff802_chanmap PkgConfig::ALSA)
+    set_target_properties(ff802_chanmap_alsa PROPERTIES C_EXTENSIONS ON)
+    ff802_set_warnings(ff802_chanmap_alsa)
+
+    add_executable(ff802-chanmap tools/ff802_chanmap.c)
+    target_link_libraries(ff802-chanmap PRIVATE ff802_chanmap_alsa)
+    target_compile_definitions(ff802-chanmap PRIVATE FF802_VERSION="${PROJECT_VERSION}")
+    set_target_properties(ff802-chanmap PROPERTIES
+        C_EXTENSIONS ON
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+    ff802_set_warnings(ff802-chanmap)
+else()
+    message(WARNING "alsa-lib not found: ff802-chanmap is not built")
+endif()
+
 # Command-line tools need libusb. Without it, only the pure libraries and
 # their tests are built.
 option(FF802_BUILD_TOOLS "Build the libusb based command-line tools" ON)

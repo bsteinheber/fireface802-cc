@@ -116,3 +116,6 @@ endif()
 
 # Static checks of the ALSA UCM profile (no sound card needed).
 add_subdirectory(audio)
+
+# ff802-chanmap (loopback measurement, hardware test T2).
+add_subdirectory(chanmap)
