@@ -171,9 +171,14 @@ SND_CTL_PLUGIN_DEFINE_FUNC(ff802fake)
             continue;
         if (!strcmp(id, "card")) {
             if (snd_config_get_integer(n, &card) < 0) {
+                char *end;
+
                 if (snd_config_get_string(n, &str) < 0)
                     return -EINVAL;
-                card = strtol(str, NULL, 10);
+                /* a card id (UCM uses hw:<CardId>) means the fake card 1 */
+                card = strtol(str, &end, 10);
+                if (end == str || *end != '\0')
+                    card = 1;
             }
             continue;
         }
