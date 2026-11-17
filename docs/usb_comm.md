@@ -173,6 +173,10 @@ Endpunkt und Bytes an. Nur die exakte Eingabe `ENABLE` löst die
    Gerät vermutlich als `0424:3fdd`. Dieses Werkzeug kann es dort nicht
    ansprechen. Vor dem Test sollte ein Rückweg geklärt sein, z. B. über den
    Windows-Treiber oder ein Gerätemenü.
+   *T4:* Geklärt, siehe [t4_disable.md](t4_disable.md). TotalMix FX setzt das
+   Gerät auf Windows oder macOS automatisch zurück; alternativ die ARC
+   (Prog + B (Mono) beim Einschalten). Einen belegten USB-Befehl dafür gibt es
+   nicht.
 3. **CC-Kennung unbestätigt.** Dass `0424:3fdd` die CC-Kennung ist und
    `snd-usb-audio` das Gerät unterstützt, ist unter Linux nicht geprüft.
 4. **Alternate Setting.** Das Werkzeug setzt kein Alternate Setting. Es

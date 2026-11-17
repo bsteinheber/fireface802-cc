@@ -12,10 +12,13 @@ Linux-Werkzeug zur Umschaltung des **ursprünglichen RME Fireface 802**
 | 2b | Umschaltprogramm `ff802-cc` mit Diagnosemodus | abgeschlossen, Umschaltung auf dem Host erfolgreich getestet |
 | 3 | ALSA-UCM-Profil mit sechs Stereo-Ausgängen für den CC-Modus, Debian-Paket `ff802-ucm-profile` | Host-Test T1 bestanden, Paket gebaut und isoliert getestet, **nicht installiert, Kanalzuordnung unbestätigt** |
 | 4 | Messwerkzeug `ff802-chanmap` für die Kanalzuordnung (Hardwaretest T2) | implementiert und im Container getestet, T2 nicht ausgeführt |
+| T4 | Automatischer Wechsel in den CC-Modus beim Anschließen/Systemstart, Debian-Paket `ff802-cc-auto`; Untersuchung `ff802-cc disable` | im Container implementiert und getestet, **nicht installiert**; `disable` nicht möglich (kein belegtes Verfahren) |
 
 Im Standard-Build kann **kein Programm Daten an das Gerät senden**. Die
 Schreibfunktion wird nur mit `-DFF802_ENABLE_USB_WRITE=ON` einkompiliert
-(siehe [docs/usb_comm.md](docs/usb_comm.md)).
+(siehe [docs/usb_comm.md](docs/usb_comm.md)). Das Paket `ff802-cc-auto`
+enthält einen so gebauten Dienst; seine Automatik ist nach der Installation
+aus (siehe [docs/t4_usb_mode.md](docs/t4_usb_mode.md)).
 
 ## Aufbau
 
@@ -30,15 +33,18 @@ include/ff802/cc_switch.h    Ablaufsteuerung der Umschaltung
 include/ff802/usb_comm.h     libusb-Backend für die Kommunikation (einziges Modul mit Schreibzugriff)
 include/ff802/chanmap.h      ff802-chanmap: Signal, Wächter, Erkennung, Ablauf, Reservierung, Auswertung
 include/ff802/chanmap_alsa.h ff802-chanmap: ALSA-Backend (nur hw:CARD=<id>, Mixer nur lesend)
+include/ff802/auto_*.h        T4: sysfs-Identität, Zustand/Ereignisse, automatischer Ablauf (ohne libusb)
 src/                         Implementierung
 tools/ff802_detect.c         Programm ff802-detect (schreibfrei)
 tools/ff802_cc.c             Programm ff802-cc
 tools/ff802_chanmap.c        Programm ff802-chanmap (Loopback-Messung, T2)
+tools/ff802_cc_autoswitch.c  T4: Dienstprogramm ff802-cc-autoswitch (nur von systemd gestartet)
 tests/                       CTest-Tests, simuliertes USB-Backend, Sicherheitsprüfungen
 tests/audio/                 Tests des UCM-Profils: statisch, alsa-lib-Parser, Auswertung mit nachgebildeter Karte, T1-Simulation
 tests/chanmap/               Tests von ff802-chanmap mit simuliertem Gerät
 tests/packaging/             Pakettest in isolierter Wurzel
-packaging/                   Debian-Paket ff802-ucm-profile (build-deb.sh, Paketinhalt)
+tests/auto/                  T4: simuliertes sysfs/USB, Dienst-Ablauf, Benachrichtigung, Steuerung, Units
+packaging/                   Debian-Pakete ff802-ucm-profile (build-deb.sh) und ff802-cc-auto (build-deb-auto.sh)
 audio/ucm2/                  ALSA-UCM-Profil (Aufbau wie /usr/share/alsa/ucm2)
 tools/hw-test/               Skripte für Host-Tests (nur nach Freigabe ausführen)
 docs/                        Protokoll, Erkennung, Kommunikation, UCM-Profil
@@ -53,6 +59,7 @@ docs/                        Protokoll, Erkennung, Kommunikation, UCM-Profil
 | `ff802_comm` | `usb_comm` | ja | nur mit `FF802_ENABLE_USB_WRITE=ON` |
 | `ff802_chanmap` | `chanmap_*` ohne ALSA | nein | – |
 | `ff802_chanmap_alsa` | `chanmap_alsa` (alsa-lib) | nein | Audio nur mit −40 dBFS, Mixer nie |
+| `ff802_auto` | `auto_sysfs`, `auto_state`, `auto_switch` | nein | nur über Backend |
 
 ## Bauen und Testen (im Dev-Container)
 
@@ -75,6 +82,8 @@ Das Debian-Paket entsteht mit `cmake --build build --target deb` unter
 `build/deb/` (reproduzierbar). Installation und Entfernung: siehe
 [packaging/ff802-ucm/README.Debian](packaging/ff802-ucm/README.Debian), erst
 nach T2 und T3.
+Das T4-Paket entsteht mit `cmake --build build --target deb-auto`
+(`build/deb/ff802-cc-auto_<Version>_amd64.deb`, siehe [docs/t4_usb_mode.md](docs/t4_usb_mode.md)).
 
 ## Programme auf dem Kubuntu-Host
 
@@ -100,7 +109,7 @@ Root-Rechte.
 | 2 | Fehler | Bedienfehler |
 | 3 | – | Vorbedingung nicht erfüllt, nichts gesendet |
 | 4 | – | Übertragung fehlgeschlagen, Gerätezustand unbekannt |
-| 5 | – | nicht gesendet (abgebrochen oder Schreiben gesperrt) |
+| 5 | – | nicht gesendet (abgebrochen, Schreiben gesperrt oder `disable`) |
 
 `ff802-cc check` braucht Schreibrechte auf die Gerätedatei. Ohne udev-Regel
 meldet es `access to the USB device denied`. Eine udev-Regel wird nicht
@@ -135,6 +144,10 @@ neuer), x86-64.
 | `deb_package` | Paket: reproduzierbarer Bau, Inhalt, Installation, Gerätezuordnung, Upgrade, Entfernung und Purge in isolierter Wurzel; installierter Baum mit der echten alsa-lib ausgewertet |
 | `pw_integration` | T3: private PipeWire-Sitzung (PipeWire 1.6.x, WirePlumber 0.5.x) mit unverändertem WirePlumber-ALSA-Monitor gegen nachgebildete Karte im Paketaufbau: sechs Sinks und eine Quelle, Signalwege bis zum Hardwarekanal, Startlautstärke, Anstecken während der Wiedergabe, Persistenz, Host-Skript `ff802-t3-host.sh` (braucht `pipewire`, `wireplumber`, `pipewire-pulse`, `pulseaudio-utils`, `libspa-0.2-dev`) |
 | `test_chanmap_*`, `chanmap_cli_*`, `check_chanmap_sources`, `chanmap_binary_symbols` | ff802-chanmap: Simulation korrekter und falscher Zuordnungen, aller Abbruch- und Fehlerfälle, Pegelwächter, Kartenerkennung, pw-reserve, Auswertung, ALSA-Backend am `null`-Plugin |
+| `test_auto_sysfs`, `test_auto_switch` | T4: Identität aus sysfs, Zustandsdateien, Sperre, automatischer Ablauf mit allen Fehler- und Änderungsfällen |
+| `auto_flow`, `auto_notify`, `auto_control`, `auto_units` | T4: Dienstaufruf wie systemd (auch gleichzeitig), Benachrichtigung mit Test-Doubles, `ff802-cc-auto on/off/status`, udev-Regel und Units (`systemd-analyze`) |
+| `autoswitch_binary_symbols`, `autoswitch_sim_no_libusb` | T4: Symbole des Dienstprogramms; Simulationsbuild ohne libusb |
+| `deb_auto_package` | T4-Paket: reproduzierbar, Inhalt, Installation/Upgrade/Entfernung/Purge in isolierter Wurzel mit Stolperdrähten |
 | `reproducible_release_build` | Release-Build mit `-Werror` in zwei Verzeichnissen, Programme byte-gleich |
 
 Fehlen die Voraussetzungen von `ucm_alsa_syntax`, `ucm_alsa_eval` oder `pw_integration`, werden sie
@@ -152,6 +165,8 @@ Keiner der automatisierten Tests greift auf USB-Hardware oder eine Soundkarte zu
 - [docs/audio_ucm_einbindung.md](docs/audio_ucm_einbindung.md): produktive UCM-Einbindung (Variante A1, Paket)
 - [docs/audio_t2_plan.md](docs/audio_t2_plan.md): Hardwaretest T2 (Kanalzuordnung) mit `ff802-chanmap`
 - [docs/audio_t3.md](docs/audio_t3.md): T3, Integration in PipeWire/WirePlumber/Plasma, Lautstärkesicherheit, Host-Test
+- [docs/t4_usb_mode.md](docs/t4_usb_mode.md): T4, automatischer CC-Moduswechsel: Architektur, Sicherheit, Installation, Aktivierung, Diagnose, Rollback, Tests
+- [docs/t4_disable.md](docs/t4_disable.md): T4, Untersuchung `ff802-cc disable` (Rückweg in den proprietären Modus)
 
 ## Lizenz
 
