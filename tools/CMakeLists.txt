@@ -41,3 +41,14 @@ set_target_properties(ff802-cc PROPERTIES
 ff802_set_warnings(ff802-cc)
 
 install(TARGETS ff802-detect ff802-cc RUNTIME DESTINATION bin)
+
+# T4: non-interactive CC enable for one USB connection, started only by
+# ff802-cc-auto@.service. Installed in /usr/libexec/ff802-cc by the
+# ff802-cc-auto package (built there with FF802_ENABLE_USB_WRITE=ON).
+add_executable(ff802-cc-autoswitch ff802_cc_autoswitch.c)
+target_link_libraries(ff802-cc-autoswitch PRIVATE ff802_auto ff802_comm)
+target_compile_definitions(ff802-cc-autoswitch PRIVATE
+    FF802_VERSION="${PROJECT_VERSION}")
+set_target_properties(ff802-cc-autoswitch PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+ff802_set_warnings(ff802-cc-autoswitch)

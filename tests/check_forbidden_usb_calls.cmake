@@ -50,7 +50,8 @@ set(COMM_ONLY
 set(COMM_FILE "${SOURCE_DIR}/src/usb_comm.c")
 set(COMM_HEADER_ALLOWED
     "${SOURCE_DIR}/src/usb_comm.c"
-    "${SOURCE_DIR}/tools/ff802_cc.c")
+    "${SOURCE_DIR}/tools/ff802_cc.c"
+    "${SOURCE_DIR}/tools/ff802_cc_autoswitch.c")
 
 file(GLOB_RECURSE sources
     "${SOURCE_DIR}/src/*.c" "${SOURCE_DIR}/src/*.h"

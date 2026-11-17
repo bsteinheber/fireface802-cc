@@ -112,6 +112,21 @@ if(FF802_HAVE_TOOLS)
                 "-DREQUIRED=libusb_open|libusb_kernel_driver_active"
                 -P ${CMAKE_CURRENT_SOURCE_DIR}/check_binary_symbols.cmake)
     endif()
+
+    # T4 program: same rules as ff802-cc.
+    if(FF802_ENABLE_USB_WRITE)
+        add_test(NAME autoswitch_binary_symbols
+            COMMAND ${CMAKE_COMMAND} -DNM=${CMAKE_NM} -DBINARY=$<TARGET_FILE:ff802-cc-autoswitch>
+                "-DFORBIDDEN=${always_forbidden}"
+                "-DREQUIRED=libusb_open|${write_symbols}"
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/check_binary_symbols.cmake)
+    else()
+        add_test(NAME autoswitch_binary_symbols
+            COMMAND ${CMAKE_COMMAND} -DNM=${CMAKE_NM} -DBINARY=$<TARGET_FILE:ff802-cc-autoswitch>
+                "-DFORBIDDEN=${always_forbidden}|${write_symbols}"
+                "-DREQUIRED=libusb_open|libusb_kernel_driver_active"
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/check_binary_symbols.cmake)
+    endif()
 endif()
 
 # Static checks of the ALSA UCM profile (no sound card needed).
