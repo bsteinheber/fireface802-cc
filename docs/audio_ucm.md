@@ -192,6 +192,21 @@ alsa-ucm-conf im Container eine andere Ausgabe für das Fireface, schlägt der
 Test fehl. Das ist gewollt, denn der Host sähe dieselbe Änderung. Die
 Vorlagen werden dann nach `fixtures/t1/README` neu erzeugt und begutachtet.
 
+**Feste Locale (`LC_ALL=C`):** `test_ucm_eval.sh` setzt für sich und alle
+Kindprozesse `LC_ALL=C`. Mehrere Prüfungen vergleichen Werkzeugausgaben mit
+festem Text, etwa die sortierte Ausgabe von `diff -rq` zwischen Systembaum
+und Overlay. Ubuntu 26.04 bringt `sort` aus rust-coreutils (uutils 0.10.0)
+mit. Dieses `sort` sortiert bei jedem Locale-Namen außer C/POSIX nach
+Sprachregeln, auch wenn die Locale im Container gar nicht installiert ist.
+GNU sort fiel in diesem Fall auf die Bytereihenfolge zurück. Mit einem vom
+Terminal geerbten `LANG=de_DE.UTF-8` (VS Code setzt das je nach
+Anzeigesprache) stand dann `Only in …/USB-Audio: conf.d` vor
+`Only in …/USB-Audio/RME: …`, und die Prüfung „overlay differs from the
+system tree only in USB-Audio.conf and the profile“ schlug fehl. Der Inhalt
+des Overlays war dabei korrekt, und alsa-ucm-conf 1.2.15.3-1ubuntu1.7 war
+nicht beteiligt. Nachstellen lässt sich der Fehler ohne die Korrektur mit
+`LC_ALL=de_DE.UTF-8 ctest --test-dir build -R ucm_alsa_eval`.
+
 **Auswertung im Container (`ucm_alsa_eval`):** Ein externes Steuer-Plugin
 (`fake_ctl_ff802.c`) stellt eine Karte mit den Kenndaten des Hosts dar:
 Treiber `USB-Audio`, ID `F80224047128`, der Langname von T1 und die

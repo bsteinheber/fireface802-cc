@@ -17,6 +17,13 @@
 #                         <system ucm2 dir> <alsa-lib version> <scratch dir>
 
 set -u
+# Fixed locale: some checks compare tool output (sort order, diff messages)
+# with literal text. The sort of rust-coreutils (Ubuntu >= 25.10) collates
+# by language rules for any non-C locale name, even one that is not
+# installed, so a LANG=de_DE.UTF-8 inherited from the terminal would put
+# "USB-Audio: conf.d" before "USB-Audio/RME: ...".
+LC_ALL=C
+export LC_ALL
 
 SRC=$1
 BIN=$2
