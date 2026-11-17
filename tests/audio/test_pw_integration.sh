@@ -118,10 +118,19 @@ sys_before=$(sys_sum)
 # --- processes ---------------------------------------------------------------
 PIDS=""      # daemons of the running session
 ALL_PIDS=""  # every daemon ever started by this test
+kill_stub_wp() { # wireplumber started by the systemctl stub (section 9)
+    if [ -f "$T/wp-stub.pid" ]; then
+        p=$(cat "$T/wp-stub.pid")
+        kill "$p" 2>/dev/null
+        wait_until 5 '! kill -0 "$p" 2>/dev/null'
+        rm -f "$T/wp-stub.pid"
+    fi
+}
 cleanup() {
     for p in $PIDS; do kill "$p" 2>/dev/null; done
     for p in $PIDS; do wait "$p" 2>/dev/null; done
     PIDS=""
+    kill_stub_wp
 }
 trap cleanup EXIT
 trap 'exit 3' INT TERM
@@ -142,6 +151,7 @@ daemon() { # daemon <name>: start in the background, log to log/<name>.log
     "$1" >> "$T/log/$1.log" 2>&1 &
     PIDS="$PIDS $!"
     ALL_PIDS="$ALL_PIDS $!"
+    [ "$1" = wireplumber ] && echo "$!" > "$T/wp.pid"
 }
 session_start() {
     daemon pipewire
@@ -156,6 +166,7 @@ session_start() {
     return 0
 }
 session_stop() {
+    kill_stub_wp
     for p in $PIDS; do kill "$p" 2>/dev/null; done
     for p in $PIDS; do wait "$p" 2>/dev/null; done
     PIDS=""
@@ -456,7 +467,126 @@ plug
 ok "a stored full volume is restored on replug (state wins over the default; host test must check it)" \
     '[ "$(volume ${OUT}Line4__sink)" = "1.00" ]'
 
-# --- 9. cleanup ------------------------------------------------------------------------
+# --- 9. host test script ff802-t3-host.sh against this session ---------------------
+# Real pactl/wpctl output of the private session; sudo, apt-get, systemctl
+# and dpkg-query (for the package only) are logging stubs. The apt-get stub
+# "purge" removes the binding from the private UCM copy, as the postrm does.
+ST=$T/stubs
+mkdir -p "$ST"
+cat > "$ST/sudo" <<EOF
+#!/bin/sh
+echo "sudo \$*" >> "$T/log/stubs.log"
+case \$1 in "$ST/apt-get") exec "\$@" ;; esac
+exit 0
+EOF
+cat > "$ST/apt-get" <<EOF
+#!/bin/sh
+echo "apt-get \$*" >> "$T/log/stubs.log"
+case \$1 in
+    install) touch "$T/pkg-installed" ;;
+    purge) rm -f "$T/pkg-installed" "\$FF802_TEST_MASTER" ;;
+esac
+exit 0
+EOF
+cat > "$ST/dpkg-query" <<EOF
+#!/bin/sh
+for a in "\$@"; do last=\$a; done
+if [ "\$last" = ff802-ucm-profile ]; then
+    [ -e "$T/pkg-installed" ] && echo "install ok installed 0.1.0" && exit 0
+    exit 1
+fi
+exec dpkg-query "\$@"
+EOF
+cat > "$ST/systemctl" <<EOF
+#!/bin/sh
+echo "systemctl \$*" >> "$T/log/stubs.log"
+[ "\$1" = --user ] || exit 1
+case "\$2 \$3" in
+    "is-active "*) echo active ;;
+    "stop wireplumber")
+        for f in wp.pid wp-stub.pid; do
+            p=\$(cat "$T/\$f" 2>/dev/null) && kill "\$p" 2>/dev/null
+        done
+        sleep 1 ;;
+    "start wireplumber")
+        wireplumber >> "$T/log/wireplumber.log" 2>&1 &
+        echo \$! > "$T/wp-stub.pid"
+        sleep 2 ;;
+    *) exit 1 ;;
+esac
+EOF
+chmod +x "$ST"/*
+t3() { # t3 <step> [args]: the host script with the overrides of the container
+    FF802_T3_OUT=$T/t3-host FF802_T3_PROC_ASOUND=$PROC FF802_T3_UCM2=$SYS \
+    FF802_T3_SUDO=$ST/sudo FF802_T3_APT=$ST/apt-get FF802_T3_SYSTEMCTL=$ST/systemctl \
+    FF802_T3_DPKG_QUERY=$ST/dpkg-query FF802_TEST_MASTER=$MASTER \
+        bash "$SRC/tools/hw-test/ff802-t3-host.sh" "$@" > "$T/log/t3-$1.txt" 2>&1
+}
+cp "$MASTER" "$T/master.saved"
+session_stop
+rm -rf "$T/state/wireplumber"
+rm -f "$T/enum/present"
+session_start && add_other_sink
+t3 precheck
+rc=$?
+ok "host script: precheck passes before installation (card without profile)" '[ "$rc" = 0 ]'
+[ "$rc" = 0 ] || sed 's/^/    /' "$T/log/t3-precheck.txt"
+FF802_T3_CONFIRM=install t3 install "$DEB"
+rc=$?
+ok "host script: install asks, then runs sudo apt-get install with the package" \
+    '[ "$rc" = 0 ] && grep -q "^apt-get install -y --no-install-recommends $DEB\$" "$T/log/stubs.log"'
+plug
+t3 check
+rc=$?
+ok "host script: check passes after the card appears (reference recorded)" \
+    '[ "$rc" = 0 ] && grep -q "is the reference" "$T/log/t3-check.txt" &&
+     [ "$(grep -c "^ok   SAFETY" "$T/log/t3-check.txt")" = 7 ]'
+[ "$rc" = 0 ] || sed 's/^/    /' "$T/log/t3-check.txt"
+set_volume "${OUT}Line4__sink" 1.0
+wait_until 10 'grep -q "Line4=.*channelVolumes.:.1.0" "$T/state/wireplumber/default-routes"'
+t3 check
+rc=$?
+ok "host script: check refuses with exit 6 (SAFETY) when a sink is above 40 %" \
+    '[ "$rc" = 6 ] && grep -q "^FAIL SAFETY Line4 volume 100 %" "$T/log/t3-check.txt" &&
+     grep -q "^FAIL SAFETY stored Fireface route volume" "$T/log/t3-check.txt"'
+q pactl set-sink-volume ff802-test.other 70%
+t3 limit
+ok "host script: limit lowers only the Fireface sink above 40 %" \
+    '[ "$(volume ${OUT}Line4__sink)" = "0.40" ] && [ "$(volume ff802-test.other)" = "0.70" ] &&
+     grep -q "1 Fireface sink(s) lowered, stored state <= 40 %" "$T/log/t3-limit.txt"'
+t3 check
+rc=$?
+ok "host script: check passes again after limit" '[ "$rc" = 0 ]'
+t3 set-default
+t3 check
+rc=$?
+ok "host script: set-default makes Headphones 9/10 the default, check confirms it" \
+    '[ "$rc" = 0 ] && [ "$(q pactl get-default-sink)" = "${OUT}Headphones1__sink" ] &&
+     grep -q "^ok   default sink is Headphones Output 9/10" "$T/log/t3-check.txt"'
+session_restart
+add_other_sink
+t3 check
+rc=$?
+ok "host script: check after restart reports PERSISTENT" \
+    '[ "$rc" = 0 ] && grep -q "^ok   PERSISTENT" "$T/log/t3-check.txt"'
+unplug
+plug
+t3 check
+rc=$?
+ok "host script: check after replug reports PERSISTENT" \
+    '[ "$rc" = 0 ] && grep -q "^ok   PERSISTENT" "$T/log/t3-check.txt"'
+FF802_T3_CONFIRM=rollback t3 rollback
+rc=$?
+[ -f "$T/wp-stub.pid" ] && ALL_PIDS="$ALL_PIDS $(cat "$T/wp-stub.pid")"
+ok "host script: rollback purges, restores the WirePlumber state and verifies it" \
+    '[ "$rc" = 0 ] && grep -q "^rollback VERIFIED" "$T/log/t3-rollback.txt" &&
+     grep -q "^apt-get purge -y ff802-ucm-profile\$" "$T/log/stubs.log"'
+[ "$rc" = 0 ] || sed 's/^/    /' "$T/log/t3-rollback.txt"
+ok "after rollback: no Fireface split sink, the other device is default again" \
+    '[ -z "$(fireface_sinks)" ] && [ "$(q pactl get-default-sink)" = "ff802-test.other" ]'
+cp "$T/master.saved" "$MASTER"
+
+# --- 10. cleanup -----------------------------------------------------------------------
 session_stop
 left=""
 for p in $ALL_PIDS; do kill -0 "$p" 2>/dev/null && left="$left $p"; done
