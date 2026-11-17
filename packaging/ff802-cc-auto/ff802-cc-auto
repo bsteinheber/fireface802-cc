@@ -1,0 +1,74 @@
+#!/bin/sh
+# ff802-cc-auto (T4): control the automatic class-compliant switch of the
+# original RME Fireface 802.
+#
+#   ff802-cc-auto status   show the automation state, the connected
+#                          Fireface 802, the last result (anyone, read only)
+#   ff802-cc-auto on       turn the automation on (administrator)
+#   ff802-cc-auto off      turn the automation off (the active local user
+#                          may do this without a password)
+#
+# "off" only stops Linux from switching the device automatically; it does
+# not change the USB mode of the Fireface (that would be "ff802-cc disable",
+# which is not available, see /usr/share/doc/ff802-cc-auto/README.Debian).
+# The state is kept in /var/lib/ff802-cc-auto/mode and survives reboots.
+# Default after installation: off.
+#
+# on/off run /usr/libexec/ff802-cc/ff802-cc-auto-on|-off as root, via
+# pkexec (polkit actions org.ff802cc.auto.on/.off) or when already root
+# (sudo by an administrator).
+#
+# Test overrides: FF802_AUTO_ROOT (prefix of all paths, no root needed),
+# FF802_AUTO_LIBEXEC (directory of the helper programs).
+
+set -u
+
+ROOT=${FF802_AUTO_ROOT:-}
+LIBEXEC=${FF802_AUTO_LIBEXEC:-/usr/libexec/ff802-cc}
+
+usage() {
+    sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'
+    exit 2
+}
+
+status() {
+    if [ -n "$ROOT" ]; then
+        FF802_AUTO_ROOT=$ROOT "$LIBEXEC/ff802-cc-autoswitch" --status
+    else
+        "$LIBEXEC/ff802-cc-autoswitch" --status
+    fi
+    rc=$?
+    echo "installed components:"
+    for f in /usr/lib/udev/rules.d/70-ff802-cc-auto.rules \
+             /usr/lib/systemd/system/ff802-cc-auto@.service \
+             /usr/lib/systemd/user/ff802-cc-notify.path \
+             /usr/lib/systemd/user/ff802-cc-notify.service \
+             "$LIBEXEC/ff802-cc-autoswitch" "$LIBEXEC/ff802-cc-notify"; do
+        case $f in "$LIBEXEC"/*) p=${FF802_AUTO_LIBEXEC:+$f}; p=${p:-$ROOT$f} ;; *) p=$ROOT$f ;; esac
+        [ -e "$p" ] && echo "  present  $f" || echo "  MISSING  $f"
+    done
+    echo "log: journalctl -t ff802-cc-auto -b   (notifications: journalctl --user -t ff802-cc-notify)"
+    return $rc
+}
+
+set_mode() { # set_mode on|off
+    helper=$LIBEXEC/ff802-cc-auto-$1
+    if [ -n "$ROOT" ] || [ "$(id -u)" = 0 ]; then
+        exec "$helper"
+    fi
+    if command -v pkexec > /dev/null 2>&1; then
+        exec pkexec "$helper"
+    fi
+    echo "ff802-cc-auto: '$1' needs administrator rights and pkexec is not installed." >&2
+    echo "An administrator can run: sudo ff802-cc-auto $1" >&2
+    exit 2
+}
+
+[ $# = 1 ] || usage
+case $1 in
+    status) status ;;
+    on) set_mode on ;;
+    off) set_mode off ;;
+    -h|--help) usage ;;
+    *) usage ;;
+esac

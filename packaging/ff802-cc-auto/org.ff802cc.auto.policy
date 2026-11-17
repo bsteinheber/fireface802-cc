@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<!--
+  ff802-cc-auto (T4): who may turn the automatic class-compliant switch
+  of the Fireface 802 on or off (ff802-cc-auto on|off via pkexec).
+
+  on:  administrator authentication (the automation sends a USB command).
+  off: the active local user, without a password (it only stops the
+       automation; nothing is sent to any device).
+-->
+<policyconfig>
+  <vendor>fireface802-cc</vendor>
+
+  <action id="org.ff802cc.auto.on">
+    <description>Turn on the automatic USB mode switch of the Fireface 802</description>
+    <description xml:lang="de">Automatische USB-Modusumschaltung des Fireface 802 einschalten</description>
+    <message>Authentication is required to let Linux switch a connected Fireface 802 to class-compliant mode automatically</message>
+    <message xml:lang="de">Zum Einschalten der automatischen Umschaltung des Fireface 802 in den Class-Compliant-Modus ist eine Administrator-Anmeldung nötig</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/ff802-cc/ff802-cc-auto-on</annotate>
+  </action>
+
+  <action id="org.ff802cc.auto.off">
+    <description>Turn off the automatic USB mode switch of the Fireface 802</description>
+    <description xml:lang="de">Automatische USB-Modusumschaltung des Fireface 802 ausschalten</description>
+    <message>Authentication is required to turn off the automatic mode switch of the Fireface 802</message>
+    <message xml:lang="de">Zum Ausschalten der automatischen Umschaltung des Fireface 802 ist eine Anmeldung nötig</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>yes</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/ff802-cc/ff802-cc-auto-off</annotate>
+  </action>
+</policyconfig>

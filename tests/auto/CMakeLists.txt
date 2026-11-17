@@ -59,3 +59,9 @@ add_test(NAME auto_notify
     COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/test_auto_notify.sh
             ${PROJECT_SOURCE_DIR} $<TARGET_FILE:ff802-cc-autoswitch-sim>
             ${CMAKE_CURRENT_BINARY_DIR}/notify-scratch)
+
+# ff802-cc-auto on/off/status, root helpers, polkit policy.
+add_test(NAME auto_control
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/test_auto_control.sh
+            ${PROJECT_SOURCE_DIR} $<TARGET_FILE:ff802-cc-autoswitch-sim>
+            ${CMAKE_CURRENT_BINARY_DIR}/control-scratch)

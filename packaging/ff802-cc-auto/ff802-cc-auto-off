@@ -1,0 +1,27 @@
+#!/bin/sh
+# ff802-cc-auto-off (T4): turn the Fireface 802 automation off.
+# Runs as root: via pkexec (polkit action org.ff802cc.auto.off) or sudo.
+# Writes /var/lib/ff802-cc-auto/mode atomically; nothing else.
+# Test override: FF802_AUTO_ROOT (prefix; pkexec and sudo clear it).
+set -eu
+umask 022
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+ROOT=${FF802_AUTO_ROOT:-}
+[ $# = 0 ] || { echo "ff802-cc-auto-off: no arguments expected" >&2; exit 2; }
+if [ -z "$ROOT" ] && [ "$(id -u)" != 0 ]; then
+    echo "ff802-cc-auto-off: needs root (use: ff802-cc-auto off)" >&2
+    exit 2
+fi
+DIR=$ROOT/var/lib/ff802-cc-auto
+mkdir -p "$DIR"
+chmod 0755 "$DIR"
+printf 'off\n' > "$DIR/mode.tmp"
+chmod 0644 "$DIR/mode.tmp"
+mv -f "$DIR/mode.tmp" "$DIR/mode"
+who=${PKEXEC_UID:+uid $PKEXEC_UID via pkexec}
+who=${who:-${SUDO_USER:+$SUDO_USER via sudo}}
+msg="automation turned off${who:+ ($who)}"
+[ -n "$ROOT" ] || logger -t ff802-cc-auto "$msg" 2>/dev/null || true
+echo "ff802-cc-auto: $msg."
+echo "Linux will not switch the Fireface 802 automatically any more (also after"
+echo "reboots). The USB mode of the device is not changed by this."
