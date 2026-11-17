@@ -1,0 +1,16 @@
+#!/bin/sh
+# prerm of ff802-ucm-profile: remove the device bindings on removal.
+# On upgrade the bindings stay; they point to the master file, which the
+# new version replaces.
+set -e
+
+case "$1" in
+    remove|deconfigure)
+        "${DPKG_ROOT:-}/usr/sbin/ff802-ucm-bind" unbind || \
+            echo "ff802-ucm-profile: unbind failed; postrm removes the links" >&2
+        ;;
+    upgrade|failed-upgrade)
+        ;;
+esac
+
+exit 0

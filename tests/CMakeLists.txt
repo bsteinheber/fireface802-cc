@@ -119,3 +119,6 @@ add_subdirectory(audio)
 
 # ff802-chanmap (loopback measurement, hardware test T2).
 add_subdirectory(chanmap)
+
+# Debian package of the UCM profile (isolated install/remove test).
+add_subdirectory(packaging)

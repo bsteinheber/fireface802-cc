@@ -1,0 +1,81 @@
+ff802-ucm-profile
+=================
+
+ALSA UCM profile for the original RME Fireface 802 in class compliant mode:
+six stereo outputs and one stereo input as separate PipeWire devices.
+
+Status: the profile is evaluated correctly by alsa-lib with the real card
+(host test T1). The physical channel assignment is not yet verified
+(hardware test T2). Do not rely on the output names before T2.
+
+Files
+-----
+
+  /usr/share/alsa/ucm2/USB-Audio/RME/Fireface-802.conf       profile
+  /usr/share/alsa/ucm2/USB-Audio/RME/Fireface-802-HiFi.conf  SplitPCM devices
+  /usr/share/alsa/ucm2/USB-Audio/conf.d/0424-3fdd.conf       selection, refuses the 802 FS
+  /usr/share/ff802-ucm/longname-master.conf                  master file for the binding
+  /usr/sbin/ff802-ucm-bind                                   device binding
+
+No file of alsa-ucm-conf is changed.
+
+Why a device binding
+--------------------
+
+alsa-lib before 1.2.16 never loads USB-Audio/conf.d/<vid>-<pid>.conf
+(optional include bug, upstream commit 62c24074). ucm.conf does probe
+conf.d/USB-Audio/<card long name>.conf before USB-Audio.conf. The package
+therefore links exactly this file for the connected card:
+
+  /usr/share/alsa/ucm2/conf.d/USB-Audio/RME Fireface 802 (<serial>) at usb-<port>, high speed.conf
+      -> ../../../../ff802-ucm/longname-master.conf
+
+The long name contains the USB port. On another port or hub the profile is
+not active (the card keeps its previous profiles) until it is bound again.
+
+Installation
+------------
+
+  1. Read "Volume safety" below.
+  2. Connect the Fireface 802 in CC mode.
+  3. sudo apt install ./ff802-ucm-profile_<version>_all.deb
+     The postinst binds the card if exactly one original Fireface 802 is
+     connected. Without a card, run 'sudo ff802-ucm-bind bind' later.
+  4. sudo ff802-ucm-bind status
+  5. Reconnect the Fireface (PipeWire/WirePlumber pick up UCM changes when
+     the device appears). The postinst does not restart any service.
+
+Volume safety
+-------------
+
+When the profile becomes active, the card switches to the HiFi profile and
+six new sinks appear; running streams may move to "Headphones 9/10".
+Before reconnecting the Fireface: headphone knobs fully down, headphones
+off, amplifiers off, all playback stopped. Then mute all new sinks before
+the first playback (docs/audio_ucm.md, "Lautstärkesicherheit vor T3").
+
+Other USB port, other Fireface
+------------------------------
+
+  sudo ff802-ucm-bind bind      binds the currently connected card (additional
+                                binding; old bindings stay until unbind)
+  sudo ff802-ucm-bind unbind    removes all bindings made by this tool
+
+Update
+------
+
+  sudo apt install ./ff802-ucm-profile_<new version>_all.deb
+
+Bindings survive upgrades; they point to the master file, which the new
+version replaces. With alsa-lib >= 1.2.16 the binding is no longer needed:
+'ff802-ucm-bind status' says so; 'sudo ff802-ucm-bind unbind' removes it,
+and USB-Audio/conf.d/0424-3fdd.conf then selects the profile on its own.
+
+Removal
+-------
+
+  sudo apt remove ff802-ucm-profile    removes the profile and all bindings
+  sudo apt purge ff802-ucm-profile     also removes /var/lib/ff802-ucm
+
+Links or files in conf.d/USB-Audio that were not created by ff802-ucm-bind
+are never touched.

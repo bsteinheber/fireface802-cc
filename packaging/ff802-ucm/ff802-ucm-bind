@@ -1,0 +1,206 @@
+#!/bin/sh
+# ff802-ucm-bind - device binding of the Fireface 802 UCM profile
+# (package ff802-ucm-profile, variant A1 of docs/audio_ucm_einbindung.md).
+#
+# alsa-lib before 1.2.16 never loads USB-Audio/conf.d/<vid>-<pid>.conf
+# (optional include bug, fixed upstream in commit 62c24074). ucm.conf
+# however probes conf.d/USB-Audio/${CardLongName}.conf before
+# USB-Audio.conf, and that lookup works. 'bind' creates exactly this file
+# for the connected card, as a relative symbolic link to the master file
+# shipped by the package. It never overwrites a file it did not create.
+#
+#   status        show cards, bindings and whether the workaround is needed
+#   bind [--force]  bind the connected original Fireface 802
+#   auto          like bind, but never fails (used by the postinst)
+#   unbind        remove every binding created by this tool
+#
+# Environment (tests and dpkg):
+#   DPKG_ROOT                     root of the installation (set by dpkg)
+#   FF802_UCM_PROC_ASOUND         ALSA procfs (default /proc/asound)
+#   FF802_UCM_ALSA_LIB_VERSION    alsa-lib version (default: from dpkg)
+
+set -eu
+
+PROG=ff802-ucm-bind
+VERSION=@VERSION@
+ROOT=${DPKG_ROOT:-}
+PROC=${FF802_UCM_PROC_ASOUND:-/proc/asound}
+USBID="0424:3fdd"
+UCM2=$ROOT/usr/share/alsa/ucm2
+CONFD=$UCM2/conf.d/USB-Audio
+# Link target, relative to $CONFD (usr/share/alsa/ucm2/conf.d/USB-Audio).
+TARGET=../../../../ff802-ucm/longname-master.conf
+MASTER=$ROOT/usr/share/ff802-ucm/longname-master.conf
+STATE=$ROOT/var/lib/ff802-ucm
+BINDINGS=$STATE/bindings
+
+die() { echo "$PROG: error: $*" >&2; exit "${2:-2}"; }
+info() { echo "$PROG: $*"; }
+
+usage() {
+    cat <<EOF
+Usage: $PROG status | bind [--force] | auto | unbind | --help | --version
+
+Binds the Fireface 802 UCM profile to the connected card (alsa-lib < 1.2.16).
+After bind or unbind, reconnect the Fireface (or restart WirePlumber) for
+PipeWire to pick up the change.
+EOF
+}
+
+alsa_lib_version() {
+    if [ -n "${FF802_UCM_ALSA_LIB_VERSION:-}" ]; then
+        echo "$FF802_UCM_ALSA_LIB_VERSION"
+        return
+    fi
+    if [ -n "$ROOT" ]; then
+        dpkg-query --admindir="$ROOT/var/lib/dpkg" -W -f='${Version}' libasound2t64 2>/dev/null || true
+    else
+        dpkg-query -W -f='${Version}' libasound2t64 2>/dev/null || true
+    fi
+}
+
+# 0 if the long-name binding is needed (alsa-lib < 1.2.16 or unknown).
+workaround_needed() {
+    v=$(alsa_lib_version)
+    [ -n "$v" ] || return 0
+    dpkg --compare-versions "$v" lt 1.2.16
+}
+
+# Print "index<TAB>id<TAB>long name" for every card with USB id 0424:3fdd.
+fireface_cards() {
+    for d in "$PROC"/card[0-9]*; do
+        [ -f "$d/usbid" ] || continue
+        [ "$(cat "$d/usbid")" = "$USBID" ] || continue
+        n=${d##*/card}
+        id=$(cat "$d/id" 2>/dev/null || true)
+        ln=$(sed -n "/^ *$n \[/{n;s/^ *//;s/ *\$//;p;q;}" "$PROC/cards" 2>/dev/null || true)
+        printf '%s\t%s\t%s\n' "$n" "$id" "$ln"
+    done
+}
+
+is_original() {
+    case $1 in
+        *"802 FS"*) return 1 ;;
+        *"Fireface 802"*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# A long name is used as a file name: refuse anything unusual.
+name_ok() {
+    case $1 in
+        ""|*/*|.*) return 1 ;;
+    esac
+    [ "$(printf '%s' "$1" | wc -l)" -eq 0 ] || return 1
+    [ "${#1}" -le 200 ] || return 1
+    return 0
+}
+
+ours() {
+    [ -L "$1" ] && [ "$(readlink "$1")" = "$TARGET" ]
+}
+
+record() {
+    mkdir -p "$STATE"
+    touch "$BINDINGS"
+    grep -qxF -- "$1" "$BINDINGS" || printf '%s\n' "$1" >> "$BINDINGS"
+}
+
+cmd_status() {
+    echo "alsa-lib: $(alsa_lib_version || true)"
+    if workaround_needed; then
+        echo "workaround: needed (alsa-lib < 1.2.16 ignores USB-Audio/conf.d)"
+    else
+        echo "workaround: not needed (alsa-lib >= 1.2.16 loads USB-Audio/conf.d/0424-3fdd.conf)"
+    fi
+    cards=$(fireface_cards)
+    if [ -z "$cards" ]; then
+        echo "cards: no ALSA card with USB id $USBID"
+    else
+        printf '%s\n' "$cards" | while IFS="$(printf '\t')" read -r n id ln; do
+            if ! is_original "$ln"; then
+                s="not an original Fireface 802, ignored"
+            elif ours "$CONFD/$ln.conf"; then
+                s="bound"
+            else
+                s="NOT bound"
+            fi
+            echo "card $n ($id): $ln: $s"
+        done
+    fi
+    if [ -s "$BINDINGS" ]; then
+        echo "bindings:"
+        while IFS= read -r ln; do
+            if ours "$CONFD/$ln.conf"; then s=ok; else s=MISSING; fi
+            echo "  $ln ($s)"
+        done < "$BINDINGS"
+    else
+        echo "bindings: none"
+    fi
+}
+
+cmd_bind() {
+    force=$1 soft=$2
+    fail() { if [ "$soft" = 1 ]; then info "$1"; exit 0; else die "$1" "${2:-2}"; fi; }
+
+    [ -f "$MASTER" ] || fail "master file $MASTER missing (package not installed?)"
+    [ -d "$CONFD" ] || fail "$CONFD missing (alsa-ucm-conf not installed?)"
+    if ! workaround_needed && [ "$force" != 1 ]; then
+        info "alsa-lib $(alsa_lib_version) loads USB-Audio/conf.d itself; no binding needed (use --force to bind anyway)"
+        exit 0
+    fi
+    cards=$(fireface_cards)
+    originals=$(printf '%s\n' "$cards" | while IFS="$(printf '\t')" read -r n id ln; do
+        [ -n "$n" ] && is_original "$ln" && printf '%s\n' "$ln"
+    done || true)
+    count=$(printf '%s' "$originals" | grep -c . || true)
+    [ "$count" -ge 1 ] || fail "no original Fireface 802 in CC mode found (USB id $USBID); connect it and run '$PROG bind'" 3
+    [ "$count" -eq 1 ] || fail "$count original Fireface 802 cards found; refusing to guess"
+    name=$originals
+    name_ok "$name" || fail "card long name '$name' cannot be used as a file name"
+    f=$CONFD/$name.conf
+    if ours "$f"; then
+        record "$name"
+        info "already bound: $name"
+        exit 0
+    fi
+    if [ -e "$f" ] || [ -L "$f" ]; then
+        fail "$f exists and was not created by $PROG; not touching it" 4
+    fi
+    [ -w "$CONFD" ] || fail "cannot write $CONFD (run with sudo)"
+    ln -s -- "$TARGET" "$f"
+    record "$name"
+    info "bound: $name"
+    info "reconnect the Fireface 802 (or restart WirePlumber) to activate the profile"
+}
+
+cmd_unbind() {
+    [ -s "$BINDINGS" ] || { info "no bindings"; rm -f -- "$BINDINGS"; return 0; }
+    [ -w "$CONFD" ] || [ ! -d "$CONFD" ] || die "cannot write $CONFD (run with sudo)"
+    while IFS= read -r ln; do
+        f=$CONFD/$ln.conf
+        if ours "$f"; then
+            rm -f -- "$f"
+            info "unbound: $ln"
+        elif [ -e "$f" ] || [ -L "$f" ]; then
+            info "left alone (not created by $PROG): $f"
+        fi
+    done < "$BINDINGS"
+    rm -f -- "$BINDINGS"
+    rmdir -- "$STATE" 2>/dev/null || true
+}
+
+case ${1:-} in
+    status) cmd_status ;;
+    bind)
+        case ${2:-} in
+            "") cmd_bind 0 0 ;;
+            --force) cmd_bind 1 0 ;;
+            *) usage >&2; exit 2 ;;
+        esac ;;
+    auto) cmd_bind 0 1 ;;
+    unbind) cmd_unbind ;;
+    -h|--help) usage ;;
+    --version) echo "$PROG $VERSION" ;;
+    *) usage >&2; exit 2 ;;
+esac

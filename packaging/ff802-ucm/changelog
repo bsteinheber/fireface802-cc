@@ -1,0 +1,10 @@
+ff802-ucm-profile (0.1.0) unstable; urgency=medium
+
+  * First package of the Fireface 802 UCM profile (CC mode): six stereo
+    outputs and one stereo input through UCM SplitPCM.
+  * Device binding by card long name (ff802-ucm-bind) as workaround for
+    alsa-lib < 1.2.16, which ignores USB-Audio/conf.d.
+  * Profile evaluated with the real card (host test T1, 29/29 checks).
+    Physical channel assignment not yet verified (hardware test T2).
+
+ -- Bernhard Steinheber <bernhard@steinheber.info>  Tue, 17 Nov 2026 12:00:00 +0100

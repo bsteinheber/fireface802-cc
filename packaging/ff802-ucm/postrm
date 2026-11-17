@@ -1,0 +1,31 @@
+#!/bin/sh
+# postrm of ff802-ucm-profile: remove remaining device bindings (only the
+# links created by ff802-ucm-bind, recognised by their exact target) and
+# the state directory.
+set -e
+
+STATE="${DPKG_ROOT:-}/var/lib/ff802-ucm"
+CONFD="${DPKG_ROOT:-}/usr/share/alsa/ucm2/conf.d/USB-Audio"
+TARGET="../../../../ff802-ucm/longname-master.conf"
+
+case "$1" in
+    remove|purge)
+        if [ -f "$STATE/bindings" ]; then
+            while IFS= read -r name; do
+                f="$CONFD/$name.conf"
+                if [ -L "$f" ] && [ "$(readlink "$f")" = "$TARGET" ]; then
+                    rm -f -- "$f"
+                fi
+            done < "$STATE/bindings"
+            rm -f -- "$STATE/bindings"
+        fi
+        rmdir -- "$STATE" 2>/dev/null || true
+        if [ "$1" = purge ]; then
+            rm -rf -- "$STATE"
+        fi
+        ;;
+    upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
+        ;;
+esac
+
+exit 0
