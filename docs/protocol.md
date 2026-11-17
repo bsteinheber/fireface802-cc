@@ -88,6 +88,13 @@ Register `0x3D44` steuert den Class-Compliant-Modus (CC-Modus):
 | `0x0001` | CC aktivieren    |
 | `0x0000` | CC deaktivieren  |
 
+> **Deutung (T4, siehe [t4_disable.md](t4_disable.md)):** Laut RME-Handbuch
+> entspricht das sehr wahrscheinlich der TotalMix-Option „Activate CC mode on
+> disconnect“. `0x0001` lässt das Gerät beim nächsten Trennen im CC-Modus
+> starten, was am Gerät bestätigt ist. `0x0000` nimmt die Option im
+> proprietären Modus zurück, was nicht getestet ist. Einen Rückweg *aus* dem
+> CC-Modus bietet das Register nicht: Dort fehlt Endpunkt `0x0C`.
+
 ### Herleitung der aufgezeichneten Befehle
 
 Adresse `0x3D44` = `011 1101 0100 0100` (binär) hat **7** gesetzte Bits.

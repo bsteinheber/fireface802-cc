@@ -5,6 +5,9 @@
  *   ff802-cc check    diagnose only: never claims the interface or sends data
  *   ff802-cc enable   send the CC enable command once, after the user types
  *                     the confirmation word on an interactive terminal
+ *   ff802-cc disable  not available: explains why (no verified way back to
+ *                     proprietary mode over USB) and the safe alternatives;
+ *                     never touches USB
  */
 #define _POSIX_C_SOURCE 200809L
 
@@ -26,6 +29,7 @@ static void usage(FILE *out)
     fprintf(out,
         "Usage: ff802-cc [--device BUS:ADDRESS] check\n"
         "       ff802-cc [--device BUS:ADDRESS] enable\n"
+        "       ff802-cc disable\n"
         "       ff802-cc --help | --version\n"
         "\n"
         "Commands:\n"
@@ -37,6 +41,9 @@ static void usage(FILE *out)
         "          'enable class-compliant mode' command (01 00 44 BD) once to\n"
         "          bulk OUT endpoint 0x0C. The mode is expected to change only\n"
         "          after the next USB disconnect or power cycle.\n"
+        "  disable Not available, nothing is sent: no verified USB command\n"
+        "          switches the device back to proprietary mode. Prints the\n"
+        "          safe alternatives.\n"
         "\n"
         "Options:\n"
         "  --device BUS:ADDRESS  select a device as listed by ff802-detect\n"
@@ -45,7 +52,41 @@ static void usage(FILE *out)
         "Exit status:\n"
         "  0 success, 1 no suitable device, 2 usage error,\n"
         "  3 precondition failed (nothing sent), 4 transfer failed,\n"
-        "  5 not sent (aborted or writes disabled in this build)\n");
+        "  5 not sent (aborted, writes disabled in this build, or disable)\n");
+}
+
+/*
+ * 'disable' has no USB path at all. Investigation (docs/t4_usb_mode.md):
+ * the captured "CC off" word 00 00 44 3D belongs to the proprietary protocol
+ * (most likely the TotalMix option "Activate CC mode on disconnect", not
+ * tested); in CC mode the
+ * device has no endpoint 0x0C, and the protocol of its vendor interface
+ * is unknown. RME documents the way back via TotalMix FX or the ARC.
+ */
+static int cmd_disable(void)
+{
+    printf(
+        "ff802-cc disable: not available. Nothing was sent.\n"
+        "\n"
+        "There is no verified USB command that switches an original Fireface 802\n"
+        "from class-compliant mode back to proprietary mode:\n"
+        "  - In class-compliant mode (0424:3fdd) the device has no endpoint 0x0C.\n"
+        "    Its vendor-specific interface 4 (bulk 0x09/0x88) uses an unknown\n"
+        "    protocol; commands are not sent on suspicion.\n"
+        "  - The captured word 00 00 44 3D belongs to the proprietary protocol\n"
+        "    (endpoint 0x0C). Most likely it clears the TotalMix FX option\n"
+        "    'Activate CC mode on disconnect'; it has never been tested.\n"
+        "\n"
+        "Ways back documented by RME:\n"
+        "  - Connect the unit to a computer with the RME driver and TotalMix FX\n"
+        "    (Windows/macOS): TotalMix FX resets it to normal mode when it detects\n"
+        "    class-compliant mode.\n"
+        "  - With the optional ARC remote: switch the unit off, hold Prog and\n"
+        "    B (Mono) and switch it on.\n"
+        "\n"
+        "To keep Linux from switching it to class-compliant mode again, turn the\n"
+        "automation off first:  ff802-cc-auto off\n");
+    return FF802_CC_EXIT_NOT_SENT;
 }
 
 static void print_bytes(FILE *out, const uint8_t *b, size_t n)
@@ -158,7 +199,8 @@ int main(int argc, char **argv)
             continue;
         }
         if (command == NULL && (strcmp(a, "check") == 0 ||
-                                strcmp(a, "enable") == 0)) {
+                                strcmp(a, "enable") == 0 ||
+                                strcmp(a, "disable") == 0)) {
             command = a;
             continue;
         }
@@ -170,6 +212,14 @@ int main(int argc, char **argv)
     if (command == NULL) {
         usage(stderr);
         return FF802_CC_EXIT_USAGE;
+    }
+
+    if (strcmp(command, "disable") == 0) {
+        if (opt.select_location) {
+            fprintf(stderr, "ff802-cc: 'disable' takes no --device\n");
+            return FF802_CC_EXIT_USAGE;
+        }
+        return cmd_disable();   /* before any USB initialisation */
     }
 
     if (strcmp(command, "enable") == 0) {
