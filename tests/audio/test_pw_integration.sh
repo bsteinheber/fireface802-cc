@@ -596,6 +596,34 @@ t3 check
 rc=$?
 ok "host script: check after replug reports PERSISTENT" \
     '[ "$rc" = 0 ] && grep -q "^ok   PERSISTENT" "$T/log/t3-check.txt"'
+# normal operation: an own volume above 40 % and an own default sink
+set_volume "${OUT}Line4__sink" 1.0
+wait_until 10 'grep -qs "Line4=.*channelVolumes.:.1.0" "$T/state/wireplumber/default-routes"'
+q wpctl set-default "$(node_id ${OUT}Line2__sink)"
+wait_until 10 'grep -qsx "default.configured.audio.sink=${OUT}Line2__sink" "$T/state/wireplumber/default-nodes"'
+t3 verify
+rc=$?
+V=$T/log/t3-verify.txt
+ok "host script: verify (normal operation) accepts 100 % and a chosen default, checks the rest" \
+    '[ "$rc" = 0 ] && grep -q "^info Line4 volume 100 % .*(user setting)" "$V" &&
+     grep -q "^ok   default sink exists: ${OUT}Line2__sink" "$V" &&
+     [ "$(grep -cE "^ok   (Line[1-4]|Headphones[12]): .* split \[AUX" "$V")" = 6 ] &&
+     grep -q "^ok   exactly six Fireface sinks" "$V" && grep -q "^ok   exactly one Fireface source" "$V" &&
+     grep -q "^ok   Fireface 802 in CC mode" "$V" && grep -q "^ok   ff802-ucm-profile installed" "$V" &&
+     grep -q "^ok   PERSISTENT" "$V" && ! grep -q "^FAIL" "$V"'
+[ "$rc" = 0 ] || sed 's/^/    /' "$V"
+t3 check
+rc=$?
+ok "host script: check (commissioning) still refuses the same state (exit 6, default not 9/10)" \
+    '[ "$rc" = 6 ] && grep -q "^FAIL SAFETY Line4 volume 100 %" "$T/log/t3-check.txt" &&
+     grep -q "^FAIL default sink is not Headphones Output 9/10" "$T/log/t3-check.txt"'
+unplug
+t3 verify
+rc=$?
+ok "host script: verify fails without the split sinks (technical checks are kept)" \
+    '[ "$rc" = 1 ] && grep -q "^FAIL expected six HiFi split sinks, found 0" "$V" &&
+     grep -q "^FAIL sink Headphones1 missing" "$V"'
+plug
 FF802_T3_CONFIRM=rollback t3 rollback
 rc=$?
 [ -f "$T/wp-stub.pid" ] && ALL_PIDS="$ALL_PIDS $(cat "$T/wp-stub.pid")"

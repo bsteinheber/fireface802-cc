@@ -2,7 +2,7 @@
 
 > **Stand:** Im Dev-Container mit PipeWire 1.6.2-1ubuntu1.2 und
 > WirePlumber 0.5.13-1ubuntu1.1 (Ubuntu 26.04, wie auf dem Host)
-> vollständig nachgewiesen (`pw_integration`, 48 Prüfungen). Auf dem Host
+> vollständig nachgewiesen (`pw_integration`, 51 Prüfungen). Auf dem Host
 > **noch nicht installiert**; der Host-Test ist vorbereitet
 > (`tools/hw-test/ff802-t3-host.sh`).
 
@@ -175,6 +175,12 @@ tools/hw-test/ff802-t3-host.sh check        # PERSISTENT nach Neustart
 tools/hw-test/ff802-t3-host.sh rollback     # Paket entfernen, WirePlumber-Zustand zurück, prüfen
 ```
 
+Im Normalbetrieb (eigene Lautstärken, eigener Standardausgang):
+
+```sh
+tools/hw-test/ff802-t3-host.sh verify       # technische Prüfung ohne 40-%-Limit
+```
+
 Was die Schritte prüfen:
 
 - **precheck:** PipeWire 1.6.x, WirePlumber 0.5.x, alsa-lib 1.2.15.x, Dienste
@@ -189,6 +195,14 @@ Was die Schritte prüfen:
   Split-Position; SAFETY für jede aktuelle Lautstärke und für die
   gespeicherten Fireface-Routen; Standardgerät; andere Geräte vorhanden
   (Lautstärkeänderungen werden angezeigt); Vergleich mit der Referenz.
+- **verify (Normalbetrieb):** dieselben technischen Prüfungen wie `check`
+  (Paket installiert, Fireface im CC-Modus, genau sechs Split-Sinks und
+  eine Quelle mit Beschreibung und Split-Position, Vergleich mit der
+  Referenz, falls vorhanden). Lautstärken und Standardausgang sind die Wahl
+  des Nutzers: Sie werden angezeigt, das Standardgerät muss nur existieren.
+  Kein 40-%-Limit, kein `precheck` nötig, legt keine Referenz an.
+  **Keine Sicherheitsprüfung**: Für die Erstinbetriebnahme und vor
+  Messungen mit Schutzmaßnahmen gilt weiterhin `check`.
 - **limit:** senkt nur Fireface-Sinks über 40 % auf 40 % und wartet, bis
   das gespeichert ist.
 - **set-default:** `wpctl set-default` für Kopfhörer 9/10; wartet, bis

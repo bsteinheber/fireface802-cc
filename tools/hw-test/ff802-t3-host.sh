@@ -8,10 +8,17 @@
 #                     records the state before (incl. a copy of the
 #                     WirePlumber state) for the rollback
 #   install <deb>     installs the package with sudo apt (asks first)
-#   check             read only: six sinks, one source, split positions,
-#                     SAFETY of the volumes (now and stored), default
-#                     device, other devices unchanged, comparison with the
-#                     first successful check (persistence)
+#   check             commissioning (read only): six sinks, one source,
+#                     split positions, SAFETY of the volumes (now and
+#                     stored, <= 40 %), default device as set by
+#                     set-default, other devices unchanged, comparison
+#                     with the first successful check (persistence)
+#   verify            normal operation (read only): package installed,
+#                     card in CC mode, six sinks, one source, split
+#                     positions, persistence as in check; volumes and the
+#                     default sink are the user's choice (reported, the
+#                     default must exist), no SAFETY limit, no precheck
+#                     needed
 #   limit             lowers every Fireface sink above 40 % to 40 %
 #                     (no other device is touched)
 #   set-default       wpctl set-default "Headphones Output 9/10"
@@ -24,7 +31,7 @@
 # 'check' must pass: it fails with exit 6 (SAFETY) if a Fireface sink is
 # above 40 % (= 0.064 linear, -23.9 dB) or a higher volume is stored for
 # the Fireface in the WirePlumber state (it would be restored on the next
-# reconnect).
+# reconnect). 'verify' is NOT a safety check: it accepts any volume.
 #
 # Output (git-ignored): build-t3-host/ (log.txt, before/, checks/, ...)
 #
@@ -278,12 +285,25 @@ Installed. Next:
 EOF
 }
 
+# cmd_check <mode>
+#   check   commissioning: SAFETY (<= 40 %, now and stored) and the
+#           default set by set-default are required; records the reference
+#   verify  normal operation: volumes and the default sink are the user's
+#           choice (reported only); everything technical is still required
 cmd_check() {
-    log check
+    mode=$1
+    log "$mode"
     require_pulse
-    [ -d "$OUT/before" ] || die "run 'precheck' first"
-    n=$(ls "$OUT/checks" 2>/dev/null | grep -c '^check-' || true)
-    C=$OUT/checks/check-$(printf '%02d' $((n + 1)))
+    if [ "$mode" = check ]; then
+        [ -d "$OUT/before" ] || die "run 'precheck' first"
+    else
+        [ -n "$(pkg_version $PKG)" ] && pass "$PKG installed ($(pkg_version $PKG))" ||
+            fail "$PKG is not installed"
+        card=$(find_card) || { echo "no or more than one original Fireface 802 (USB $USBID) in $PROC/cards"; exit 3; }
+        pass "Fireface 802 in CC mode: card ${card%%$'\t'*}"
+    fi
+    n=$(ls "$OUT/checks" 2>/dev/null | grep -c "^$mode-" || true)
+    C=$OUT/checks/$mode-$(printf '%02d' $((n + 1)))
     mkdir -p "$C"
     ff_sinks > "$C/sinks.txt"
     ff_sources > "$C/sources.txt"
@@ -304,7 +324,9 @@ cmd_check() {
         [ "$split" = "$pos" ] && case $desc in *"$suffix") true ;; *) false ;; esac &&
             pass "$dev: $suffix, split $pos" ||
             fail "$dev: expected '$suffix' $pos, found '$desc' $split"
-        if [ "$raw" -le "$LIMIT_RAW" ]; then
+        if [ "$mode" = verify ]; then
+            echo "info $dev volume $((raw * 100 / 65536)) %${mute:+ (mute: $mute)} (user setting)"
+        elif [ "$raw" -le "$LIMIT_RAW" ]; then
             pass "SAFETY $dev volume $((raw * 100 / 65536)) % <= 40 %${mute:+ (mute: $mute)}"
         else
             fail "SAFETY $dev volume $((raw * 100 / 65536)) % > 40 % ($name)"
@@ -322,7 +344,9 @@ cmd_check() {
     echo "--- Fireface card: ${card:-not found}"
     [ -n "$card" ] || fail "Fireface card not found in PipeWire"
     high=$(stored_high "$card")
-    if [ -n "$high" ]; then
+    if [ "$mode" = verify ]; then
+        [ -z "$high" ] || echo "info stored Fireface route volumes above 40 % (user setting): $high"
+    elif [ -n "$high" ]; then
         fail "SAFETY stored Fireface route volume above 40 % (restored on reconnect): $high"
         safety=1
     else
@@ -330,19 +354,29 @@ cmd_check() {
     fi
 
     echo "--- default sink: $(cat "$C/default-sink.txt")"
-    if [ -f "$OUT/set-default.done" ]; then
+    if [ "$mode" = verify ]; then
+        # any existing sink the user chose; it must exist
+        pa_nodes sinks | cut -d'|' -f1 | grep -qxF -- "$(cat "$C/default-sink.txt")" &&
+            pass "default sink exists: $(cat "$C/default-sink.txt") (user choice)" ||
+            fail "no valid default sink ('$(cat "$C/default-sink.txt")')"
+    elif [ -f "$OUT/set-default.done" ]; then
         hp=$(sink_by_dev Headphones1 | cut -d'|' -f1)
         [ "$(cat "$C/default-sink.txt")" = "$hp" ] && pass "default sink is Headphones Output 9/10 (set-default)" ||
             fail "default sink is not Headphones Output 9/10 although set-default was run"
     fi
-    if diff <(cut -d'|' -f1 "$OUT/before/other-devices.txt") <(cut -d'|' -f1 "$C/other-devices.txt") > "$C/other-devices.diff"; then
-        pass "other audio devices still present ($(wc -l < "$C/other-devices.txt"))"
+    if [ "$mode" = check ]; then
+        if diff <(cut -d'|' -f1 "$OUT/before/other-devices.txt") <(cut -d'|' -f1 "$C/other-devices.txt") > "$C/other-devices.diff"; then
+            pass "other audio devices still present ($(wc -l < "$C/other-devices.txt"))"
+        else
+            fail "other audio devices changed (see $C/other-devices.diff)"
+        fi
+        if ! diff -q "$OUT/before/other-devices.txt" "$C/other-devices.txt" > /dev/null; then
+            echo "info volumes/mute of other devices changed since precheck (by you or applications):"
+            diff "$OUT/before/other-devices.txt" "$C/other-devices.txt" | sed 's/^/    /'
+        fi
     else
-        fail "other audio devices changed (see $C/other-devices.diff)"
-    fi
-    if ! diff -q "$OUT/before/other-devices.txt" "$C/other-devices.txt" > /dev/null; then
-        echo "info volumes/mute of other devices changed since precheck (by you or applications):"
-        diff "$OUT/before/other-devices.txt" "$C/other-devices.txt" | sed 's/^/    /'
+        # other devices may come and go in normal operation
+        echo "info other audio devices: $(cut -d'|' -f1 "$C/other-devices.txt" | grep -vc '\.monitor$' || true) (not required)"
     fi
 
     # persistence: names, descriptions, split positions as in the first passing check
@@ -355,7 +389,7 @@ cmd_check() {
             sed 's/^/    /' "$C/identity.diff"
         fi
     fi
-    if [ "$fails" = 0 ] && [ ! -f "$OUT/checks/reference-identity.txt" ]; then
+    if [ "$mode" = check ] && [ "$fails" = 0 ] && [ ! -f "$OUT/checks/reference-identity.txt" ]; then
         cp "$C/identity.txt" "$OUT/checks/reference-identity.txt"
         basename "$C" > "$OUT/checks/reference-name.txt"
         echo "info $(basename "$C") is the reference for the persistence checks"
@@ -365,8 +399,10 @@ cmd_check() {
         echo "check FAILED: SAFETY - no audio output. Run '$0 limit', then check again."
         exit 6
     fi
-    [ "$fails" = 0 ] || { echo "check FAILED ($fails)"; exit 1; }
-    echo "check PASSED ($(basename "$C"))"
+    [ "$fails" = 0 ] || { echo "$mode FAILED ($fails)"; exit 1; }
+    echo "$mode PASSED ($(basename "$C"))"
+    [ "$mode" = verify ] && echo "info normal operation: volumes and default are not limited; for commissioning use '$0 check'"
+    true
 }
 
 cmd_limit() {
@@ -470,7 +506,7 @@ cmd_status() {
     echo "output: $OUT"
     [ -d "$OUT/before" ] && echo "precheck: recorded" || echo "precheck: not recorded"
     echo "package: $(pkg_version $PKG || true)"
-    ls "$OUT/checks" 2>/dev/null | grep '^check-' | sed 's/^/check: /'
+    ls "$OUT/checks" 2>/dev/null | grep -E '^(check|verify)-' | sed 's/^/run: /'
     [ -f "$OUT/set-default.done" ] && echo "set-default: done (before: $(cat "$OUT/default-before.txt"))"
     true
 }
@@ -478,7 +514,8 @@ cmd_status() {
 case ${1:-} in
     precheck) [ $# = 1 ] || usage; cmd_precheck ;;
     install) [ $# = 2 ] || usage; cmd_install "$2" ;;
-    check) [ $# = 1 ] || usage; cmd_check ;;
+    check) [ $# = 1 ] || usage; cmd_check check ;;
+    verify) [ $# = 1 ] || usage; cmd_check verify ;;
     limit) [ $# = 1 ] || usage; cmd_limit ;;
     set-default) [ $# = 1 ] || usage; cmd_set_default ;;
     rollback) [ $# = 1 ] || usage; cmd_rollback ;;
