@@ -122,3 +122,6 @@ add_subdirectory(chanmap)
 
 # Debian package of the UCM profile (isolated install/remove test).
 add_subdirectory(packaging)
+
+# T4: automatic CC mode switch (simulated sysfs, USB and desktop only).
+add_subdirectory(auto)

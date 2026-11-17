@@ -1,0 +1,52 @@
+# ff802-cc-auto (T4): handle one USB connection of the Fireface 802.
+# Instance: <kernel name>:<busnum>:<devnum>, wanted by 70-ff802-cc-auto.rules.
+#
+# Does nothing while the automation is off. Otherwise, for a Fireface 802
+# in proprietary mode: validates the identity, records the connection
+# (at most one attempt per connection), re-validates right before the
+# write and sends the CC enable command 01 00 44 BD once. Never resets
+# the device, never retries, never switches back to proprietary mode.
+# Log: journalctl -t ff802-cc-auto
+
+[Unit]
+Description=Fireface 802: class-compliant mode for USB connection %i
+Documentation=file:/usr/share/doc/ff802-cc-auto/README.Debian
+StartLimitIntervalSec=0
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/ff802-cc/ff802-cc-autoswitch --service %i
+TimeoutStartSec=30
+SyslogIdentifier=ff802-cc-auto
+RuntimeDirectory=ff802-cc-auto
+RuntimeDirectoryMode=0755
+RuntimeDirectoryPreserve=yes
+UMask=0022
+
+# Root without any capability: enough to open the root-owned usbfs node
+# of this device; nothing else is writable.
+CapabilityBoundingSet=
+AmbientCapabilities=
+NoNewPrivileges=yes
+DevicePolicy=closed
+DeviceAllow=char-usb_device rw
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateNetwork=yes
+IPAddressDeny=any
+RestrictAddressFamilies=AF_UNIX AF_NETLINK
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged

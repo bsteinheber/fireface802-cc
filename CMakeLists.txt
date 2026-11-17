@@ -52,6 +52,16 @@ target_include_directories(ff802_switch PUBLIC
 target_link_libraries(ff802_switch PUBLIC ff802_protocol ff802_detect)
 ff802_set_warnings(ff802_switch)
 
+# T4 automation: sysfs identity, per-connection state, events, and the
+# switch flow on an abstract USB backend. No libusb here.
+add_library(ff802_auto STATIC
+    src/auto_sysfs.c
+    src/auto_state.c)
+target_include_directories(ff802_auto PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(ff802_auto PUBLIC ff802_switch)
+ff802_set_warnings(ff802_auto)
+
 # Loopback measurement core of ff802-chanmap (hardware test T2): signal
 # generation, guards, detection, flow, reservation, report. No ALSA here,
 # so the complete flow is testable against a simulated device.

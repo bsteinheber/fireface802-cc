@@ -1,0 +1,20 @@
+# ff802-cc-auto (T4): original RME Fireface 802, USB connection events.
+#
+# Nothing is executed by udev. On "add" the systemd unit
+# ff802-cc-auto@<kernel name>:<busnum>:<devnum>.service is wanted; it
+# checks whether the automation is on (ff802-cc-auto status) and handles
+# each connection at most once. Only the two USB IDs of the Fireface 802
+# match: 2a39:3fcd (proprietary mode) and 0424:3fdd (class-compliant mode).
+# No access rights are changed.
+
+SUBSYSTEM!="usb", GOTO="ff802_cc_auto_end"
+ENV{DEVTYPE}!="usb_device", GOTO="ff802_cc_auto_end"
+ATTR{idVendor}=="2a39", ATTR{idProduct}=="3fcd", GOTO="ff802_cc_auto_match"
+ATTR{idVendor}=="0424", ATTR{idProduct}=="3fdd", GOTO="ff802_cc_auto_match"
+GOTO="ff802_cc_auto_end"
+
+LABEL="ff802_cc_auto_match"
+TAG+="systemd"
+ACTION=="add", ENV{SYSTEMD_WANTS}+="ff802-cc-auto@%k:$env{BUSNUM}:$env{DEVNUM}.service"
+
+LABEL="ff802_cc_auto_end"
