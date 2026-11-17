@@ -64,6 +64,14 @@ if(ALSA_FOUND)
     target_compile_definitions(fake_ctl_ff802 PRIVATE PIC)
     set_target_properties(fake_ctl_ff802 PROPERTIES C_EXTENSIONS ON)
     ff802_set_warnings(fake_ctl_ff802)
+
+    # Fake hardware PCM (22 channels, S24_3LE, measures playback peaks) for
+    # the PipeWire integration test.
+    add_library(fake_pcm_ff802 MODULE fake_pcm_ff802.c)
+    target_link_libraries(fake_pcm_ff802 PRIVATE PkgConfig::ALSA)
+    target_compile_definitions(fake_pcm_ff802 PRIVATE PIC)
+    set_target_properties(fake_pcm_ff802 PROPERTIES C_EXTENSIONS ON)
+    ff802_set_warnings(fake_pcm_ff802)
 endif()
 
 # Evaluation of the profile by the real alsa-lib with a fake card: runs the
@@ -104,3 +112,56 @@ endif()
 add_test(NAME ucm_t1_script
     COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/test_ucm_t1.sh
             ${PROJECT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}/t1-scratch)
+
+# PipeWire/WirePlumber integration (T3) with a fake Fireface 802: a private
+# PipeWire session (own runtime, config and state directories below the
+# scratch dir) runs the unchanged WirePlumber ALSA monitor, ACP, UCM
+# SplitPCM and the loopbacks against the fake control and PCM plugins.
+# The fake enumerator replaces only PipeWire's udev enumerator. Needs the
+# packages pipewire, pipewire-bin, pipewire-pulse, wireplumber,
+# pulseaudio-utils and libspa-0.2-dev (dev container). FF802_PW_ROOT can
+# point to an unpacked tree of these packages instead of /.
+set(FF802_PW_ROOT / CACHE PATH
+    "Root of the PipeWire/WirePlumber installation used by pw_integration")
+set(pw_skip "${ucm_eval_skip}")
+set(pw_spa_include "")
+if(pw_skip STREQUAL "")
+    if(FF802_PW_ROOT STREQUAL "/")
+        pkg_check_modules(SPA QUIET libspa-0.2)
+        if(SPA_FOUND)
+            set(pw_spa_include ${SPA_INCLUDE_DIRS})
+        endif()
+    elseif(EXISTS ${FF802_PW_ROOT}/usr/include/spa-0.2/spa/monitor/device.h)
+        set(pw_spa_include ${FF802_PW_ROOT}/usr/include/spa-0.2)
+    endif()
+    if(pw_spa_include STREQUAL "")
+        set(pw_skip "libspa-0.2 headers not found (libspa-0.2-dev missing, rebuild the dev container)")
+    endif()
+endif()
+if(pw_skip STREQUAL "")
+    foreach(tool pipewire wireplumber pipewire-pulse pw-cli pw-cat pw-record wpctl pactl pacat)
+        if(NOT EXISTS ${FF802_PW_ROOT}/usr/bin/${tool})
+            set(pw_skip "${tool} not found below ${FF802_PW_ROOT} (pipewire/wireplumber/pulseaudio-utils missing, rebuild the dev container)")
+            break()
+        endif()
+    endforeach()
+endif()
+if(pw_skip STREQUAL "")
+    add_library(fake_spa_enum_ff802 MODULE fake_spa_enum_ff802.c)
+    target_include_directories(fake_spa_enum_ff802 SYSTEM PRIVATE ${pw_spa_include})
+    set_target_properties(fake_spa_enum_ff802 PROPERTIES
+        C_EXTENSIONS ON
+        OUTPUT_NAME spa-ff802-fake-enum
+        LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/spa/ff802-test)
+    ff802_set_warnings(fake_spa_enum_ff802)
+    add_test(NAME pw_integration
+        COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/test_pw_integration.sh
+                ${PROJECT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}
+                ${FF802_PW_ROOT} ${FF802_SYSTEM_UCM2}
+                ${CMAKE_CURRENT_BINARY_DIR}/pw-scratch)
+    set_tests_properties(pw_integration PROPERTIES
+        TIMEOUT 300
+        REQUIRED_FILES "$<TARGET_FILE:fake_ctl_ff802>;$<TARGET_FILE:fake_pcm_ff802>;$<TARGET_FILE:fake_spa_enum_ff802>")
+else()
+    ff802_alsa_test_unavailable(pw_integration "${pw_skip}")
+endif()
