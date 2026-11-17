@@ -21,6 +21,13 @@ foreach(name test_usb_backend test_cc_switch)
     add_test(NAME ${name} COMMAND ${name})
 endforeach()
 
+# Release build with -Werror twice in different directories: identical
+# programs (reproducible build).
+add_test(NAME reproducible_release_build
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/check_reproducible_build.sh
+            ${PROJECT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}/repro-scratch)
+set_tests_properties(reproducible_release_build PROPERTIES TIMEOUT 900)
+
 # Static safety check over all sources (no compiler involved).
 add_test(NAME check_forbidden_usb_calls
     COMMAND ${CMAKE_COMMAND} -DSOURCE_DIR=${PROJECT_SOURCE_DIR}
