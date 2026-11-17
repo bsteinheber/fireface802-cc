@@ -1,0 +1,3 @@
+ALSA lib parser.c:305:(error_node) [error.ucm] UCM is not supported for this USB device (RME Fireface 802 (24047128) at usb-0000:00:14.0-2.4.1.1.3, high speed @ USB0424:3fdd)
+ALSA lib main.c:1804:(snd_use_case_mgr_open) [error.ucm] failed to import hw:1 use case configuration -6
+alsaucm: error failed to open sound card hw:1: No such device or address

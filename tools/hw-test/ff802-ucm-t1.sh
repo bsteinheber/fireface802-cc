@@ -25,6 +25,7 @@ set -eu
 PROG=ff802-ucm-t1
 USBID="0424:3fdd"
 MARKER=".ff802-ucm-t1"
+LOADER_ID="ff802-t1"
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 WORK_DIR=${FF802_T1_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/ff802-ucm-t1}
@@ -41,14 +42,17 @@ PROFILE_FILES="USB-Audio/conf.d/0424-3fdd.conf
 USB-Audio/RME/Fireface-802.conf
 USB-Audio/RME/Fireface-802-HiFi.conf"
 
-# Devices the HiFi verb must provide.
-EXPECTED_DEVICES="Headphones 1
-Headphones 2
-Line 1
-Line 2
-Line 3
-Line 4
-Line 5"
+# Devices the HiFi verb must provide, as alsa-lib reports them.
+# alsa-lib >= 1.2.15 normalizes device names ("Line 1" becomes "Line1",
+# see verb_normalize_device_names() in src/ucm/parser.c).
+# Fields: name|direction|channel pair|comment|priority
+EXPECTED_DEVICES="Headphones1|Playback|8 9|Headphones Output 9/10|255
+Headphones2|Playback|10 11|Headphones Output 11/12|200
+Line1|Playback|0 1|Analog Output 1/2|192
+Line2|Playback|2 3|Analog Output 3/4|191
+Line3|Playback|4 5|Analog Output 5/6|190
+Line4|Playback|6 7|Analog Output 7/8|189
+Line5|Capture|0 1|Analog Input 1/2|192"
 
 die() { echo "$PROG: error: $*" >&2; exit 2; }
 info() { echo "$PROG: $*"; }
@@ -84,6 +88,7 @@ safety_scan() {
     # Loops read from here-documents so that die() ends the script itself
     # (a while loop in a pipeline would run in a subshell).
     while IFS= read -r rel; do
+        [ -n "$rel" ] || continue
         f=$OVERLAY/$rel
         [ -f "$f" ] || die "missing file in overlay: $f"
         if grep -Eq '(^|[^A-Za-z])(cset|cset-new|cset-tlv|exec|shell|sysw|BootSequence|FixedBootSequence|SectionDefaults)([^A-Za-z]|$)' "$f"; then
@@ -93,7 +98,46 @@ safety_scan() {
 USB-Audio/USB-Audio.conf
 common/pcm/split.conf
 $PROFILE_FILES
+$(cat "$WORK_DIR/scan-extra" 2>/dev/null || true)
 EOF
+}
+
+# Make the private copy of USB-Audio.conf load our conf.d file.
+#
+# The system file includes USB-Audio/conf.d/<vid>-<pid>.conf with
+# "Optional true". alsa-lib before 1.2.16 checks the existence of an
+# optional include with access() on the unresolved path
+# ("/USB-Audio/conf.d/0424-3fdd.conf", relative to the UCM root, not to the
+# file system), so the file is never loaded (fixed upstream in alsa-lib
+# commit 62c24074 "ucm: fix optional include"). In the private copy only,
+# a block is inserted before "If.inc" that includes the file without
+# "Optional", guarded by the USB id. With a fixed alsa-lib the file is
+# simply evaluated twice, which defines the same value twice.
+insert_loader() {
+    f=$OVERLAY/USB-Audio/USB-Audio.conf
+    n=$(grep -c '^If\.inc[[:space:]]*{' "$f" || true)
+    [ "$n" = 1 ] || die "expected exactly one 'If.inc {' line in $f, found $n"
+    ! grep -q "If\.$LOADER_ID" "$f" || die "$f already contains If.$LOADER_ID"
+    line=$(grep -n '^If\.inc[[:space:]]*{' "$f" | cut -d: -f1)
+    {
+        head -n "$((line - 1))" "$f"
+        # shellcheck disable=SC2016 # ${CardComponents} is UCM syntax
+        printf '%s\n' \
+            "# Inserted by $PROG into its private copy only (alsa-lib < 1.2.16" \
+            "# skips optional includes, see tools/hw-test/ff802-ucm-t1.sh)." \
+            "If.$LOADER_ID {" \
+            '	Condition {' \
+            '		Type String' \
+            '		Haystack "${CardComponents}"' \
+            '		Needle "USB0424:3fdd"' \
+            '	}' \
+            '	True.Include.ff802.File "/USB-Audio/conf.d/0424-3fdd.conf"' \
+            '}' \
+            ''
+        tail -n "+$line" "$f"
+    } > "$f.ff802-new"
+    rm -f -- "$f"
+    mv -- "$f.ff802-new" "$f"
 }
 
 cmd_prepare() {
@@ -124,7 +168,8 @@ EOF
     done <<EOF
 $PROFILE_FILES
 EOF
-
+    insert_loader
+    echo "overlay change: If.$LOADER_ID inserted into USB-Audio/USB-Audio.conf" > "$WORK_DIR/layout"
     safety_scan
 
     {
@@ -133,7 +178,10 @@ EOF
         if command -v dpkg-query >/dev/null 2>&1; then
             # shellcheck disable=SC2016 # dpkg-query format, not a variable
             echo "alsa-ucm-conf: $(dpkg-query -W -f='${Version}' alsa-ucm-conf 2>/dev/null || echo unknown)"
+            # shellcheck disable=SC2016
+            echo "alsa-lib: $(dpkg-query -W -f='${Version}' libasound2t64 2>/dev/null || echo unknown)"
         fi
+        cat "$WORK_DIR/layout"
         while IFS= read -r rel; do
             echo "profile: $rel $(cksum < "$OVERLAY/$rel" | cut -d' ' -f1)"
         done <<EOF
@@ -161,14 +209,34 @@ find_card() {
     echo "$found"
 }
 
-# Run alsaucm with the private UCM tree; output goes to a result file.
-ucm() {
-    out=$1
-    shift
+# Run alsaucm with the given UCM tree; output goes to a result file.
+ucm_with() {
+    tree=$1
+    out=$2
+    shift 2
     status=0
-    ALSA_CONFIG_UCM2=$OVERLAY "$ALSAUCM" "$@" > "$RESULTS/$out" 2>&1 || status=$?
+    ALSA_CONFIG_UCM2=$tree "$ALSAUCM" "$@" > "$RESULTS/$out" 2>&1 || status=$?
     echo "exit status: $status" >> "$RESULTS/$out"
     return 0
+}
+
+# Print the value of <key> of device <dev> from an alsaucm text dump,
+# without the quotes added by alsaucm.
+dump_value() {
+    awk -v dev="$2" -v key="$3" '
+        /^\tDevice\./ {
+            d = $0
+            sub(/^\tDevice\./, "", d); sub(/ \{$/, "", d); gsub(/"/, "", d)
+            cur = d
+            next
+        }
+        /^\t\}/ { cur = "" }
+        cur == dev && $1 == key {
+            v = $0
+            sub(/^[\t ]*[^\t ]+ /, "", v); gsub(/"/, "", v)
+            print v
+            exit
+        }' "$1"
 }
 
 check() {
@@ -195,40 +263,55 @@ cmd_run() {
            exit 3 ;;
         *) die "more than one ALSA card with USB id $USBID; refusing to guess" ;;
     esac
-    longname=$(sed -n "s/^ *$card \[[^]]*\]: *//p; /^ *$card \[/{n;s/^ *//p;}" "$PROC_ASOUND/cards" 2>/dev/null | tail -n 1)
+    # /proc/asound/cards: " N [id    ]: driver - short name" followed by a
+    # line with the long name.
+    longname=$(sed -n "/^ *$card \[/{n;s/^ *//p;q;}" "$PROC_ASOUND/cards" 2>/dev/null)
     info "card hw:$card: $longname"
     printf 'card: hw:%s\nlong name: %s\n' "$card" "$longname" > "$RESULTS/card.txt"
 
     # Baseline with the unmodified system tree (expected to be unsupported).
-    status=0
-    "$ALSAUCM" -c "hw:$card" list _verbs > "$RESULTS/baseline-verbs.txt" 2>&1 || status=$?
-    echo "exit status: $status" >> "$RESULTS/baseline-verbs.txt"
+    ucm_with "$SYSTEM_UCM2" baseline-verbs.txt -c "hw:$card" list _verbs
 
-    ucm verbs.txt         -c "hw:$card" list _verbs
-    ucm devices.txt       -c "hw:$card" list _devices/HiFi
-    ucm dump.txt          -c "hw:$card" dump text
-    ucm dump-split.txt    -c "<<<SplitPCM=1>>>hw:$card" dump text
+    ucm_with "$OVERLAY" verbs.txt         -c "hw:$card" list _verbs
+    ucm_with "$OVERLAY" devices.txt       -c "hw:$card" list _devices/HiFi
+    ucm_with "$OVERLAY" dump.txt          -c "hw:$card" dump text
+    ucm_with "$OVERLAY" dump-split.txt    -c "<<<SplitPCM=1>>>hw:$card" dump text
 
+    R=$RESULTS
     failed=0
     echo "T1 results (details in $RESULTS):"
     check "card long name names the original Fireface 802" \
         'printf "%s" "$longname" | grep -q "Fireface 802" && ! printf "%s" "$longname" | grep -q "802 FS"'
-    check "HiFi verb is offered" 'grep -q "HiFi" "$RESULTS/verbs.txt"'
-    while IFS= read -r dev; do
-        check "device '$dev' is listed" 'grep -Fq "$dev" "$RESULTS/devices.txt"'
+    check "baseline: system tree alone has no UCM profile for the card" \
+        'grep -q "UCM is not supported" "$R/baseline-verbs.txt"'
+    for f in verbs devices dump dump-split; do
+        check "$f: alsaucm succeeds without ALSA errors or warnings" \
+            'grep -qx "exit status: 0" "$R/$f.txt" && ! grep -Eqi "ALSA lib|error|warning" "$R/$f.txt"'
+    done
+    check "HiFi is the only verb" \
+        '[ "$(grep -Ec "^  [0-9]+: " "$R/verbs.txt")" = 1 ] && grep -qx "  0: HiFi" "$R/verbs.txt"'
+    check "exactly 7 devices" '[ "$(grep -Ec "^  [0-9]+: " "$R/devices.txt")" = 7 ]'
+
+    while IFS='|' read -r dev dir pair comment prio; do
+        c0=${pair% *}
+        c1=${pair#* }
+        if [ "$dir" = Playback ]; then split=ff802_stereo_out; else split=ff802_stereo_in; fi
+        check "$dev: listed with comment '$comment'" \
+            'grep -A1 -Ex "  [0-9]+: $dev" "$R/devices.txt" | grep -qx "    $comment"'
+        check "$dev: ${dir}PCM is $split channels $c0,$c1, 2 channels, priority $prio" \
+            'dump_value "$R/dump.txt" "$dev" ${dir}PCM | grep -Eq "(^|\.)$split:[^,]+,0,$c0,$c1\$" &&
+             [ "$(dump_value "$R/dump.txt" "$dev" ${dir}Channels)" = 2 ] &&
+             [ "$(dump_value "$R/dump.txt" "$dev" ${dir}Priority)" = "$prio" ]'
+        check "$dev: SplitPCM gives hw PCM, 22 channels, channels $c0/$c1 as FL/FR" \
+            'dump_value "$R/dump-split.txt" "$dev" ${dir}PCM | grep -Eq "(^|\.)hw:[^,]+,0\$" &&
+             [ "$(dump_value "$R/dump-split.txt" "$dev" ${dir}Channels)" = 22 ] &&
+             [ "$(dump_value "$R/dump-split.txt" "$dev" ${dir}Channel0)" = "$c0" ] &&
+             [ "$(dump_value "$R/dump-split.txt" "$dev" ${dir}Channel1)" = "$c1" ] &&
+             [ "$(dump_value "$R/dump-split.txt" "$dev" ${dir}ChannelPos0)" = FL ] &&
+             [ "$(dump_value "$R/dump-split.txt" "$dev" ${dir}ChannelPos1)" = FR ]'
     done <<EOF
 $EXPECTED_DEVICES
 EOF
-    check "dump succeeds" 'grep -q "exit status: 0" "$RESULTS/dump.txt"'
-    check "dump without SplitPCM refers to the ff802 split PCMs" \
-        'grep -q "ff802_stereo_out" "$RESULTS/dump.txt" && grep -q "ff802_stereo_in" "$RESULTS/dump.txt"'
-    check "SplitPCM dump succeeds" 'grep -q "exit status: 0" "$RESULTS/dump-split.txt"'
-    check "SplitPCM dump reports 22 hardware playback channels" \
-        'grep -Eq "PlaybackChannels[^0-9]*22" "$RESULTS/dump-split.txt"'
-    check "SplitPCM dump reports 22 hardware capture channels" \
-        'grep -Eq "CaptureChannels[^0-9]*22" "$RESULTS/dump-split.txt"'
-    check "SplitPCM dump uses the hw PCM of the card" \
-        'grep -Eq "PlaybackPCM.*hw:" "$RESULTS/dump-split.txt"'
 
     info "no PCM was opened, no audio was played, no configuration was changed"
     if [ "$failed" -ne 0 ]; then

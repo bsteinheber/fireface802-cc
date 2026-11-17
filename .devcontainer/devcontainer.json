@@ -6,6 +6,9 @@
     "workspaceFolder": "/workspaces/fireface802-cc",
     "containerUser": "developer",
     "remoteUser": "developer",
+    "containerEnv": {
+        "FF802_REQUIRE_ALSA_TESTS": "ON"
+    },
     "updateRemoteUserUID": false,
     "runArgs": [
         "--cap-drop=ALL",

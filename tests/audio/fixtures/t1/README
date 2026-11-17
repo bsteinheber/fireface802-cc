@@ -1,0 +1,6 @@
+Output of the T1 alsaucm queries as produced by the real alsa-lib 1.2.15.3
+(tests/audio/test_ucm_eval.sh with the fake Fireface 802 control device and
+the Ubuntu alsa-ucm-conf 1.2.15.3-1ubuntu1.7 tree). Used by test_ucm_t1.sh
+as canned answers of its fake alsaucm. Regenerate them from the results of
+test_ucm_eval.sh (build dir: tests/audio/eval-scratch/results/, without the
+"exit status" lines) whenever the profile changes.

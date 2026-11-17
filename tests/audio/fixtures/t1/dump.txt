@@ -1,0 +1,73 @@
+Verb.HiFi {
+	Comment Default
+	Device.Headphones1 {
+		Comment "Headphones Output 9/10"
+		Values {
+			CaptureCTL "_ucm0001.hw:F80224047128"
+			PlaybackCTL "_ucm0001.hw:F80224047128"
+			PlaybackChannels 2
+			PlaybackPCM "_ucm0001.ff802_stereo_out:F80224047128,0,8,9"
+			PlaybackPriority 255
+		}
+	}
+	Device.Headphones2 {
+		Comment "Headphones Output 11/12"
+		Values {
+			CaptureCTL "_ucm0001.hw:F80224047128"
+			PlaybackCTL "_ucm0001.hw:F80224047128"
+			PlaybackChannels 2
+			PlaybackPCM "_ucm0001.ff802_stereo_out:F80224047128,0,10,11"
+			PlaybackPriority 200
+		}
+	}
+	Device.Line1 {
+		Comment "Analog Output 1/2"
+		Values {
+			CaptureCTL "_ucm0001.hw:F80224047128"
+			PlaybackCTL "_ucm0001.hw:F80224047128"
+			PlaybackChannels 2
+			PlaybackPCM "_ucm0001.ff802_stereo_out:F80224047128,0,0,1"
+			PlaybackPriority 192
+		}
+	}
+	Device.Line5 {
+		Comment "Analog Input 1/2"
+		Values {
+			CaptureCTL "_ucm0001.hw:F80224047128"
+			CaptureChannels 2
+			CapturePCM "_ucm0001.ff802_stereo_in:F80224047128,0,0,1"
+			CapturePriority 192
+			PlaybackCTL "_ucm0001.hw:F80224047128"
+		}
+	}
+	Device.Line2 {
+		Comment "Analog Output 3/4"
+		Values {
+			CaptureCTL "_ucm0001.hw:F80224047128"
+			PlaybackCTL "_ucm0001.hw:F80224047128"
+			PlaybackChannels 2
+			PlaybackPCM "_ucm0001.ff802_stereo_out:F80224047128,0,2,3"
+			PlaybackPriority 191
+		}
+	}
+	Device.Line3 {
+		Comment "Analog Output 5/6"
+		Values {
+			CaptureCTL "_ucm0001.hw:F80224047128"
+			PlaybackCTL "_ucm0001.hw:F80224047128"
+			PlaybackChannels 2
+			PlaybackPCM "_ucm0001.ff802_stereo_out:F80224047128,0,4,5"
+			PlaybackPriority 190
+		}
+	}
+	Device.Line4 {
+		Comment "Analog Output 7/8"
+		Values {
+			CaptureCTL "_ucm0001.hw:F80224047128"
+			PlaybackCTL "_ucm0001.hw:F80224047128"
+			PlaybackChannels 2
+			PlaybackPCM "_ucm0001.ff802_stereo_out:F80224047128,0,6,7"
+			PlaybackPriority 189
+		}
+	}
+}

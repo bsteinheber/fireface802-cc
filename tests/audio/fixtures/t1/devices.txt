@@ -1,0 +1,14 @@
+  0: Headphones1
+    Headphones Output 9/10
+  1: Headphones2
+    Headphones Output 11/12
+  2: Line1
+    Analog Output 1/2
+  3: Line5
+    Analog Input 1/2
+  4: Line2
+    Analog Output 3/4
+  5: Line3
+    Analog Output 5/6
+  6: Line4
+    Analog Output 7/8

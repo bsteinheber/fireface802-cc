@@ -1,0 +1,101 @@
+Verb.HiFi {
+	Comment Default
+	Device.Headphones1 {
+		Comment "Headphones Output 9/10"
+		Values {
+			CaptureCTL "_ucm0001.hw:F80224047128"
+			PlaybackCTL "_ucm0001.hw:F80224047128"
+			PlaybackChannel0 8
+			PlaybackChannel1 9
+			PlaybackChannelPos0 FL
+			PlaybackChannelPos1 FR
+			PlaybackChannels 22
+			PlaybackPCM "_ucm0001.hw:F80224047128,0"
+			PlaybackPriority 255
+		}
+	}
+	Device.Headphones2 {
+		Comment "Headphones Output 11/12"
+		Values {
+			CaptureCTL "_ucm0001.hw:F80224047128"
+			PlaybackCTL "_ucm0001.hw:F80224047128"
+			PlaybackChannel0 10
+			PlaybackChannel1 11
+			PlaybackChannelPos0 FL
+			PlaybackChannelPos1 FR
+			PlaybackChannels 22
+			PlaybackPCM "_ucm0001.hw:F80224047128,0"
+			PlaybackPriority 200
+		}
+	}
+	Device.Line1 {
+		Comment "Analog Output 1/2"
+		Values {
+			CaptureCTL "_ucm0001.hw:F80224047128"
+			PlaybackCTL "_ucm0001.hw:F80224047128"
+			PlaybackChannel0 0
+			PlaybackChannel1 1
+			PlaybackChannelPos0 FL
+			PlaybackChannelPos1 FR
+			PlaybackChannels 22
+			PlaybackPCM "_ucm0001.hw:F80224047128,0"
+			PlaybackPriority 192
+		}
+	}
+	Device.Line5 {
+		Comment "Analog Input 1/2"
+		Values {
+			CaptureCTL "_ucm0001.hw:F80224047128"
+			CaptureChannel0 0
+			CaptureChannel1 1
+			CaptureChannelPos0 FL
+			CaptureChannelPos1 FR
+			CaptureChannels 22
+			CapturePCM "_ucm0001.hw:F80224047128,0"
+			CapturePriority 192
+			PlaybackCTL "_ucm0001.hw:F80224047128"
+		}
+	}
+	Device.Line2 {
+		Comment "Analog Output 3/4"
+		Values {
+			CaptureCTL "_ucm0001.hw:F80224047128"
+			PlaybackCTL "_ucm0001.hw:F80224047128"
+			PlaybackChannel0 2
+			PlaybackChannel1 3
+			PlaybackChannelPos0 FL
+			PlaybackChannelPos1 FR
+			PlaybackChannels 22
+			PlaybackPCM "_ucm0001.hw:F80224047128,0"
+			PlaybackPriority 191
+		}
+	}
+	Device.Line3 {
+		Comment "Analog Output 5/6"
+		Values {
+			CaptureCTL "_ucm0001.hw:F80224047128"
+			PlaybackCTL "_ucm0001.hw:F80224047128"
+			PlaybackChannel0 4
+			PlaybackChannel1 5
+			PlaybackChannelPos0 FL
+			PlaybackChannelPos1 FR
+			PlaybackChannels 22
+			PlaybackPCM "_ucm0001.hw:F80224047128,0"
+			PlaybackPriority 190
+		}
+	}
+	Device.Line4 {
+		Comment "Analog Output 7/8"
+		Values {
+			CaptureCTL "_ucm0001.hw:F80224047128"
+			PlaybackCTL "_ucm0001.hw:F80224047128"
+			PlaybackChannel0 6
+			PlaybackChannel1 7
+			PlaybackChannelPos0 FL
+			PlaybackChannelPos1 FR
+			PlaybackChannels 22
+			PlaybackPCM "_ucm0001.hw:F80224047128,0"
+			PlaybackPriority 189
+		}
+	}
+}
