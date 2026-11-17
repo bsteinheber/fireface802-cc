@@ -5,8 +5,31 @@ ALSA UCM profile for the original RME Fireface 802 in class compliant mode:
 six stereo outputs and one stereo input as separate PipeWire devices.
 
 Status: the profile is evaluated correctly by alsa-lib with the real card
-(host test T1). The physical channel assignment is not yet verified
-(hardware test T2). Do not rely on the output names before T2.
+(host test T1). Analog outputs 1 and 2 are physically confirmed; the other
+outputs are not yet verified (hardware test T2). Do not rely on the other
+output names before T2.
+
+PipeWire / WirePlumber
+----------------------
+
+No PipeWire or WirePlumber configuration is installed or needed.
+WirePlumber 0.5 handles UCM SplitPCM itself: one hidden 22 channel node
+for the hardware and one sink per output (a loopback), so all six outputs
+can be used at the same time and chosen per application in Plasma:
+
+  Fireface 802 (<serial>) Analog Output 1/2 ... 7/8
+  Fireface 802 (<serial>) Headphones Output 9/10, 11/12
+  Fireface 802 (<serial>) Analog Input 1/2           (source)
+
+Within the Fireface, Headphones Output 9/10 has the highest priority. The
+system default is chosen by the user (wpctl set-default, Plasma); it is
+stored by WirePlumber and survives restart and reconnect.
+
+Volumes: new sinks start at 40 % (0.064 linear, -23.9 dB, WirePlumber's
+default for new sinks). A volume the user changed is stored by WirePlumber
+(~/.local/state/wireplumber/default-routes) and restored on the next
+reconnect, also a high one. Check the volumes before every first playback
+after reconnecting.
 
 Files
 -----
@@ -79,3 +102,9 @@ Removal
 
 Links or files in conf.d/USB-Audio that were not created by ff802-ucm-bind
 are never touched.
+
+Removal does not touch per-user WirePlumber state (stored volumes, default
+device, per-application outputs in ~/.local/state/wireplumber). These
+entries are harmless without the profile; the host test script
+tools/hw-test/ff802-t3-host.sh (rollback) restores the state recorded
+before installation.

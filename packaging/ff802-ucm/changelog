@@ -1,3 +1,15 @@
+ff802-ucm-profile (0.2.0) unstable; urgency=medium
+
+  * No change of the UCM files or the binding.
+  * README.Debian: behaviour in PipeWire 1.6 / WirePlumber 0.5 (T3
+    container test pw_integration): six sinks and one source through
+    WirePlumber's own SplitPCM support, no PipeWire/WirePlumber
+    configuration needed; new sinks start at 40 % (-23.9 dB); stored
+    WirePlumber state overrides that; what removal does not touch.
+  * Analog outputs 1 and 2 physically confirmed (T2, partial).
+
+ -- Bernhard Steinheber <bernhard@steinheber.info>  Tue, 17 Nov 2026 18:00:00 +0100
+
 ff802-ucm-profile (0.1.0) unstable; urgency=medium
 
   * First package of the Fireface 802 UCM profile (CC mode): six stereo

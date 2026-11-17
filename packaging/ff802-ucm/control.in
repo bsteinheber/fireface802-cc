@@ -15,4 +15,6 @@ Description: ALSA UCM profile for the RME Fireface 802 in class compliant mode
  to the connected card by its long name (ff802-ucm-bind). No file of
  alsa-ucm-conf is modified.
  .
- The physical channel assignment is not yet verified (hardware test T2).
+ Analog outputs 1/2 are physically confirmed; the other outputs are not yet
+ verified (hardware test T2). No PipeWire or WirePlumber configuration is
+ needed: WirePlumber 0.5 creates the six sinks itself.
