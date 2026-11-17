@@ -34,8 +34,14 @@ int ff802_format_port_path(const ff802_usb_dev *dev, char *buf, size_t size)
 
     for (unsigned i = 0; i < depth; i++) {
         size_t used = (size_t)len < size ? (size_t)len : size;
-        int r = snprintf(buf ? buf + used : NULL, size - used, "%c%u",
-                         i == 0 ? '-' : '.', (unsigned)dev->ports[i]);
+        char sep = i == 0 ? '-' : '.';
+        int r;
+        /* Without room (or without buffer) only measure the length:
+         * snprintf with a NULL destination is only defined for size 0. */
+        if (buf != NULL && used < size)
+            r = snprintf(buf + used, size - used, "%c%u", sep, (unsigned)dev->ports[i]);
+        else
+            r = snprintf(NULL, 0, "%c%u", sep, (unsigned)dev->ports[i]);
         if (r < 0)
             return r;
         len += r;
