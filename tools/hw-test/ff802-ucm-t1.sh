@@ -59,9 +59,13 @@ info() { echo "$PROG: $*"; }
 
 usage() {
     cat <<EOF
-Usage: $PROG prepare | run | clean | --help
+Usage: $PROG prepare [--package <deb>] | run | clean | --help
 
 Isolated, read-only test T1 of the Fireface 802 UCM profile.
+  prepare                  repository profile + loader block in USB-Audio.conf
+  prepare --package <deb>  layout of the ff802-ucm-profile package: its files
+                           plus the master file under the card long name
+                           (needs the card connected), USB-Audio.conf unchanged
 Working directory: $WORK_DIR
 EOF
 }
@@ -140,8 +144,54 @@ insert_loader() {
     mv -- "$f.ff802-new" "$f"
 }
 
+# Overlay with the layout of the installed ff802-ucm-profile package: its
+# UCM files, and its master file under the long name of the connected card
+# (as ff802-ucm-bind would link it). USB-Audio.conf stays unchanged. The
+# master file is copied instead of linked, because the package's relative
+# link target only resolves inside /usr/share.
+install_package_layout() {
+    pkg=$WORK_DIR/pkg
+    mkdir -p "$pkg"
+    dpkg-deb -x "$1" "$pkg" || die "cannot extract $1"
+    [ -f "$pkg/usr/share/ff802-ucm/longname-master.conf" ] ||
+        die "$1 does not contain usr/share/ff802-ucm/longname-master.conf"
+    (cd "$pkg/usr/share/alsa/ucm2" && find . -type f) > "$WORK_DIR/pkg-files"
+    while IFS= read -r rel; do
+        [ ! -e "$SYSTEM_UCM2/$rel" ] || die "package file $rel exists in the system tree - aborting"
+    done < "$WORK_DIR/pkg-files"
+    cp -R "$pkg/usr/share/alsa/ucm2/." "$OVERLAY/"
+
+    card_rc=0
+    card=$(find_card) || card_rc=$?
+    case $card_rc in
+        0) ;;
+        1) echo "$PROG: no ALSA card with USB id $USBID; the package layout needs the card" >&2
+           exit 3 ;;
+        *) die "more than one ALSA card with USB id $USBID; refusing to guess" ;;
+    esac
+    name=$(sed -n "/^ *$card \[/{n;s/^ *//;s/ *\$//;p;q;}" "$PROC_ASOUND/cards" 2>/dev/null)
+    case $name in
+        ""|*/*|.*) die "card long name '$name' cannot be used as a file name" ;;
+    esac
+    mkdir -p "$OVERLAY/conf.d/USB-Audio"
+    [ ! -e "$OVERLAY/conf.d/USB-Audio/$name.conf" ] ||
+        die "system tree already has conf.d/USB-Audio/$name.conf - aborting"
+    cp "$pkg/usr/share/ff802-ucm/longname-master.conf" "$OVERLAY/conf.d/USB-Audio/$name.conf"
+    printf '%s\n' "conf.d/USB-Audio/$name.conf" > "$WORK_DIR/scan-extra"
+    {
+        echo "layout: package $(dpkg-deb -f "$1" Package) $(dpkg-deb -f "$1" Version)"
+        echo "binding: conf.d/USB-Audio/$name.conf (copy of longname-master.conf)"
+        echo "overlay change: none in USB-Audio/USB-Audio.conf"
+    } > "$WORK_DIR/layout"
+}
+
 cmd_prepare() {
+    deb=${1:-}
     refuse_root
+    if [ -n "$deb" ]; then
+        [ -f "$deb" ] || die "package not found: $deb"
+        command -v dpkg-deb >/dev/null 2>&1 || die "dpkg-deb not found"
+    fi
     [ -f "$SYSTEM_UCM2/USB-Audio/USB-Audio.conf" ] ||
         die "system UCM tree not found: $SYSTEM_UCM2"
     while IFS= read -r rel; do
@@ -162,14 +212,18 @@ EOF
     mkdir -p "$OVERLAY" "$RESULTS"
     cp -RP "$SYSTEM_UCM2/." "$OVERLAY/"
 
-    while IFS= read -r rel; do
-        mkdir -p "$(dirname -- "$OVERLAY/$rel")"
-        cp "$REPO_UCM2/$rel" "$OVERLAY/$rel"
-    done <<EOF
+    if [ -n "$deb" ]; then
+        install_package_layout "$deb"
+    else
+        while IFS= read -r rel; do
+            mkdir -p "$(dirname -- "$OVERLAY/$rel")"
+            cp "$REPO_UCM2/$rel" "$OVERLAY/$rel"
+        done <<EOF
 $PROFILE_FILES
 EOF
-    insert_loader
-    echo "overlay change: If.$LOADER_ID inserted into USB-Audio/USB-Audio.conf" > "$WORK_DIR/layout"
+        insert_loader
+        echo "overlay change: If.$LOADER_ID inserted into USB-Audio/USB-Audio.conf" > "$WORK_DIR/layout"
+    fi
     safety_scan
 
     {
@@ -328,7 +382,12 @@ cmd_clean() {
 }
 
 case ${1:-} in
-    prepare) cmd_prepare ;;
+    prepare)
+        case ${2:-} in
+            "") cmd_prepare ;;
+            --package) [ -n "${3:-}" ] || { usage >&2; exit 2; }; cmd_prepare "$3" ;;
+            *) usage >&2; exit 2 ;;
+        esac ;;
     run)     cmd_run ;;
     clean)   cmd_clean ;;
     -h|--help) usage ;;

@@ -318,6 +318,48 @@ else
     echo "skip Ctrl+C test (setsid or env --default-signal not available)"
 fi
 
+ok "system tree unchanged before the package layout tests" '[ "$(sys_sum)" = "$sys_before" ]'
+
+# --- 9. package layout (prepare --package) -------------------------------------------
+DEB=$(sh "$SRC/packaging/build-deb.sh" "$T/deb")
+LN="RME Fireface 802 (24047128) at usb-0000:00:14.0-2.4.1.1.3, high speed"
+make_proc "Fireface 802 (24047128)" "RME Fireface 802 (24047128)"
+rc=$(run_t1 prepare --package "$DEB")
+ok "prepare --package succeeds" '[ "$rc" = 0 ]'
+ok "package layout: master file under the card long name" \
+    'cmp -s "$W/ucm2/conf.d/USB-Audio/$LN.conf" "$SRC/packaging/ff802-ucm/longname-master.conf"'
+ok "package layout: USB-Audio.conf identical to the system file" \
+    'cmp -s "$W/ucm2/USB-Audio/USB-Audio.conf" "$SYS/USB-Audio/USB-Audio.conf" && ! grep -q "If.ff802-t1" "$W/ucm2/USB-Audio/USB-Audio.conf"'
+ok "package layout: profile files from the package" \
+    'cmp -s "$W/ucm2/USB-Audio/RME/Fireface-802-HiFi.conf" "$SRC/audio/ucm2/USB-Audio/RME/Fireface-802-HiFi.conf"'
+ok "package layout recorded in the manifest" \
+    'grep -q "^layout: package ff802-ucm-profile 0.1.0" "$W/manifest.txt" && grep -q "^binding: conf.d/USB-Audio/$LN.conf" "$W/manifest.txt"'
+: > "$LOG"
+rc=$(run_t1 run)
+ok "run with the package layout passes" '[ "$rc" = 0 ] && grep -q "all checks passed" "$T/out.txt"'
+ok "system tree unchanged by the package layout" '[ "$(sys_sum)" = "$sys_before" ]'
+rc=$(run_t1 clean)
+ok "clean removes the package layout" '[ "$rc" = 0 ] && [ ! -e "$W" ]'
+
+rm -f "$PROC/card1/usbid"
+rc=$(run_t1 prepare --package "$DEB")
+ok "prepare --package without card: exit 3" '[ "$rc" = 3 ]'
+make_proc "Fireface 802 (24047128)" "RME Fireface 802 (24047128)"
+rm -rf -- "${W:?}"
+rc=$(run_t1 prepare --package "$T/missing.deb")
+ok "prepare --package with missing file: exit 2" '[ "$rc" = 2 ] && grep -q "package not found" "$T/out.txt"'
+rc=$(run_t1 prepare --package)
+ok "prepare --package without file: usage, exit 2" '[ "$rc" = 2 ]'
+rm -rf -- "${W:?}"
+
+rc=$(run_wrap --package "$DEB")
+ok "wrapper --package: passes, rollback verified" \
+    '[ "$rc" = 0 ] && grep -q "package layout: $DEB" "$HO/log.txt" && grep -q "rollback=verified" "$HO/log.txt" && [ ! -e "$W" ]'
+rc=$(run_wrap --package)
+ok "wrapper --package without file: exit 2" '[ "$rc" = 2 ]'
+rc=$(run_wrap --bogus)
+ok "wrapper rejects unknown arguments" '[ "$rc" = 2 ]'
+
 ok "system tree unchanged at the end" '[ "$(sys_sum)" = "$sys_before" ]'
 
 echo "$checks checks, $fails failures"

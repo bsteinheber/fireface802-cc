@@ -108,6 +108,27 @@ for f in verbs devices dump dump-split baseline-verbs; do
         'grep -v "^exit status:" "$T/results/$f.txt" | sed "s/^ucm_query: /alsaucm: /" | cmp -s - "$SRC/tests/audio/fixtures/t1/$f.txt"'
 done
 
+# --- 1b. T1 with the layout of the ff802-ucm-profile package ---------------------
+# (master file under the card long name, USB-Audio.conf unchanged)
+sh "$SCRIPT" clean > /dev/null 2>&1
+DEB=$(sh "$SRC/packaging/build-deb.sh" "$T/deb")
+sh "$SCRIPT" prepare --package "$DEB" > "$T/prepare-pkg.txt" 2>&1
+rc=$?
+ok "T1 prepare --package succeeds" '[ "$rc" = 0 ]'
+ok "package layout leaves USB-Audio.conf unchanged" \
+    'cmp -s "$SYS/USB-Audio/USB-Audio.conf" "$W/ucm2/USB-Audio/USB-Audio.conf"'
+sh "$SCRIPT" run > "$T/run-pkg.txt" 2>&1
+rc=$?
+ok "T1 run with the package layout passes with the real alsa-lib" \
+    '[ "$rc" = 0 ] && grep -q "all checks passed" "$T/run-pkg.txt" && [ "$(grep -c "SplitPCM gives hw PCM" "$T/run-pkg.txt")" = 7 ]'
+[ "$rc" = 0 ] || sed 's/^/    /' "$T/run-pkg.txt"
+for f in verbs devices dump dump-split; do
+    ok "package layout: $f identical to the fixture (host T1 run 2)" \
+        'grep -v "^exit status:" "$W/results/$f.txt" | cmp -s - "$SRC/tests/audio/fixtures/t1/$f.txt"'
+done
+sh "$SCRIPT" clean > /dev/null 2>&1
+sh "$SCRIPT" prepare > /dev/null 2>&1   # repository layout again for the next checks
+
 # --- 2. the alsa-lib optional include problem ------------------------------------
 # Same overlay but with the unmodified system USB-Audio.conf: only the conf.d
 # hook ("Optional true") could load the profile.

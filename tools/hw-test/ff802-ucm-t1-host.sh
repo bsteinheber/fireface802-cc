@@ -3,7 +3,8 @@
 #
 # Run on the Kubuntu host as normal user (not root):
 #
-#   tools/hw-test/ff802-ucm-t1-host.sh
+#   tools/hw-test/ff802-ucm-t1-host.sh                    repository profile
+#   tools/hw-test/ff802-ucm-t1-host.sh --package <deb>    layout of the package
 #
 # Steps: record the state of every location T1 could conceivably affect,
 # 'ff802-ucm-t1.sh prepare' and 'run', copy the results, then ALWAYS
@@ -34,6 +35,16 @@ REPO=$(cd -- "$SCRIPT_DIR/../.." && pwd)
 T1=$SCRIPT_DIR/ff802-ucm-t1.sh
 OUT=${FF802_T1_OUT:-$REPO/build-t1}
 WORK=${FF802_T1_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/ff802-ucm-t1}
+
+DEB=""
+case ${1:-} in
+    "") ;;
+    --package)
+        [ -n "${2:-}" ] && [ -f "$2" ] || { echo "ff802-ucm-t1-host: --package expects a .deb file" >&2; exit 2; }
+        DEB=$(cd -- "$(dirname -- "$2")" && pwd)/$(basename -- "$2")
+        [ $# -eq 2 ] || { echo "ff802-ucm-t1-host: unexpected argument" >&2; exit 2; } ;;
+    *) echo "usage: ff802-ucm-t1-host.sh [--package <deb>]" >&2; exit 2 ;;
+esac
 
 if [ "$(id -u)" = 0 ]; then
     echo "ff802-ucm-t1-host: do not run as root" >&2
@@ -151,9 +162,9 @@ snapshot "$OUT/state-before.txt"
 trap finish EXIT
 trap 'interrupted=1; echo "interrupted"; exit 130' INT TERM HUP
 
-echo "=== prepare"
+echo "=== prepare${DEB:+ (package layout: $DEB)}"
 rc_prep=interrupted
-"$T1" prepare
+if [ -n "$DEB" ]; then "$T1" prepare --package "$DEB"; else "$T1" prepare; fi
 rc_prep=$?
 echo "prepare exit: $rc_prep"
 if [ "$rc_prep" = 0 ]; then
