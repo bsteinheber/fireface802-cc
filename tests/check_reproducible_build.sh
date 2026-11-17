@@ -25,7 +25,7 @@ done
 
 rc=0
 n=0
-for prog in ff802-detect ff802-cc ff802-chanmap; do
+for prog in ff802-detect ff802-cc ff802-cc-autoswitch ff802-chanmap; do
     [ -f "$T/a/$prog" ] || continue
     n=$((n + 1))
     if cmp -s "$T/a/$prog" "$T/b/$prog"; then

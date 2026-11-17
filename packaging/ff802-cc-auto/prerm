@@ -1,0 +1,5 @@
+#!/bin/sh
+# prerm of ff802-cc-auto: nothing to stop (the service runs only for a
+# moment per USB event and is never restarted).
+set -e
+exit 0

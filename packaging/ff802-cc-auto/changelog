@@ -1,0 +1,12 @@
+ff802-cc-auto (0.1.0) unstable; urgency=medium
+
+  * Initial package (T4): automatic switch of the original RME Fireface 802
+    from proprietary USB mode (2a39:3fcd) to class-compliant mode
+    (0424:3fdd) when it is connected or present at boot.
+  * Off after installation; ff802-cc-auto on|off|status.
+  * At most one attempt per USB connection; never resets the device,
+    never retries, never switches back to proprietary mode.
+  * Desktop notification in the Plasma session: reconnect the USB cable.
+  * Not yet tested on the host (container development only).
+
+ -- Bernhard Steinheber <bernhard@steinheber.info>  Tue, 17 Nov 2026 20:00:00 +0100

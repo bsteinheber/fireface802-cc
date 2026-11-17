@@ -1,0 +1,22 @@
+#!/bin/sh
+# postinst of ff802-cc-auto. Reloads udev rules and systemd units; does
+# NOT trigger udev events and does NOT start the service: installing the
+# package never sends anything to a device. The automation stays off
+# until 'ff802-cc-auto on'.
+set -e
+
+case "$1" in
+    configure)
+        if [ -z "${DPKG_ROOT:-}" ] && [ -d /run/systemd/system ]; then
+            systemctl daemon-reload || true
+            udevadm control --reload-rules || true
+        fi
+        mode=$(cat "${DPKG_ROOT:-}/var/lib/ff802-cc-auto/mode" 2>/dev/null || echo off)
+        echo "ff802-cc-auto: automation is ${mode}." \
+             "Turn it on with 'ff802-cc-auto on'; see /usr/share/doc/ff802-cc-auto/README.Debian"
+        ;;
+    abort-upgrade|abort-remove|abort-deconfigure)
+        ;;
+esac
+
+exit 0

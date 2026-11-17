@@ -1,0 +1,81 @@
+ff802-cc-auto
+=============
+
+Automatic class-compliant (CC) mode for the original RME Fireface 802
+(not the 802 FS). After booting Linux with the unit still in proprietary
+USB mode (2a39:3fcd, e.g. after Windows), the unit is prepared for Linux
+audio without running "ff802-cc enable" by hand.
+
+The automation is OFF after installation.
+
+  ff802-cc-auto status   state, connected unit, last result (anyone)
+  ff802-cc-auto on       turn on  (administrator: pkexec or sudo)
+  ff802-cc-auto off      turn off (the active local user, no password)
+
+The state is kept in /var/lib/ff802-cc-auto/mode and survives reboots.
+
+What happens when the automation is on
+--------------------------------------
+
+1. udev (70-ff802-cc-auto.rules) sees the unit at boot or when it is
+   connected and starts ff802-cc-auto@<port>:<bus>:<devnum>.service.
+   udev itself executes nothing.
+2. The service (root without capabilities, only USB device nodes, no
+   network) reads the cached sysfs attributes: USB ID 2a39:3fcd,
+   manufacturer "RME", product "Fireface 802 (<serial>)", high speed.
+   Anything else is refused. 0424:3fdd (already CC mode): nothing to do.
+3. The connection is recorded in /run/ff802-cc-auto/attempts: at most one
+   attempt per connection, also after errors. A reboot or a reconnection
+   is a new connection.
+4. Right before the write everything is checked again (same connection,
+   same device, automation still on). Then the CC enable command
+   01 00 44 BD is sent once to interface 1, bulk OUT endpoint 0x0C.
+   No reset, no retry, never the other direction.
+5. A notification in the Plasma session asks you to disconnect the USB
+   cable briefly and reconnect it ("Fireface 802 - Class-Compliant-Modus
+   vorbereitet"). After reconnecting, the unit appears as 0424:3fdd; a
+   short confirmation follows. The audio configuration of
+   ff802-ucm-profile is used unchanged.
+
+A physical USB disconnection is required: the command only sets the
+TotalMix option "Activate CC mode on disconnect" in the unit.
+
+Notifications
+-------------
+
+The system service only writes /run/ff802-cc-auto/event. The systemd user
+units ff802-cc-notify.path/.service (started with every graphical session)
+show each event once. If nobody was logged in (switch at boot), the
+notification is shown at login while it is still relevant. A missing
+notification never affects the USB side.
+
+Switching back to proprietary mode
+----------------------------------
+
+Not possible from Linux ("ff802-cc disable" explains why): connect the
+unit to Windows/macOS with TotalMix FX, which resets it to normal mode, or
+use the optional ARC (hold Prog and B (Mono) while switching the unit on).
+To stay in proprietary mode on Linux, turn the automation off first:
+ff802-cc-auto off.
+
+Diagnosis
+---------
+
+  ff802-cc-auto status
+  journalctl -t ff802-cc-auto -b             system service
+  journalctl --user -t ff802-cc-notify -b    notifications
+  systemctl list-units 'ff802-cc-auto@*'
+
+Exit codes of the service: 0 off / handled / CC mode / sent, 3 nothing
+sent (refused or failed before the write), 4 the write failed (device
+state unknown: power-cycle the unit and check with "ff802-cc-auto status").
+
+Removal
+-------
+
+  ff802-cc-auto off                (optional: stops further switches now)
+  sudo apt purge ff802-cc-auto     removes everything incl. the state
+
+Removal deletes /var/lib/ff802-cc-auto and /run/ff802-cc-auto, so a later
+installation starts with the automation off. The USB mode of the unit and
+the ff802-ucm-profile package are not touched.

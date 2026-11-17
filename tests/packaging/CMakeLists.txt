@@ -34,3 +34,18 @@ if(deb_skip STREQUAL "")
 else()
     ff802_alsa_test_unavailable(deb_package "${deb_skip}")
 endif()
+
+# Debian package ff802-cc-auto (T4): build target and isolated package test.
+# cmake --build <dir> --target deb-auto  ->  <dir>/deb/ff802-cc-auto_<v>_<arch>.deb
+if(FF802_DPKG_DEB AND FF802_HAVE_TOOLS)
+    add_custom_target(deb-auto
+        COMMAND sh ${PROJECT_SOURCE_DIR}/packaging/build-deb-auto.sh ${CMAKE_BINARY_DIR}/deb
+        COMMENT "Building the ff802-cc-auto Debian package"
+        VERBATIM)
+endif()
+if(FF802_DPKG_DEB AND FF802_DPKG AND FF802_HAVE_TOOLS)
+    add_test(NAME deb_auto_package
+        COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/test_deb_auto.sh
+                ${PROJECT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}/deb-auto-scratch)
+    set_tests_properties(deb_auto_package PROPERTIES TIMEOUT 900)
+endif()
