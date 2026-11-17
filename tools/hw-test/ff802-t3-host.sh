@@ -403,7 +403,16 @@ cmd_set_default() {
         { grep -s '^default.configured.audio.sink=' "$WPSTATE/default-nodes" || echo "none"; } > "$OUT/default-before.txt"
     wpctl set-default "$id" || die "wpctl set-default failed" 1
     touch "$OUT/set-default.done"
-    echo "default sink: $(pactl get-default-sink 2>/dev/null) (configured before: $(cat "$OUT/default-before.txt"))"
+    # WirePlumber writes its state only after a timeout; a restart before
+    # that would lose the configured default (wait as limit does)
+    name=${hp%%|*}
+    n=50
+    until grep -qsxF "default.configured.audio.sink=$name" "$WPSTATE/default-nodes" || [ "$n" = 0 ]; do
+        sleep 0.1; n=$((n - 1))
+    done
+    grep -qsxF "default.configured.audio.sink=$name" "$WPSTATE/default-nodes" ||
+        die "the configured default was not stored by WirePlumber ($WPSTATE/default-nodes)" 1
+    echo "default sink: $(pactl get-default-sink 2>/dev/null) (configured before: $(cat "$OUT/default-before.txt")), stored"
 }
 
 cmd_rollback() {

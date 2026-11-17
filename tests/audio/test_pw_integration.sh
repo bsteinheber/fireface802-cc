@@ -178,9 +178,15 @@ plug() {
     touch "$T/enum/present"
     wait_until 15 'fireface_sinks | grep -q Headphones1' && sleep 1
 }
-unplug() {
+unplug() { # waits until no sink of the card is left (split or non-UCM)
     rm -f "$T/enum/present"
-    wait_until 10 '[ -z "$(fireface_sinks)" ]'
+    wait_until 10 '[ -z "$(fireface_any_sinks)" ]'
+}
+# the card without the binding (before installation, after the purge):
+# ACP falls back to its non-UCM profiles
+plug_unbound() {
+    touch "$T/enum/present"
+    wait_until 15 '[ -n "$(fireface_any_sinks)" ]' && sleep 1
 }
 # a second audio device, as the internal sound card on the host
 add_other_sink() {
@@ -198,6 +204,7 @@ IN=alsa_input.$FF.HiFi__
 SINKS="Line1 Line2 Line3 Line4 Headphones1 Headphones2"
 
 fireface_sinks() { q pactl list sinks short | awk '{print $2}' | grep "^$OUT" | sort; }
+fireface_any_sinks() { q pactl list sinks short | awk '{print $2}' | grep "^alsa_output\.$FF\." | sort; }
 fireface_sources() { q pactl list sources short | awk '{print $2}' | grep "^$IN" | sort; }
 node_id() {
     q pw-cli ls Node | awk -v want="$1" '
@@ -407,7 +414,7 @@ ok "card appearing during playback: stream moves to Headphones1, never above -23
 # --- 5. persistence: volume, restart, replug ---------------------------------------
 set_volume "${OUT}Headphones1__sink" 0.25
 ok "a changed volume is stored by WirePlumber (default-routes)" \
-    'wait_until 10 "grep -q \"Headphones1=.*channelVolumes.:.0.015625\" \"$T/state/wireplumber/default-routes\""'
+    'wait_until 10 "grep -qs \"Headphones1=.*channelVolumes.:.0.015625\" \"$T/state/wireplumber/default-routes\""'
 session_restart
 ok "after a restart of PipeWire/WirePlumber: Headphones1 0.25, the others 0.40" \
     '[ "$(volume ${OUT}Headphones1__sink)" = "0.25" ] && [ "$(volume ${OUT}Line1__sink)" = "0.40" ] &&
@@ -424,7 +431,7 @@ ok "after replugging: same six sink names, Headphones1 0.25, the others 0.40" \
 # --- 6. persistence: configured default (wpctl set-default) --------------------------
 q wpctl set-default "$(node_id ${OUT}Line2__sink)"
 ok "wpctl set-default stores the configured default" \
-    'wait_until 10 "grep -q \"default.configured.audio.sink=.*Line2__sink\" \"$T/state/wireplumber/default-nodes\""'
+    'wait_until 10 "grep -qs \"default.configured.audio.sink=.*Line2__sink\" \"$T/state/wireplumber/default-nodes\""'
 session_restart
 add_other_sink
 ok "configured default kept after a restart" '[ "$(q pactl get-default-sink)" = "${OUT}Line2__sink" ]'
@@ -446,7 +453,7 @@ idx=$(q pactl list sink-inputs short | awk 'NR == 1 { print $1 }')
 q pactl move-sink-input "$idx" "${OUT}Line3__sink"
 wait "$player"
 ok "moving an application stores its output (WirePlumber stream state)" \
-    'wait_until 10 "grep -q \"application.name:ff802-app-a=.*Line3__sink\" \"$T/state/wireplumber/stream-properties\""'
+    'wait_until 10 "grep -qs \"application.name:ff802-app-a=.*Line3__sink\" \"$T/state/wireplumber/stream-properties\""'
 session_restart
 peaks_reset
 pa_play ff802-app-a "$T/sq1.raw"
@@ -461,7 +468,7 @@ ok "another application uses the default (Headphones1, channels 8/9, at its stor
 
 # --- 8. stored state overrides the default volume ------------------------------------
 set_volume "${OUT}Line4__sink" 1.0
-wait_until 10 'grep -q "Line4=.*channelVolumes.:.1.0" "$T/state/wireplumber/default-routes"'
+wait_until 10 'grep -qs "Line4=.*channelVolumes.:.1.0" "$T/state/wireplumber/default-routes"'
 unplug
 plug
 ok "a stored full volume is restored on replug (state wins over the default; host test must check it)" \
@@ -483,7 +490,7 @@ cat > "$ST/apt-get" <<EOF
 #!/bin/sh
 echo "apt-get \$*" >> "$T/log/stubs.log"
 case \$1 in
-    install) touch "$T/pkg-installed" ;;
+    install) touch "$T/pkg-installed"; cp "$T/master.saved" "\$FF802_TEST_MASTER" ;;
     purge) rm -f "$T/pkg-installed" "\$FF802_TEST_MASTER" ;;
 esac
 exit 0
@@ -522,11 +529,22 @@ t3() { # t3 <step> [args]: the host script with the overrides of the container
     FF802_T3_DPKG_QUERY=$ST/dpkg-query FF802_TEST_MASTER=$MASTER \
         bash "$SRC/tools/hw-test/ff802-t3-host.sh" "$@" > "$T/log/t3-$1.txt" 2>&1
 }
+# As on the host: precheck runs with the Fireface connected but not bound
+# (only its non-UCM profiles), and the internal device is the configured
+# default of the user. The install stub creates the binding as the package
+# does; then the card is switched off and on.
 cp "$MASTER" "$T/master.saved"
 session_stop
 rm -rf "$T/state/wireplumber"
-rm -f "$T/enum/present"
+rm -f "$T/enum/present" "$MASTER"
 session_start && add_other_sink
+q wpctl set-default "$(node_id ff802-test.other)"
+wait_until 10 'grep -qs "default.configured.audio.sink=.*ff802-test.other" "$T/state/wireplumber/default-nodes"'
+plug_unbound
+unbound_sinks=$(fireface_any_sinks)
+ok "before installation: the unbound card has only non-UCM sinks, the other device is default" \
+    '[ -n "$unbound_sinks" ] && [ -z "$(fireface_sinks)" ] &&
+     [ "$(q pactl get-default-sink)" = "ff802-test.other" ]'
 t3 precheck
 rc=$?
 ok "host script: precheck passes before installation (card without profile)" '[ "$rc" = 0 ]'
@@ -534,7 +552,9 @@ ok "host script: precheck passes before installation (card without profile)" '[ 
 FF802_T3_CONFIRM=install t3 install "$DEB"
 rc=$?
 ok "host script: install asks, then runs sudo apt-get install with the package" \
-    '[ "$rc" = 0 ] && grep -q "^apt-get install -y --no-install-recommends $DEB\$" "$T/log/stubs.log"'
+    '[ "$rc" = 0 ] && grep -q "^apt-get install -y --no-install-recommends $DEB\$" "$T/log/stubs.log" &&
+     [ -f "$MASTER" ]'
+unplug
 plug
 t3 check
 rc=$?
@@ -543,7 +563,7 @@ ok "host script: check passes after the card appears (reference recorded)" \
      [ "$(grep -c "^ok   SAFETY" "$T/log/t3-check.txt")" = 7 ]'
 [ "$rc" = 0 ] || sed 's/^/    /' "$T/log/t3-check.txt"
 set_volume "${OUT}Line4__sink" 1.0
-wait_until 10 'grep -q "Line4=.*channelVolumes.:.1.0" "$T/state/wireplumber/default-routes"'
+wait_until 10 'grep -qs "Line4=.*channelVolumes.:.1.0" "$T/state/wireplumber/default-routes"'
 t3 check
 rc=$?
 ok "host script: check refuses with exit 6 (SAFETY) when a sink is above 40 %" \
@@ -562,7 +582,8 @@ t3 check
 rc=$?
 ok "host script: set-default makes Headphones 9/10 the default, check confirms it" \
     '[ "$rc" = 0 ] && [ "$(q pactl get-default-sink)" = "${OUT}Headphones1__sink" ] &&
-     grep -q "^ok   default sink is Headphones Output 9/10" "$T/log/t3-check.txt"'
+     grep -q "^ok   default sink is Headphones Output 9/10" "$T/log/t3-check.txt" &&
+     grep -qx "default.configured.audio.sink=${OUT}Headphones1__sink" "$T/state/wireplumber/default-nodes"'
 session_restart
 add_other_sink
 t3 check
@@ -584,6 +605,9 @@ ok "host script: rollback purges, restores the WirePlumber state and verifies it
 [ "$rc" = 0 ] || sed 's/^/    /' "$T/log/t3-rollback.txt"
 ok "after rollback: no Fireface split sink, the other device is default again" \
     '[ -z "$(fireface_sinks)" ] && [ "$(q pactl get-default-sink)" = "ff802-test.other" ]'
+ok "after rollback: the card has its non-UCM sinks of precheck, default as recorded by precheck" \
+    '[ "$(fireface_any_sinks)" = "$unbound_sinks" ] &&
+     [ "$(cat "$T"/t3-host/before.rolled-back-*/default-sink.txt)" = "ff802-test.other" ]'
 cp "$T/master.saved" "$MASTER"
 
 # --- 10. cleanup -----------------------------------------------------------------------

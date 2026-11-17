@@ -2,7 +2,7 @@
 
 > **Stand:** Im Dev-Container mit PipeWire 1.6.2-1ubuntu1.2 und
 > WirePlumber 0.5.13-1ubuntu1.1 (Ubuntu 26.04, wie auf dem Host)
-> vollständig nachgewiesen (`pw_integration`, 46 Prüfungen). Auf dem Host
+> vollständig nachgewiesen (`pw_integration`, 48 Prüfungen). Auf dem Host
 > **noch nicht installiert**; der Host-Test ist vorbereitet
 > (`tools/hw-test/ff802-t3-host.sh`).
 
@@ -191,6 +191,9 @@ Was die Schritte prüfen:
   (Lautstärkeänderungen werden angezeigt); Vergleich mit der Referenz.
 - **limit:** senkt nur Fireface-Sinks über 40 % auf 40 % und wartet, bis
   das gespeichert ist.
+- **set-default:** `wpctl set-default` für Kopfhörer 9/10; wartet, bis
+  WirePlumber den konfigurierten Standard gespeichert hat (sonst ginge er
+  bei einem sofortigen Neustart verloren).
 - **rollback:** Bestätigung, `sudo apt-get purge`, WirePlumber anhalten,
   Zustand aus `precheck` exakt wiederherstellen, WirePlumber starten.
   Prüft danach Dateien, Prüfsummen des Zustands, dass keine Split-Sinks
