@@ -1,6 +1,6 @@
 # ALSA-UCM-Profil für das Fireface 802 (Class-Compliant-Modus)
 
-> **Stand: als Debian-Paket `ff802-ucm-profile` 0.1.0 gebaut und im
+> **Stand: als Debian-Paket `ff802-ucm-profile` 0.2.0 gebaut (UCM-Dateien seit 0.1.0 unverändert) und im
 > Container geprüft; nicht installiert, nicht aktiviert.**
 > **T1 ist bestanden** ([Lauf 2 am 2026-11-17](#t1-lauf-2-am-2026-11-17):
 > 29/29 Prüfungen, Rückbau nachgewiesen). alsa-lib findet und wertet das
@@ -250,8 +250,8 @@ Aufbau: Die Paketdateien und die Hauptdatei kommen unter dem Langnamen der
 angeschlossenen Karte in die Testkopie, `USB-Audio.conf` bleibt unverändert.
 
 ```sh
-cmake --build build --target deb          # build/deb/ff802-ucm-profile_0.1.0_all.deb
-tools/hw-test/ff802-ucm-t1-host.sh --package build/deb/ff802-ucm-profile_0.1.0_all.deb
+cmake --build build --target deb          # build/deb/ff802-ucm-profile_0.2.0_all.deb
+tools/hw-test/ff802-ucm-t1-host.sh --package build/deb/ff802-ucm-profile_0.2.0_all.deb
 ```
 
 Der Wrapper geht so vor:

@@ -234,6 +234,7 @@ cmd_precheck() {
     pactl get-default-sink > "$OUT/before/default-sink.txt" 2>/dev/null
     pactl get-default-source > "$OUT/before/default-source.txt" 2>/dev/null
     pactl list cards > "$OUT/before/cards.txt" 2>/dev/null
+    pactl list sinks > "$OUT/before/sinks-full.txt" 2>/dev/null   # incl. priority.session
     printf '%s\n' "$longname" > "$OUT/before/longname.txt"
     if [ -d "$WPSTATE" ]; then
         cp -a "$WPSTATE" "$OUT/before/wireplumber-state"
@@ -410,7 +411,7 @@ cmd_rollback() {
     [ -d "$OUT/before" ] || die "no state recorded by 'precheck'; nothing to roll back to"
     R=$OUT/rollback
     rm -rf "$R"; mkdir -p "$R"
-    confirm rollback "Remove $PKG (sudo $APT purge) and restore the WirePlumber state of precheck? WirePlumber is restarted."
+    confirm rollback "Remove $PKG (sudo $APT purge) and restore the WirePlumber state of precheck (volume/default changes made since then, also for other devices, are undone)? WirePlumber is restarted."
     if [ -n "$(pkg_version $PKG)" ]; then
         $SUDO "$APT" purge -y "$PKG" || echo "purge failed"
     fi

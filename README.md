@@ -69,6 +69,7 @@ ctest --test-dir build --output-on-failure
 | `FF802_WERROR` | `ON` | Warnungen als Fehler |
 | `FF802_REQUIRE_ALSA_TESTS` | aus Umgebung, sonst `OFF` | ALSA-/Pakettests schlagen fehl statt übersprungen zu werden (Dev-Container: `ON`) |
 | `FF802_SYSTEM_UCM2` | `/usr/share/alsa/ucm2` | UCM-Baum für `ucm_alsa_eval` und `deb_package` |
+| `FF802_PW_ROOT` | `/` | Wurzel der PipeWire-/WirePlumber-Installation für `pw_integration` (entpackter Paketbaum möglich) |
 
 Das Debian-Paket entsteht mit `cmake --build build --target deb` unter
 `build/deb/` (reproduzierbar). Installation und Entfernung: siehe
@@ -132,10 +133,11 @@ neuer), x86-64.
 | `ucm_alsa_eval` | Auswertung des Profils durch die echte alsa-lib mit nachgebildeter Fireface-Karte; führt das T1-Skript im Container aus (braucht `alsa-ucm-conf` und alsa-lib 1.2.15.x) |
 | `ucm_t1_script` | Host-Test-Skript T1 und Host-Wrapper gegen nachgebautes UCM-Verzeichnis, procfs und `alsaucm` |
 | `deb_package` | Paket: reproduzierbarer Bau, Inhalt, Installation, Gerätezuordnung, Upgrade, Entfernung und Purge in isolierter Wurzel; installierter Baum mit der echten alsa-lib ausgewertet |
+| `pw_integration` | T3: private PipeWire-Sitzung (PipeWire 1.6.x, WirePlumber 0.5.x) mit unverändertem WirePlumber-ALSA-Monitor gegen nachgebildete Karte im Paketaufbau: sechs Sinks und eine Quelle, Signalwege bis zum Hardwarekanal, Startlautstärke, Anstecken während der Wiedergabe, Persistenz, Host-Skript `ff802-t3-host.sh` (braucht `pipewire`, `wireplumber`, `pipewire-pulse`, `pulseaudio-utils`, `libspa-0.2-dev`) |
 | `test_chanmap_*`, `chanmap_cli_*`, `check_chanmap_sources`, `chanmap_binary_symbols` | ff802-chanmap: Simulation korrekter und falscher Zuordnungen, aller Abbruch- und Fehlerfälle, Pegelwächter, Kartenerkennung, pw-reserve, Auswertung, ALSA-Backend am `null`-Plugin |
 | `reproducible_release_build` | Release-Build mit `-Werror` in zwei Verzeichnissen, Programme byte-gleich |
 
-Fehlen die Voraussetzungen von `ucm_alsa_syntax` oder `ucm_alsa_eval`, werden sie
+Fehlen die Voraussetzungen von `ucm_alsa_syntax`, `ucm_alsa_eval` oder `pw_integration`, werden sie
 übersprungen. Im Dev-Container (`FF802_REQUIRE_ALSA_TESTS=ON`) schlagen sie dann
 stattdessen fehl.
 
@@ -149,6 +151,7 @@ Keiner der automatisierten Tests greift auf USB-Hardware oder eine Soundkarte zu
 - [docs/audio_ucm.md](docs/audio_ucm.md): ALSA-UCM-Profil, Host-Test T1, Lautstärkesicherheit
 - [docs/audio_ucm_einbindung.md](docs/audio_ucm_einbindung.md): produktive UCM-Einbindung (Variante A1, Paket)
 - [docs/audio_t2_plan.md](docs/audio_t2_plan.md): Hardwaretest T2 (Kanalzuordnung) mit `ff802-chanmap`
+- [docs/audio_t3.md](docs/audio_t3.md): T3, Integration in PipeWire/WirePlumber/Plasma, Lautstärkesicherheit, Host-Test
 
 ## Lizenz
 

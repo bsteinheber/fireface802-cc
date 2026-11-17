@@ -1,11 +1,11 @@
 # Produktive UCM-Einbindung unter alsa-lib 1.2.15.3
 
 > **Stand 2026-11-17: entschieden und umgesetzt.** Variante **A1** ist als
-> Debian-Paket `ff802-ucm-profile` 0.1.0 umgesetzt (`packaging/`, siehe
+> Debian-Paket `ff802-ucm-profile` (0.1.0, Dokumentation ergänzt in 0.2.0) umgesetzt (`packaging/`, siehe
 > [Umsetzung](#umsetzung)). Es ist im Container in einer isolierten Wurzel
 > geprüft und **nicht installiert**. Eine Installation auf dem Host braucht
 > eine eigene Freigabe, erst nach T2 (Kanalzuordnung) und T3
-> (PipeWire-/KDE-Sitzung). Dieses Dokument bleibt als Begründung der
+> (PipeWire-/KDE-Sitzung, im Container nachgewiesen und als Host-Test vorbereitet: [audio_t3.md](audio_t3.md)). Dieses Dokument bleibt als Begründung der
 > Entscheidung erhalten.
 
 ## Ausgangslage
