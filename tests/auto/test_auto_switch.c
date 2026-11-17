@@ -79,7 +79,7 @@ static ff802_auto_outcome run(fixture *fx, factory_ctx *c, unsigned devnum,
 static int event_kind(fixture *fx, const char *kind)
 {
     char buf[512], want[64];
-    fx_read(fx, "run/event", buf, sizeof buf);
+    fx_read(fx, "run/ff802-cc-auto/event", buf, sizeof buf);
     snprintf(want, sizeof want, "\nkind=%s\n", kind);
     return strstr(buf, want) != NULL;
 }
@@ -112,7 +112,7 @@ static void test_cc_mode(void)
     ctx_init(&c, &fx, 19);
     CHECK(run(&fx, &c, 19, &r) == FF802_AUTO_CC_ACTIVE);
     CHECK(c.n_create == 0 && c.fake.n_write == 0);
-    CHECK(r.event_seq == 0 && !fx_exists(&fx, "run/event"));   /* nothing pending */
+    CHECK(r.event_seq == 0 && !fx_exists(&fx, "run/ff802-cc-auto/event"));   /* nothing pending */
     fx_done(&fx);
 }
 
@@ -277,7 +277,7 @@ static void test_identity(void)
     ctx_init(&c, &fx, 18);
     fx_dev(&fx, PORT, "0424", "2514", 3, 18, "480", "Microchip", "USB2514B");
     CHECK(run(&fx, &c, 18, &r) == FF802_AUTO_REFUSED);
-    CHECK(c.n_create == 0 && !fx_exists(&fx, "run/event"));
+    CHECK(c.n_create == 0 && !fx_exists(&fx, "run/ff802-cc-auto/event"));
     fx_dev(&fx, PORT, "2a39", "3ffc", 3, 18, "480", "RME", "Fireface 802 FS (1)");
     CHECK(run(&fx, &c, 18, &r) == FF802_AUTO_REFUSED && c.n_create == 0);
     fx_dev(&fx, PORT, "0424", "3fdd", 3, 18, "480", "Microchip", "Fireface 802");
@@ -310,7 +310,7 @@ static void test_off(void)
         ctx_init(&c, &fx, 18);
         CHECK(run(&fx, &c, 18, &r) == FF802_AUTO_OFF);
         CHECK(c.n_create == 0 && c.fake.n_write == 0 && r.event_seq == 0);
-        CHECK(!fx_exists(&fx, "run/attempts/" PORT "_3_18"));
+        CHECK(!fx_exists(&fx, "run/ff802-cc-auto/attempts/" PORT "_3_18"));
         /* reboot: /run is empty, the off state stays */
         fx_rm_rf(fx.paths.run_dir);
         CHECK(run(&fx, &c, 18, &r) == FF802_AUTO_OFF && c.n_create == 0);

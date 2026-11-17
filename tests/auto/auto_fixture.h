@@ -52,7 +52,10 @@ static inline void fx_init(fixture *fx)
     if (ff802_auto_paths_below(&fx->paths, fx->root) != 0)
         exit(2);
     char d[256];
-    mkdir(fx->paths.state_dir, 0755);
+    char cmd[512];
+    snprintf(cmd, sizeof cmd, "mkdir -p -- '%s' '%s'", fx->paths.state_dir, fx->paths.run_dir);
+    if (system(cmd) != 0)
+        exit(2);
     snprintf(d, sizeof d, "%s/bus", fx->paths.sysfs_root);
     mkdir(fx->paths.sysfs_root, 0755);
     mkdir(d, 0755);

@@ -1,0 +1,16 @@
+# ff802-cc-auto (T4), systemd user unit: show the last event of the
+# Fireface 802 automation once (at session start and when it changes).
+# No USB access; a failure here has no effect on the system service.
+[Unit]
+Description=Fireface 802: mode switch notification
+Documentation=file:/usr/share/doc/ff802-cc-auto/README.Debian
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/ff802-cc/ff802-cc-notify
+TimeoutStartSec=60
+
+[Install]
+WantedBy=graphical-session.target

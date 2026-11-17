@@ -31,8 +31,8 @@ int ff802_auto_paths_below(ff802_auto_paths *p, const char *root)
     memset(p, 0, sizeof *p);
     if (root == NULL || root[0] != '/')
         return -1;
-    if (set_path(p->run_dir, root, "/run") != 0 ||
-        set_path(p->state_dir, root, "/state") != 0 ||
+    if (set_path(p->run_dir, root, "/run/ff802-cc-auto") != 0 ||
+        set_path(p->state_dir, root, "/var/lib/ff802-cc-auto") != 0 ||
         set_path(p->sysfs_root, root, "/sys") != 0)
         return -1;
     return 0;

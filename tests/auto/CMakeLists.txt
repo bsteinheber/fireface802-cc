@@ -52,3 +52,10 @@ if(FF802_HAVE_TOOLS)
             "-DREQUIRED=flock"
             -P ${PROJECT_SOURCE_DIR}/tests/check_binary_symbols.cmake)
 endif()
+
+# Desktop notification (test doubles for notify-send and busctl) and its
+# decoupling from the system service.
+add_test(NAME auto_notify
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/test_auto_notify.sh
+            ${PROJECT_SOURCE_DIR} $<TARGET_FILE:ff802-cc-autoswitch-sim>
+            ${CMAKE_CURRENT_BINARY_DIR}/notify-scratch)

@@ -138,7 +138,7 @@ static void test_connection_records(void)
     CHECK(ff802_sysfs_read(fx.paths.sysfs_root, "3-2.4.1.1.3", &d) == FF802_SYSFS_OK);
     CHECK(ff802_auto_claim_connection(&fx.paths, &d) == 1);
     CHECK(ff802_auto_claim_connection(&fx.paths, &d) == 0);   /* same connection */
-    CHECK(fx_exists(&fx, "run/attempts/3-2.4.1.1.3_3_18"));
+    CHECK(fx_exists(&fx, "run/ff802-cc-auto/attempts/3-2.4.1.1.3_3_18"));
     d.devnum = 20;                                             /* reconnected */
     CHECK(ff802_auto_claim_connection(&fx.paths, &d) == 1);
     /* "reboot": /run is empty again */
@@ -159,11 +159,11 @@ static void test_events(void)
     CHECK(ff802_auto_write_event(&fx.paths, FF802_EVENT_PREPARED, &d, "sent") == 1);
     CHECK(ff802_auto_write_event(&fx.paths, FF802_EVENT_FAILED, &d,
                                  "bad\nline\x01") == 2);
-    fx_read(&fx, "run/event", buf, sizeof buf);
+    fx_read(&fx, "run/ff802-cc-auto/event", buf, sizeof buf);
     CHECK(strstr(buf, "seq=2\nkind=failed\n") == buf);
     CHECK(strstr(buf, "\nport=3-2.4.1.1.3\nbusnum=3\ndevnum=18\n") != NULL);
     CHECK(strstr(buf, "\ndetail=bad?line?\n") != NULL);
-    CHECK(!fx_exists(&fx, "run/event.tmp"));
+    CHECK(!fx_exists(&fx, "run/ff802-cc-auto/event.tmp"));
 
     CHECK(!ff802_auto_pending_for(&fx.paths, "3-2.4.1.1.3"));
     CHECK(ff802_auto_set_pending(&fx.paths, &d) == 0);
@@ -175,7 +175,7 @@ static void test_events(void)
     CHECK(ff802_auto_clear_pending(&fx.paths) == 0);
 
     CHECK(ff802_auto_write_result(&fx.paths, "sent", "3-2.4.1.1.3", "ok") == 0);
-    fx_read(&fx, "run/last-result", buf, sizeof buf);
+    fx_read(&fx, "run/ff802-cc-auto/last-result", buf, sizeof buf);
     CHECK(strstr(buf, "\noutcome=sent\nport=3-2.4.1.1.3\ndetail=ok\n") != NULL);
     fx_done(&fx);
 }

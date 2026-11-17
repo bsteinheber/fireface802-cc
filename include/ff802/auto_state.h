@@ -40,7 +40,8 @@ typedef struct ff802_auto_paths {
 /* /run/ff802-cc-auto, /var/lib/ff802-cc-auto, /sys */
 void ff802_auto_default_paths(ff802_auto_paths *p);
 
-/* <root>/run, <root>/state, <root>/sys (tests). Returns 0 on success. */
+/* The same layout below <root> (tests): <root>/run/ff802-cc-auto,
+ * <root>/var/lib/ff802-cc-auto, <root>/sys. Returns 0 on success. */
 int ff802_auto_paths_below(ff802_auto_paths *p, const char *root);
 
 typedef enum ff802_auto_mode {

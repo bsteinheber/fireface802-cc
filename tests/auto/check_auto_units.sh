@@ -77,5 +77,29 @@ echo "info systemd-analyze security: exposure $exposure"
 ok "systemd-analyze security: exposure <= 2.0" \
     '[ -n "$exposure" ] && awk -v e="$exposure" "BEGIN { exit !(e <= 2.0) }"'
 
+# --- user units of the notification --------------------------------------------
+UPATH=$P/ff802-cc-notify.path
+USVC=$P/ff802-cc-notify.service
+ok "user path unit watches only the event file and starts only the notification" \
+    '[ "$(grep -E "^Path" "$UPATH")" = "PathChanged=/run/ff802-cc-auto/event" ] &&
+     grep -qx "Unit=ff802-cc-notify.service" "$UPATH" && grep -qx "WantedBy=graphical-session.target" "$UPATH"'
+ok "user service: oneshot notifier, bounded, part of the graphical session" \
+    '[ "$(grep -E "^Exec" "$USVC")" = "ExecStart=/usr/libexec/ff802-cc/ff802-cc-notify" ] &&
+     grep -qx "Type=oneshot" "$USVC" && grep -qx "TimeoutStartSec=60" "$USVC" &&
+     grep -qx "PartOf=graphical-session.target" "$USVC" && ! grep -qE "^Restart" "$USVC"'
+ok "notifier has no USB, privilege or system-unit access and writes only below XDG_RUNTIME_DIR" \
+    '! grep -Eq "ff802-cc-autoswitch|/dev/bus|sudo|pkexec|systemctl|udevadm" "$P/ff802-cc-notify" &&
+     [ "$(grep -oE "> *\"[^\"]*\"" "$P/ff802-cc-notify" | sort -u | tr "\n" ";")" = "> \"\$SEEN.tmp\";" ]'
+sed 's|/usr/libexec/ff802-cc/ff802-cc-notify|/bin/true|' "$USVC" > "$T/ff802-cc-notify.service"
+cp "$UPATH" "$T/ff802-cc-notify.path"
+xdg=$(mktemp -d /tmp/ff802-xdg.XXXXXX)   # short: socket paths of other units
+(cd "$T" && XDG_RUNTIME_DIR=$xdg systemd-analyze --user verify --man=no \
+    "$T/ff802-cc-notify.path" "$T/ff802-cc-notify.service") > "$T/verify-user.txt" 2>&1
+rc=$?
+rm -rf -- "$xdg"
+ok "systemd-analyze --user verify: no warning for the notification units" \
+    '[ "$rc" = 0 ] && ! grep -q "ff802-cc-notify" "$T/verify-user.txt"'
+grep "ff802-cc-notify" "$T/verify-user.txt" | sed 's/^/    /'
+
 echo "$checks checks, $fails failures"
 [ "$fails" -eq 0 ]

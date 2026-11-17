@@ -1,0 +1,127 @@
+#!/bin/sh
+# ff802-cc-notify (T4): desktop notification for the events of the
+# Fireface 802 automation. Runs in the user's graphical session (systemd
+# user units ff802-cc-notify.path / .service), never as root.
+#
+# Reads /run/ff802-cc-auto/event (written by ff802-cc-auto@.service) and
+# shows each event at most once per session; the last shown sequence
+# number is kept in $XDG_RUNTIME_DIR. Events that are no longer relevant
+# (device reconnected meanwhile, confirmation older than two minutes) are
+# not shown, e.g. at a login long after the boot. Sends with notify-send,
+# or with busctl (org.freedesktop.Notifications) if notify-send is missing.
+#
+# Has no access to USB and does not start anything: a failed notification
+# changes nothing on the system side. Always exits 0.
+#
+# Test overrides: FF802_NOTIFY_ROOT (prefix for /run and /sys),
+# FF802_NOTIFY_WAIT (seconds to wait for the notification service).
+
+set -u
+LC_ALL=C.UTF-8
+export LC_ALL
+
+ROOT=${FF802_NOTIFY_ROOT:-}
+EVENT=$ROOT/run/ff802-cc-auto/event
+DEVS=$ROOT/sys/bus/usb/devices
+WAIT=${FF802_NOTIFY_WAIT:-30}
+APP="Fireface 802"
+ICON=audio-card
+
+log() { echo "ff802-cc-notify: $*" >&2; }
+
+[ -r "$EVENT" ] || { log "no event"; exit 0; }
+if [ -z "${XDG_RUNTIME_DIR:-}" ] || [ ! -d "$XDG_RUNTIME_DIR" ]; then
+    log "no XDG_RUNTIME_DIR (no user session): not shown"
+    exit 0
+fi
+SEEN=$XDG_RUNTIME_DIR/ff802-cc-notify.seen
+
+field() { sed -n "s/^$1=//p" "$EVENT" | head -n 1; }
+seq=$(field seq); kind=$(field kind); time=$(field time)
+port=$(field port); busnum=$(field busnum); devnum=$(field devnum); detail=$(field detail)
+
+# strict validation: the file is root-owned, but never trust its format
+case $seq in ''|*[!0-9]*) log "invalid event (seq)"; exit 0 ;; esac
+case $time in ''|*[!0-9]*) log "invalid event (time)"; exit 0 ;; esac
+case $busnum in ''|*[!0-9]*) log "invalid event (busnum)"; exit 0 ;; esac
+case $devnum in ''|*[!0-9]*) log "invalid event (devnum)"; exit 0 ;; esac
+case $port in ''|*[!0-9.-]*) log "invalid event (port)"; exit 0 ;; esac
+case $kind in prepared|cc-active|failed) ;; *) log "invalid event (kind)"; exit 0 ;; esac
+detail=$(printf '%s' "$detail" | tr -cd '[:print:]' | cut -c1-200)
+
+seen=$(cat "$SEEN" 2>/dev/null || echo 0)
+case $seen in ''|*[!0-9]*) seen=0 ;; esac
+if [ "$seq" -le "$seen" ]; then
+    exit 0
+fi
+# mark first: whatever happens below, this event is never shown twice
+printf '%s\n' "$seq" > "$SEEN.tmp" && mv -f "$SEEN.tmp" "$SEEN"
+
+same_connection() { # the event's connection is still there, in mode <vid>
+    d=$DEVS/$port
+    [ "$(cat "$d/idVendor" 2>/dev/null)" = "$1" ] &&
+    [ "$(cat "$d/devnum" 2>/dev/null)" = "$devnum" ] &&
+    [ "$(cat "$d/busnum" 2>/dev/null)" = "$busnum" ]
+}
+
+case $kind in
+    prepared)
+        if ! same_connection 2a39; then
+            log "event $seq (prepared) no longer relevant: device reconnected"
+            exit 0
+        fi
+        summary="$APP – Class-Compliant-Modus vorbereitet"
+        body="Bitte die USB-Verbindung des Fireface kurz trennen und wieder anschließen."
+        urgency=2 ;;
+    failed)
+        if ! same_connection 2a39; then
+            log "event $seq (failed) no longer relevant: device reconnected"
+            exit 0
+        fi
+        summary="$APP – automatische Umschaltung nicht erfolgt"
+        body="$detail. Details: ff802-cc-auto status, journalctl -t ff802-cc-auto"
+        urgency=1 ;;
+    cc-active)
+        now=$(date +%s)
+        if [ $((now - time)) -gt 120 ]; then
+            log "event $seq (cc-active) older than two minutes: not shown"
+            exit 0
+        fi
+        summary="$APP – Class-Compliant-Modus aktiv"
+        body="Das Fireface ist für den Linux-Audiobetrieb bereit."
+        urgency=1 ;;
+esac
+
+# the notification service of the session (Plasma) may start after us
+have_server() { busctl --user status org.freedesktop.Notifications > /dev/null 2>&1; }
+if command -v busctl > /dev/null 2>&1; then
+    n=$((WAIT * 2))
+    while ! have_server; do
+        n=$((n - 1))
+        if [ "$n" -le 0 ]; then
+            log "event $seq ($kind): no notification service in this session; not shown"
+            exit 0
+        fi
+        sleep 0.5
+    done
+fi
+
+if command -v notify-send > /dev/null 2>&1; then
+    case $urgency in 2) u=critical ;; *) u=normal ;; esac
+    if notify-send --app-name="$APP" --icon="$ICON" --urgency="$u" "$summary" "$body"; then
+        log "event $seq ($kind) shown"
+    else
+        log "event $seq ($kind): notify-send failed; not shown"
+    fi
+elif command -v busctl > /dev/null 2>&1; then
+    if busctl --user call org.freedesktop.Notifications /org/freedesktop/Notifications \
+            org.freedesktop.Notifications Notify 'susssasa{sv}i' \
+            "$APP" 0 "$ICON" "$summary" "$body" 0 1 urgency y "$urgency" -1 > /dev/null; then
+        log "event $seq ($kind) shown"
+    else
+        log "event $seq ($kind): busctl Notify failed; not shown"
+    fi
+else
+    log "event $seq ($kind): neither notify-send nor busctl available; not shown"
+fi
+exit 0
