@@ -118,7 +118,7 @@ der Beitrag frühestens mit einem späteren Release.
 | ändert Systemdateien | nein (nur neue) | ja | nein | nein | ja (Bibliothek) | nein |
 | robust gegen alsa-ucm-conf-Updates | ja | nein | nein | ja | ja | ja |
 | andere Karten betroffen | nein | alle USB | alle | nein | alle | nein |
-| unabhängig vom USB-Port | **nein** | ja | ja | ja | ja | ja |
+| unabhängig vom USB-Port | **nein** (ab 0.3.0: ja, udev-Hook) | ja | ja | ja | ja | ja |
 | Wartungsaufwand | gering | hoch | hoch | keiner | hoch | keiner |
 | rückstandsfrei entfernbar | ja (Paket) | ja | ja | – | aufwendig | – |
 
@@ -173,5 +173,7 @@ Installation, Aktualisierung und Entfernung beschreibt
 - **Sobald alsa-lib ≥ 1.2.16 installiert ist:** `sudo ff802-ucm-bind unbind`.
   Die `conf.d`-Datei übernimmt dann, und der Test `ucm_alsa_eval` zeigt
   diesen Wechsel an.
-- **USB-Port:** Wechselt das Fireface den Port, muss es mit
-  `sudo ff802-ucm-bind bind` erneut gebunden werden.
+- **USB-Port:** Seit 0.3.0 bindet eine udev-Regel das Fireface an jedem
+  Port automatisch, siehe [audio_t3_usb_port.md](audio_t3_usb_port.md). Dass
+  das vor der ersten Verarbeitung durch WirePlumber geschieht, ist im
+  Host-Test noch zu bestätigen.

@@ -2,7 +2,7 @@
 
 > **Stand:** Im Dev-Container mit PipeWire 1.6.2-1ubuntu1.2 und
 > WirePlumber 0.5.13-1ubuntu1.1 (Ubuntu 26.04, wie auf dem Host)
-> vollständig nachgewiesen (`pw_integration`, 51 Prüfungen). Auf dem Host
+> vollständig nachgewiesen (`pw_integration`, 60 Prüfungen; Portwechsel siehe [audio_t3_usb_port.md](audio_t3_usb_port.md)). Auf dem Host
 > **noch nicht installiert**; der Host-Test ist vorbereitet
 > (`tools/hw-test/ff802-t3-host.sh`).
 
@@ -159,9 +159,9 @@ Voraussetzung: Ihre Freigabe. Das Skript fragt vor jeder Änderung nach und
 gibt selbst nie Audio aus. Ausgaben liegen in `build-t3-host/`.
 
 ```sh
-cmake --build build --target deb            # build/deb/ff802-ucm-profile_0.2.0_all.deb
+cmake --build build --target deb            # build/deb/ff802-ucm-profile_0.3.0_all.deb
 tools/hw-test/ff802-t3-host.sh precheck     # nur lesend; zeichnet den Ausgangszustand auf
-tools/hw-test/ff802-t3-host.sh install build/deb/ff802-ucm-profile_0.2.0_all.deb
+tools/hw-test/ff802-t3-host.sh install build/deb/ff802-ucm-profile_0.3.0_all.deb
 # Sicherheitsmaßnahmen, dann Fireface aus/ein (oder USB ab/an)
 tools/hw-test/ff802-t3-host.sh check        # Referenz; muss vor jeder Ausgabe bestehen
 tools/hw-test/ff802-t3-host.sh set-default  # Kopfhörer 9/10 als Systemstandard
