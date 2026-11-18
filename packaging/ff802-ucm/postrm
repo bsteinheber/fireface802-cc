@@ -1,7 +1,9 @@
 #!/bin/sh
 # postrm of ff802-ucm-profile: remove remaining device bindings (only the
 # links created by ff802-ucm-bind, recognised by their exact target) and
-# the state directory.
+# the state directory. The udev rule is gone at this point (removed by
+# dpkg before postrm); a binding made by a last event is still recorded and
+# removed here. Reloads the udev rules; never triggers udev events.
 set -e
 
 STATE="${DPKG_ROOT:-}/var/lib/ff802-ucm"
@@ -22,6 +24,9 @@ case "$1" in
         rmdir -- "$STATE" 2>/dev/null || true
         if [ "$1" = purge ]; then
             rm -rf -- "$STATE"
+        fi
+        if [ -z "${DPKG_ROOT:-}" ] && [ -d /run/udev ]; then
+            udevadm control --reload-rules || true
         fi
         ;;
     upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)

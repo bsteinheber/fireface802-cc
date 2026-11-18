@@ -261,7 +261,7 @@ cmd_install() {
     deb=$(cd -- "$(dirname -- "$deb")" && pwd)/$(basename -- "$deb")
     [ "$(dpkg-deb -f "$deb" Package 2>/dev/null)" = "$PKG" ] || die "$deb is not $PKG"
     bad=$(dpkg-deb -c "$deb" | awk '{ print $6 }' | sed 's#^\./##' | grep -v '/$' |
-          grep -vE '^usr/share/alsa/ucm2/USB-Audio/(conf\.d/0424-3fdd|RME/Fireface-802(-HiFi)?)\.conf$|^usr/share/ff802-ucm/longname-master\.conf$|^usr/sbin/ff802-ucm-bind$|^usr/share/doc/ff802-ucm-profile/')
+          grep -vE '^usr/share/alsa/ucm2/USB-Audio/(conf\.d/0424-3fdd|RME/Fireface-802(-HiFi)?)\.conf$|^usr/share/ff802-ucm/longname-master\.conf$|^usr/sbin/ff802-ucm-bind$|^usr/lib/udev/rules.d/77-ff802-ucm-bind\.rules$|^usr/share/doc/ff802-ucm-profile/')
     [ -z "$bad" ] || die "unexpected files in the package: $bad"
     echo "package: $PKG $(dpkg-deb -f "$deb" Version), files only below ucm2/USB-Audio, ff802-ucm, sbin, doc"
     cat <<'EOF'

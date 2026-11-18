@@ -1,3 +1,16 @@
+ff802-ucm-profile (0.3.0) unstable; urgency=medium
+
+  * Automatic binding on every USB port: 77-ff802-ucm-bind.rules runs
+    "ff802-ucm-bind udev <card>" on the "change" event of the sound card
+    (the event PipeWire/WirePlumber wait for). Only the original Fireface
+    802 (USB id 0424:3fdd, strict long name, high speed); only ever adds a
+    binding, never overwrites a foreign file, never removes one; nothing
+    with alsa-lib >= 1.2.16. No WirePlumber restart, no user state touched.
+  * postinst/postrm reload the udev rules (no trigger).
+  * No change of the UCM files or the master file.
+
+ -- Bernhard Steinheber <bernhard@steinheber.info>  Wed, 18 Nov 2026 12:00:00 +0100
+
 ff802-ucm-profile (0.2.0) unstable; urgency=medium
 
   * No change of the UCM files or the binding.

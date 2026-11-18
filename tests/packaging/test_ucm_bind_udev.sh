@@ -193,6 +193,19 @@ ms=$(( ($(date +%s%N) - start) / 1000000 ))
 echo "info hook run time: $ms ms"
 ok "short: one run takes well below a second (no waiting)" '[ "$ms" -lt 1000 ]'
 
+# --- udev rule (static) ---------------------------------------------------------------
+RULE=$SRC/packaging/ff802-ucm/77-ff802-ucm-bind.rules
+rules=$(grep -v '^[[:space:]]*#' "$RULE" | grep -v '^[[:space:]]*$')
+ok "rule: only the change event of sound card devices card<N> (not controlC, pcm, add)" \
+    '[ "$(printf "%s\n" "$rules" | head -n 3 | tr "\n" ";")" = "ACTION!=\"change\", GOTO=\"ff802_ucm_bind_end\";SUBSYSTEM!=\"sound\", GOTO=\"ff802_ucm_bind_end\";KERNEL!=\"card[0-9]*\", GOTO=\"ff802_ucm_bind_end\";" ]'
+ok "rule: USB id 0424:3fdd and product Fireface 802* of the same parent, card index %n" \
+    'printf "%s\n" "$rules" | grep -qxF "ATTRS{idVendor}==\"0424\", ATTRS{idProduct}==\"3fdd\", ATTRS{product}==\"Fireface 802*\", RUN+=\"/usr/sbin/ff802-ucm-bind udev %n\""'
+ok "rule: exactly one RUN, no PROGRAM/IMPORT, no access rights, no environment changes" \
+    '[ "$(printf "%s\n" "$rules" | grep -c "RUN")" = 1 ] &&
+     ! printf "%s\n" "$rules" | grep -Eq "PROGRAM|IMPORT|MODE|OWNER|GROUP|uaccess|TAG|ENV\{|SYSTEMD_WANTS|OPTIONS"'
+ok "rule: numbered before systemd's 78-sound-card.rules, ends with its label" \
+    '[ "${RULE##*/}" = "77-ff802-ucm-bind.rules" ] && [ "$(printf "%s\n" "$rules" | tail -n 1)" = "LABEL=\"ff802_ucm_bind_end\"" ]'
+
 # --- static properties ---------------------------------------------------------------
 body=$(sed -n '/^cmd_udev() {/,/^}/p' "$BIND")
 ok "udev mode never removes, overwrites or forces anything" \

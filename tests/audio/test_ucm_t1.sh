@@ -333,7 +333,7 @@ ok "package layout: USB-Audio.conf identical to the system file" \
 ok "package layout: profile files from the package" \
     'cmp -s "$W/ucm2/USB-Audio/RME/Fireface-802-HiFi.conf" "$SRC/audio/ucm2/USB-Audio/RME/Fireface-802-HiFi.conf"'
 ok "package layout recorded in the manifest" \
-    'grep -q "^layout: package ff802-ucm-profile 0.2.0" "$W/manifest.txt" && grep -q "^binding: conf.d/USB-Audio/$LN.conf" "$W/manifest.txt"'
+    'grep -q "^layout: package ff802-ucm-profile 0.3.0" "$W/manifest.txt" && grep -q "^binding: conf.d/USB-Audio/$LN.conf" "$W/manifest.txt"'
 : > "$LOG"
 rc=$(run_t1 run)
 ok "run with the package layout passes" '[ "$rc" = 0 ] && grep -q "all checks passed" "$T/out.txt"'

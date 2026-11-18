@@ -12,8 +12,10 @@ Description: ALSA UCM profile for the RME Fireface 802 in class compliant mode
  original Fireface 802 (not the 802 FS) through UCM SplitPCM.
  .
  alsa-lib before 1.2.16 ignores USB-Audio/conf.d, so the profile is bound
- to the connected card by its long name (ff802-ucm-bind). No file of
- alsa-ucm-conf is modified.
+ to the connected card by its long name (ff802-ucm-bind). The long name
+ contains the USB port; a udev rule binds the card automatically whenever
+ it is connected, also on a new port. With alsa-lib >= 1.2.16 no binding is
+ created. No file of alsa-ucm-conf is modified.
  .
  Analog outputs 1/2 are physically confirmed; the other outputs are not yet
  verified (hardware test T2). No PipeWire or WirePlumber configuration is

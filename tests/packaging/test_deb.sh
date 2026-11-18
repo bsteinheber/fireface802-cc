@@ -72,6 +72,7 @@ mkdir -p "$T/proc-none"
 printf ' 0 [sofsoundwire   ]: sof-soundwire - sof-soundwire\n                      DellInc.-XPS179730-0C4XC6\n' > "$T/proc-none/cards"
 mkproc "$T/proc-ff802" "$LONGNAME"
 mkproc "$T/proc-otherport" "RME Fireface 802 (24047128) at usb-0000:00:14.0-1, high speed"
+mkproc "$T/proc-port3" "RME Fireface 802 (24047128) at usb-0000:00:14.0-3, high speed"
 mkproc "$T/proc-fs" "RME Fireface 802 FS (12345678) at usb-0000:00:14.0-1, high speed"
 mkproc "$T/proc-slash" "RME Fireface 802 (1) at usb-a/../b, high speed"
 mkproc "$T/proc-two" "$LONGNAME"
@@ -83,7 +84,7 @@ printf ' 2 [F802B          ]: USB-Audio - Fireface 802 (2)\n                    
 # --- 1. build, reproducibility, contents ---------------------------------------
 DEB=$(sh "$SRC/packaging/build-deb.sh" "$T/out1")
 DEB2=$(sh "$SRC/packaging/build-deb.sh" "$T/out2")
-ok "package builds" '[ -f "$DEB" ] && [ "${DEB##*/}" = "ff802-ucm-profile_0.2.0_all.deb" ]'
+ok "package builds" '[ -f "$DEB" ] && [ "${DEB##*/}" = "ff802-ucm-profile_0.3.0_all.deb" ]'
 ok "build is reproducible (identical bytes)" '[ -f "$DEB2" ] && cmp -s "$DEB" "$DEB2"'
 SOURCE_DATE_EPOCH=1700000000 sh "$SRC/packaging/build-deb.sh" "$T/out3" > /dev/null
 ok "SOURCE_DATE_EPOCH changes only the timestamps" \
@@ -97,6 +98,7 @@ cat > "$T/contents.expected" <<'EOF'
 -rw-r--r-- root/root ./usr/share/doc/ff802-ucm-profile/changelog.gz
 -rw-r--r-- root/root ./usr/share/doc/ff802-ucm-profile/copyright
 -rw-r--r-- root/root ./usr/share/ff802-ucm/longname-master.conf
+-rw-r--r-- root/root ./usr/lib/udev/rules.d/77-ff802-ucm-bind.rules
 -rwxr-xr-x root/root ./usr/sbin/ff802-ucm-bind
 EOF
 sort -o "$T/contents.expected" "$T/contents.expected"
@@ -109,12 +111,17 @@ ok "profile files in the package equal the repository" \
 ok "no package file exists in the Ubuntu UCM tree (nothing is overwritten)" \
     '! (cd "$T/x/usr/share/alsa/ucm2" && find . -type f) | while IFS= read -r f; do [ -e "$SYS/$f" ] && echo "$f"; done | grep -q .'
 ok "control: name, version, architecture, dependencies" \
-    'dpkg-deb -f "$DEB" Package Version Architecture Depends | tr "\n" "|" | grep -qx "Package: ff802-ucm-profile|Version: 0.2.0|Architecture: all|Depends: alsa-ucm-conf (>= 1.2.15.3), libasound2t64 (>= 1.2.15.3)|"'
+    'dpkg-deb -f "$DEB" Package Version Architecture Depends | tr "\n" "|" | grep -qx "Package: ff802-ucm-profile|Version: 0.3.0|Architecture: all|Depends: alsa-ucm-conf (>= 1.2.15.3), libasound2t64 (>= 1.2.15.3)|"'
 ok "md5sums cover every file" \
-    '[ "$(dpkg-deb -I "$DEB" md5sums | wc -l)" = 8 ] && (cd "$T/x" && dpkg-deb -I "$DEB" md5sums | md5sum -c --quiet)'
-ok "bind tool knows the package version" '"$T/x/usr/sbin/ff802-ucm-bind" --version | grep -qx "ff802-ucm-bind 0.2.0"'
+    '[ "$(dpkg-deb -I "$DEB" md5sums | wc -l)" = 9 ] && (cd "$T/x" && dpkg-deb -I "$DEB" md5sums | md5sum -c --quiet)'
+ok "bind tool knows the package version" '"$T/x/usr/sbin/ff802-ucm-bind" --version | grep -qx "ff802-ucm-bind 0.3.0"'
 ok "maintainer scripts and bind tool pass sh -n" \
     'for s in postinst prerm postrm ff802-ucm-bind; do sh -n "$SRC/packaging/ff802-ucm/$s" || exit 1; done'
+ok "udev rule in the package equals the repository" \
+    'cmp -s "$T/x/usr/lib/udev/rules.d/77-ff802-ucm-bind.rules" "$SRC/packaging/ff802-ucm/77-ff802-ucm-bind.rules"'
+ok "maintainer scripts only reload udev rules: no trigger, no service start or restart" \
+    '! grep -Eq "udevadm +trigger|udevadm +settle|systemctl|wireplumber|pipewire" "$SRC/packaging/ff802-ucm/postinst" "$SRC/packaging/ff802-ucm/prerm" "$SRC/packaging/ff802-ucm/postrm" &&
+     [ "$(grep -c "udevadm control --reload-rules" "$SRC/packaging/ff802-ucm/postinst" "$SRC/packaging/ff802-ucm/postrm" | cut -d: -f2 | tr "\n" " ")" = "1 1 " ]'
 
 # --- 2. isolated root with stand-in dependencies ----------------------------------
 mkdir -p "$R/var/lib/dpkg/info" "$R/var/lib/dpkg/updates" "$R/var/lib/dpkg/triggers"
@@ -145,7 +152,7 @@ rc=$(run install.txt dpkg_r -i "$DEB")
 ok "install without a connected card succeeds" '[ "$rc" = 0 ]'
 ok "postinst reports the missing card" 'grep -q "no original Fireface 802 in CC mode found" "$T/install.txt"'
 ok "package is installed and configured" \
-    'dpkg-query --admindir="$R/var/lib/dpkg" -W -f="\${Status} \${Version}" ff802-ucm-profile | grep -qx "install ok installed 0.2.0"'
+    'dpkg-query --admindir="$R/var/lib/dpkg" -W -f="\${Status} \${Version}" ff802-ucm-profile | grep -qx "install ok installed 0.3.0"'
 ok "no binding without a card" '[ -z "$(ls -A "$CONFD" | grep -v "^USB-Audio.conf$")" ] && [ ! -e "$R/var/lib/ff802-ucm/bindings" ]'
 ok "files of alsa-ucm-conf unchanged" '[ "$(cd "$R/usr/share/alsa/ucm2" && find . -type f -exec cksum {} + | sort | grep -v "/RME/Fireface-802\|/USB-Audio/conf.d/0424-3fdd")" = "$sys_before" ]'
 
@@ -225,23 +232,28 @@ rc=$(run bad.txt "$BIND" frobnicate)
 ok "unknown command: usage, exit 2" '[ "$rc" = 2 ] && grep -q "Usage:" "$T/bad.txt"'
 
 # --- 7. upgrade keeps the bindings ------------------------------------------------------
-sh "$SRC/packaging/build-deb.sh" "$T/out-new" 0.2.1 > "$T/build-new.txt"
+sh "$SRC/packaging/build-deb.sh" "$T/out-new" 0.3.1 > "$T/build-new.txt"
 FF802_UCM_PROC_ASOUND=$T/proc-ff802
-rc=$(run upgrade.txt dpkg_r -i "$T/out-new/ff802-ucm-profile_0.2.1_all.deb")
-ok "upgrade to 0.2.1 succeeds" \
-    '[ "$rc" = 0 ] && dpkg-query --admindir="$R/var/lib/dpkg" -W -f="\${Version}" ff802-ucm-profile | grep -qx 0.2.1'
+rc=$(run upgrade.txt dpkg_r -i "$T/out-new/ff802-ucm-profile_0.3.1_all.deb")
+ok "upgrade to 0.3.1 succeeds" \
+    '[ "$rc" = 0 ] && dpkg-query --admindir="$R/var/lib/dpkg" -W -f="\${Version}" ff802-ucm-profile | grep -qx 0.3.1'
 ok "bindings survive the upgrade and point to the new master file" \
     '[ -f "$CONFD/$LONGNAME.conf" ] && [ -f "$CONFD/$OTHER.conf" ] && [ "$(wc -l < "$R/var/lib/ff802-ucm/bindings")" = 2 ] && grep -q "already bound" "$T/upgrade.txt"'
-ok "bind tool reports the new version" '"$BIND" --version | grep -qx "ff802-ucm-bind 0.2.1"'
+ok "bind tool reports the new version" '"$BIND" --version | grep -qx "ff802-ucm-bind 0.3.1"'
 
 # --- 8. removal -------------------------------------------------------------------------
+PORT3="RME Fireface 802 (24047128) at usb-0000:00:14.0-3, high speed"
+rc=$(run udev.txt env FF802_UCM_PROC_ASOUND="$T/proc-port3" FF802_UCM_ALSA_LIB_VERSION=1.2.15.3-1ubuntu1.1 "$BIND" udev 1)
+ok "installed udev hook binds the card on a third USB port; old bindings stay" \
+    '[ "$rc" = 0 ] && [ -L "$CONFD/$PORT3.conf" ] && [ -f "$CONFD/$LONGNAME.conf" ] && [ -f "$CONFD/$OTHER.conf" ] &&
+     [ "$(wc -l < "$R/var/lib/ff802-ucm/bindings")" = 3 ]'
 echo "foreign" > "$CONFD/foreign.conf"
 rc=$(run remove.txt dpkg_r -r ff802-ucm-profile)
 ok "remove succeeds" '[ "$rc" = 0 ]'
-ok "remove deletes all bindings" '[ ! -e "$CONFD/$LONGNAME.conf" ] && [ ! -L "$CONFD/$LONGNAME.conf" ] && [ ! -L "$CONFD/$OTHER.conf" ]'
+ok "remove deletes all bindings" '[ ! -e "$CONFD/$LONGNAME.conf" ] && [ ! -L "$CONFD/$LONGNAME.conf" ] && [ ! -L "$CONFD/$OTHER.conf" ] && [ ! -L "$CONFD/$PORT3.conf" ]'
 ok "remove leaves foreign files alone" '[ "$(cat "$CONFD/foreign.conf")" = foreign ]'
 ok "remove deletes the package files and the state" \
-    '[ ! -e "$R/usr/share/ff802-ucm" ] && [ ! -e "$BIND" ] && [ ! -e "$R/usr/share/alsa/ucm2/USB-Audio/conf.d" ] && [ ! -e "$R/var/lib/ff802-ucm" ]'
+    '[ ! -e "$R/usr/share/ff802-ucm" ] && [ ! -e "$BIND" ] && [ ! -e "$R/usr/lib/udev/rules.d/77-ff802-ucm-bind.rules" ] && [ ! -e "$R/usr/share/alsa/ucm2/USB-Audio/conf.d" ] && [ ! -e "$R/var/lib/ff802-ucm" ]'
 rm -f "$CONFD/foreign.conf"
 ok "root equals the state before the installation" '[ "$(tree_sum)" = "$tree_before" ]'
 

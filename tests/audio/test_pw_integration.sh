@@ -499,7 +499,7 @@ cat > "$ST/dpkg-query" <<EOF
 #!/bin/sh
 for a in "\$@"; do last=\$a; done
 if [ "\$last" = ff802-ucm-profile ]; then
-    [ -e "$T/pkg-installed" ] && echo "install ok installed 0.2.0" && exit 0
+    [ -e "$T/pkg-installed" ] && echo "install ok installed 0.3.0" && exit 0
     exit 1
 fi
 exec dpkg-query "\$@"

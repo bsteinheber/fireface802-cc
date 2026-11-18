@@ -46,6 +46,7 @@ put 0644 "$UCM/RME/Fireface-802.conf"         usr/share/alsa/ucm2/USB-Audio/RME/
 put 0644 "$UCM/RME/Fireface-802-HiFi.conf"    usr/share/alsa/ucm2/USB-Audio/RME/Fireface-802-HiFi.conf
 put 0644 "$PKGSRC/longname-master.conf"       usr/share/ff802-ucm/longname-master.conf
 put 0755 "$PKGSRC/ff802-ucm-bind"             usr/sbin/ff802-ucm-bind
+put 0644 "$PKGSRC/77-ff802-ucm-bind.rules"    usr/lib/udev/rules.d/77-ff802-ucm-bind.rules
 sed -i "s/@VERSION@/$VERSION/" "$STAGE/usr/sbin/ff802-ucm-bind"
 put 0644 "$PKGSRC/copyright"                  usr/share/doc/$NAME/copyright
 put 0644 "$PKGSRC/README.Debian"              usr/share/doc/$NAME/README.Debian

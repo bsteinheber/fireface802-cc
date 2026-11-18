@@ -3,12 +3,17 @@
 # Never fails because of a missing or ambiguous device. Does not restart
 # PipeWire or WirePlumber: the profile becomes active when the Fireface is
 # reconnected (see README.Debian, volume safety).
+# Reloads the udev rules (77-ff802-ucm-bind.rules binds the card on every
+# later connection); never triggers udev events.
 set -e
 
 case "$1" in
     configure)
         "${DPKG_ROOT:-}/usr/sbin/ff802-ucm-bind" auto || \
             echo "ff802-ucm-profile: binding failed; run 'sudo ff802-ucm-bind bind' later" >&2
+        if [ -z "${DPKG_ROOT:-}" ] && [ -d /run/udev ]; then
+            udevadm control --reload-rules || true
+        fi
         echo "ff802-ucm-profile: status: sudo ff802-ucm-bind status;" \
              "see /usr/share/doc/ff802-ucm-profile/README.Debian"
         ;;

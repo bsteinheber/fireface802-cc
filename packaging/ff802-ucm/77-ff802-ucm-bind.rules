@@ -1,0 +1,21 @@
+# ff802-ucm-profile (0.3.0): bind the UCM profile of the original RME
+# Fireface 802 in class-compliant mode automatically, on every USB port.
+#
+# Event: "change" of the sound card device card<N>. systemd's
+# 78-sound-card.rules generates it from the "add" of controlC<N>, i.e.
+# when all device nodes of the card exist, and sets SOUND_INITIALIZED=1 on
+# it; PipeWire/WirePlumber wait for exactly this event. udev normally
+# relays an event to listeners only after its RUN programs have finished,
+# so the binding should exist before WirePlumber opens the card. This is
+# checked in the host test, not taken for granted.
+#
+# %n is the kernel number of card<N>, i.e. the ALSA card index. All ATTRS
+# match the USB device the card belongs to. "ff802-ucm-bind udev" checks
+# everything again (USB id, strict long name, alsa-lib < 1.2.16), takes
+# milliseconds, only ever adds a binding and always exits 0.
+
+ACTION!="change", GOTO="ff802_ucm_bind_end"
+SUBSYSTEM!="sound", GOTO="ff802_ucm_bind_end"
+KERNEL!="card[0-9]*", GOTO="ff802_ucm_bind_end"
+ATTRS{idVendor}=="0424", ATTRS{idProduct}=="3fdd", ATTRS{product}=="Fireface 802*", RUN+="/usr/sbin/ff802-ucm-bind udev %n"
+LABEL="ff802_ucm_bind_end"

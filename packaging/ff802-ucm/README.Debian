@@ -39,6 +39,7 @@ Files
   /usr/share/alsa/ucm2/USB-Audio/conf.d/0424-3fdd.conf       selection, refuses the 802 FS
   /usr/share/ff802-ucm/longname-master.conf                  master file for the binding
   /usr/sbin/ff802-ucm-bind                                   device binding
+  /usr/lib/udev/rules.d/77-ff802-ucm-bind.rules              automatic binding (0.3.0)
 
 No file of alsa-ucm-conf is changed.
 
@@ -53,8 +54,14 @@ therefore links exactly this file for the connected card:
   /usr/share/alsa/ucm2/conf.d/USB-Audio/RME Fireface 802 (<serial>) at usb-<port>, high speed.conf
       -> ../../../../ff802-ucm/longname-master.conf
 
-The long name contains the USB port. On another port or hub the profile is
-not active (the card keeps its previous profiles) until it is bound again.
+The long name contains the USB port. Since 0.3.0 the udev rule
+/usr/lib/udev/rules.d/77-ff802-ucm-bind.rules binds the card automatically
+whenever it is connected, also on a new port or hub ("ff802-ucm-bind udev
+<card>", logged as ff802-ucm-bind in the journal). It runs on the "change"
+event of the sound card that PipeWire waits for, so normally the profile is
+active right away, without restarting WirePlumber. It only adds bindings,
+never replaces a file it did not create, and does nothing with
+alsa-lib >= 1.2.16.
 
 Installation
 ------------
@@ -80,6 +87,10 @@ the first playback (docs/audio_ucm.md, "Lautstärkesicherheit vor T3").
 Other USB port, other Fireface
 ------------------------------
 
+Nothing to do: the udev rule binds the card on every port (old bindings
+stay). If the six outputs are missing anyway (check: journalctl -b -t
+ff802-ucm-bind), bind by hand and reconnect the Fireface:
+
   sudo ff802-ucm-bind bind      binds the currently connected card (additional
                                 binding; old bindings stay until unbind)
   sudo ff802-ucm-bind unbind    removes all bindings made by this tool
@@ -97,7 +108,8 @@ and USB-Audio/conf.d/0424-3fdd.conf then selects the profile on its own.
 Removal
 -------
 
-  sudo apt remove ff802-ucm-profile    removes the profile and all bindings
+  sudo apt remove ff802-ucm-profile    removes the profile, the udev rule and all
+                                       bindings (also those made by the rule)
   sudo apt purge ff802-ucm-profile     also removes /var/lib/ff802-ucm
 
 Links or files in conf.d/USB-Audio that were not created by ff802-ucm-bind
