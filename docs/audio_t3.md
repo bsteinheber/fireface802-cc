@@ -2,9 +2,11 @@
 
 > **Stand:** Im Dev-Container mit PipeWire 1.6.2-1ubuntu1.2 und
 > WirePlumber 0.5.13-1ubuntu1.1 (Ubuntu 26.04, wie auf dem Host)
-> vollständig nachgewiesen (`pw_integration`, 60 Prüfungen; Portwechsel siehe [audio_t3_usb_port.md](audio_t3_usb_port.md)). Auf dem Host
-> **noch nicht installiert**; der Host-Test ist vorbereitet
-> (`tools/hw-test/ff802-t3-host.sh`).
+> vollständig nachgewiesen (`pw_integration`, 60 Prüfungen; Portwechsel siehe [audio_t3_usb_port.md](audio_t3_usb_port.md)).
+> Auf dem Host ist `ff802-ucm-profile` 0.3.0 installiert. Der
+> Host-Hardwaretest des Portwechsels vom 2026-11-18 ist bestanden
+> (`verify-03`, siehe [audio_t3_usb_port.md](audio_t3_usb_port.md#host-test-2026-11-18-ergebnis)).
+> Host-Test-Skript: `tools/hw-test/ff802-t3-host.sh`.
 
 ## Ergebnis
 
@@ -153,7 +155,11 @@ bleiben für den Host-Test:
 - **Installation mit dpkg/apt auf dem Host** und Rücknahme mit dem
   `systemctl`-Neustart von WirePlumber.
 
-## Host-Test T3 (vorbereitet, nicht ausgeführt)
+## Host-Test T3
+
+Der Ablauf wurde auf dem Host ausgeführt; das zuletzt dokumentierte
+Ergebnis ist `verify-03` nach dem Portwechsel mit 0.3.0
+([audio_t3_usb_port.md](audio_t3_usb_port.md#host-test-2026-11-18-ergebnis)).
 
 Voraussetzung: Ihre Freigabe. Das Skript fragt vor jeder Änderung nach und
 gibt selbst nie Audio aus. Ausgaben liegen in `build-t3-host/`.

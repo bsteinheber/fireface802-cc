@@ -2,8 +2,13 @@
 
 > **Stand:** Im Dev-Container vollständig entwickelt und getestet
 > (Simulation von sysfs, USB, udev/systemd-Aufrufen und Desktop). Auf dem
-> Host **nicht installiert, nicht aktiviert, kein echter Schreibzugriff**.
-> Paket: `ff802-cc-auto` 0.1.0.
+> Host ist `ff802-cc-auto` 0.1.0 **installiert und aktiviert**. Die
+> automatische Aktivierung des Class-Compliant-Modus wurde auf dem Host
+> **erfolgreich getestet**. Nach dem Umschaltbefehl ist gegebenenfalls ein
+> physisches Trennen und Wiederanschließen der USB-Verbindung erforderlich
+> (siehe [Ereignisablauf](#ereignisablauf-automatik-an-gerät-proprietär)).
+> Welche Einzelschritte des [Host-Testplans](#host-testplan) ausgeführt
+> wurden, ist nicht dokumentiert.
 
 T4 hat zwei Teile:
 
@@ -284,7 +289,11 @@ cmake -S . -B build && cmake --build build && ctest --test-dir build
   CC-Modus, weil keine Trennung stattfindet.
 - **`ff802-cc disable`** ist offen, siehe [t4_disable.md](t4_disable.md).
 
-## Erster Host-Test (vorbereitet, Freigabe nötig)
+## Host-Testplan
+
+Die automatische Aktivierung wurde auf dem Host erfolgreich getestet.
+Welche der folgenden Schritte dabei im Einzelnen ausgeführt wurden, ist
+nicht dokumentiert.
 
 1. **Nur lesend**, Fireface im proprietären Modus (nach Windows):
    `lsusb -d 2a39:3fcd` und

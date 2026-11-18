@@ -1,7 +1,7 @@
 # ALSA-UCM-Profil für das Fireface 802 (Class-Compliant-Modus)
 
-> **Stand: als Debian-Paket `ff802-ucm-profile` 0.2.0 gebaut (UCM-Dateien seit 0.1.0 unverändert) und im
-> Container geprüft; nicht installiert, nicht aktiviert.**
+> **Stand: Debian-Paket `ff802-ucm-profile`, auf dem Host Version 0.3.0
+> installiert (UCM-Dateien seit 0.1.0 unverändert).**
 > **T1 ist bestanden** ([Lauf 2 am 2026-11-17](#t1-lauf-2-am-2026-11-17):
 > 29/29 Prüfungen, Rückbau nachgewiesen). alsa-lib findet und wertet das
 > Profil mit der echten Karte aus, wenn es geladen wird. Die

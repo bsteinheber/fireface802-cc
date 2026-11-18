@@ -10,9 +10,9 @@ Linux-Werkzeug zur Umschaltung des **ursprünglichen RME Fireface 802**
 | 1  | Kodierung der Registerbefehle und Tests | abgeschlossen |
 | 2a | Diagnoseprogramm `ff802-detect`: lesende Geräteerkennung | abgeschlossen, auf dem Host getestet |
 | 2b | Umschaltprogramm `ff802-cc` mit Diagnosemodus | abgeschlossen, Umschaltung auf dem Host erfolgreich getestet |
-| 3 | ALSA-UCM-Profil mit sechs Stereo-Ausgängen für den CC-Modus, Debian-Paket `ff802-ucm-profile` | Host-Test T1 bestanden, Paket gebaut und isoliert getestet, **nicht installiert, Kanalzuordnung unbestätigt** |
+| 3 | ALSA-UCM-Profil mit sechs Stereo-Ausgängen für den CC-Modus, Debian-Paket `ff802-ucm-profile` (T1, T3) | Host-Test T1 bestanden; Version **0.3.0 auf dem Host installiert**, automatischer USB-Portwechsel auf dem Host erfolgreich getestet (2026-11-18, [docs/audio_t3_usb_port.md](docs/audio_t3_usb_port.md)); Kanalzuordnung unbestätigt (T2) |
 | 4 | Messwerkzeug `ff802-chanmap` für die Kanalzuordnung (Hardwaretest T2) | implementiert und im Container getestet, T2 nicht ausgeführt |
-| T4 | Automatischer Wechsel in den CC-Modus beim Anschließen/Systemstart, Debian-Paket `ff802-cc-auto`; Untersuchung `ff802-cc disable` | im Container implementiert und getestet, **nicht installiert**; `disable` nicht möglich (kein belegtes Verfahren) |
+| T4 | Automatischer Wechsel in den CC-Modus beim Anschließen/Systemstart, Debian-Paket `ff802-cc-auto`; Untersuchung `ff802-cc disable` | Version **0.1.0 auf dem Host installiert**, automatische Umschaltung in den Class-Compliant-Modus auf dem Host erfolgreich getestet; `disable` nicht möglich (kein belegtes Verfahren) |
 
 Im Standard-Build kann **kein Programm Daten an das Gerät senden**. Die
 Schreibfunktion wird nur mit `-DFF802_ENABLE_USB_WRITE=ON` einkompiliert

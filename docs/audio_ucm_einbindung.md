@@ -2,10 +2,10 @@
 
 > **Stand 2026-11-17: entschieden und umgesetzt.** Variante **A1** ist als
 > Debian-Paket `ff802-ucm-profile` (0.1.0, Dokumentation ergänzt in 0.2.0) umgesetzt (`packaging/`, siehe
-> [Umsetzung](#umsetzung)). Es ist im Container in einer isolierten Wurzel
-> geprüft und **nicht installiert**. Eine Installation auf dem Host braucht
-> eine eigene Freigabe, erst nach T2 (Kanalzuordnung) und T3
-> (PipeWire-/KDE-Sitzung, im Container nachgewiesen und als Host-Test vorbereitet: [audio_t3.md](audio_t3.md)). Dieses Dokument bleibt als Begründung der
+> [Umsetzung](#umsetzung)). Auf dem Host ist inzwischen Version 0.3.0
+> installiert (automatische Bindung an jedem USB-Port:
+> [audio_t3_usb_port.md](audio_t3_usb_port.md); PipeWire-/KDE-Sitzung:
+> [audio_t3.md](audio_t3.md)). Dieses Dokument bleibt als Begründung der
 > Entscheidung erhalten.
 
 ## Ausgangslage
@@ -174,6 +174,8 @@ Installation, Aktualisierung und Entfernung beschreibt
   Die `conf.d`-Datei übernimmt dann, und der Test `ucm_alsa_eval` zeigt
   diesen Wechsel an.
 - **USB-Port:** Seit 0.3.0 bindet eine udev-Regel das Fireface an jedem
-  Port automatisch, siehe [audio_t3_usb_port.md](audio_t3_usb_port.md). Dass
-  das vor der ersten Verarbeitung durch WirePlumber geschieht, ist im
-  Host-Test noch zu bestätigen.
+  Port automatisch, siehe [audio_t3_usb_port.md](audio_t3_usb_port.md). Auf
+  dem Host am 2026-11-18 funktional bestätigt (neuer Port `3-2.4.1.4.3`,
+  ohne WirePlumber-Neustart). Dass die Bindung zeitlich vor der ersten
+  Verarbeitung durch WirePlumber entsteht, ist nicht per Zeitstempel
+  nachgewiesen.

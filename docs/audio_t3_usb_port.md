@@ -1,9 +1,14 @@
 # T3 0.3.0: UCM-Bindung an jedem USB-Port
 
-> **Stand:** `ff802-ucm-profile` 0.3.0 im Dev-Container implementiert und
-> getestet. Auf dem Host **nicht installiert**. Die Annahme zur
-> Reihenfolge von udev und WirePlumber (unten, A1) ist **nicht
-> verifiziert** und wird im Host-Test ausdrücklich geprüft.
+> **Stand 2026-11-18:** `ff802-ucm-profile` 0.3.0 ist auf dem Host
+> installiert. Der Host-Hardwaretest des Portwechsels ist **bestanden**
+> (siehe [Host-Test 2026-11-18](#host-test-2026-11-18-ergebnis)): Am neuen
+> Port entstand die Bindung automatisch, das Profil war ohne
+> WirePlumber-Neustart aktiv. A2 bis A5 sind bestätigt. A1 ist
+> **funktional** bestätigt; die genaue zeitliche Reihenfolge von udev-Hook
+> und WirePlumber ist **nicht** durch einen Zeitstempelvergleich
+> nachgewiesen. Die Schritte 5 bis 10 des Testplans wurden nicht
+> berichtet und bleiben offen.
 
 ## Problem
 
@@ -83,15 +88,15 @@ dieselbe Kette.
 Der Hook löscht nie etwas, startet nichts neu und greift weder auf
 WirePlumber noch auf Benutzersitzungen oder deren Zustand zu.
 
-## Annahmen (nicht als gesichert betrachtet)
+## Annahmen
 
-| Nr. | Annahme | Begründung | Prüfung |
-|---|---|---|---|
-| A1 | Die Bindung existiert, bevor WirePlumber die Karte öffnet | udev gibt ein Ereignis normalerweise erst an Programme wie PipeWire weiter, wenn die `RUN`-Programme beendet sind; PipeWire wartet auf das `change` mit `SOUND_INITIALIZED` | **Host-Test, Schritte 4 und 7** |
-| A2 | Ubuntu 26.04 erzeugt das `change` auf `card<N>` wie beschrieben | Inhalt von `78-sound-card.rules` (systemd) | Host-Test, Schritt 1 (nur lesend) |
-| A3 | `systemd-udevd` darf `/usr` schreiben (kein `ProtectSystem`) | Standard-Unit von systemd | Host-Test, Schritt 1 (nur lesend) |
-| A4 | `idVendor`, `idProduct` und `product` liegen am selben Elterngerät | USB-Geräteknoten | Host-Test, Schritt 1 (`udevadm info -a`) |
-| A5 | Die Knotennamen hängen nicht vom Port ab, daher gelten gespeicherte Lautstärken und Standardausgänge am neuen Port | `verify-02 PERSISTENT` nach dem Portwechsel; Container-Test | Host-Test, Schritt 4 |
+| Nr. | Annahme | Begründung | Prüfung | Ergebnis Host-Test 2026-11-18 |
+|---|---|---|---|---|
+| A1 | Die Bindung existiert, bevor WirePlumber die Karte öffnet | udev gibt ein Ereignis normalerweise erst an Programme wie PipeWire weiter, wenn die `RUN`-Programme beendet sind; PipeWire wartet auf das `change` mit `SOUND_INITIALIZED` | Host-Test, Schritte 4 und 7 | **funktional bestätigt** (Schritt 4): Bindung automatisch angelegt, Profil ohne manuelle Bindung und ohne WirePlumber-Neustart aktiv (PID unverändert). **Zeitliche Reihenfolge nicht nachgewiesen**: kein Zeitstempelvergleich Journal ↔ `udevadm monitor`. Kaltstart (Schritt 7) nicht berichtet |
+| A2 | Ubuntu 26.04 erzeugt das `change` auf `card<N>` wie beschrieben | Inhalt von `78-sound-card.rules` (systemd) | Host-Test, Schritt 1 (nur lesend) | **bestätigt**: Ereignis `ACTION=change` mit `SOUND_INITIALIZED=1` beobachtet |
+| A3 | `systemd-udevd` darf `/usr` schreiben (kein `ProtectSystem`) | Standard-Unit von systemd | Host-Test, Schritt 1 (nur lesend) | **bestätigt durch das Ergebnis**: Die Regel hat die Bindung angelegt |
+| A4 | `idVendor`, `idProduct` und `product` liegen am selben Elterngerät | USB-Geräteknoten | Host-Test, Schritt 1 (`udevadm info -a`) | **bestätigt durch das Ergebnis**: Die Regel hat gegriffen |
+| A5 | Die Knotennamen hängen nicht vom Port ab, daher gelten gespeicherte Lautstärken und Standardausgänge am neuen Port | `verify-02 PERSISTENT` nach dem Portwechsel; Container-Test | Host-Test, Schritt 4 | **bestätigt**: Lautstärken erhalten, Standard weiter Line2 (3/4), `verify-03` bestanden |
 
 Trifft A1 nicht zu, ist die Folge harmlos. Die Bindung entsteht trotzdem,
 aber die Karte erscheint beim ersten Anschluss an diesem Port ohne
@@ -137,7 +142,7 @@ sudo apt install ./ff802-ucm-profile_0.3.0_all.deb     # Host, Administrator
 Die Reihenfolge innerhalb von udev (A1) lässt sich im Container nicht
 prüfen: Dort gibt es kein udevd.
 
-## Host-Test (Freigabe nötig)
+## Host-Testplan
 
 Ausgangslage: 0.2.0 und T4 installiert, Fireface im CC-Modus an Port A
 gebunden. Zuerst die Lautstärkesicherheit herstellen: Kopfhörer ab,
@@ -204,3 +209,48 @@ Verstärker aus, keine Wiedergabe.
     - Alternativ zurück auf 0.2.0:
       `sudo apt install --allow-downgrades ./ff802-ucm-profile_0.2.0_all.deb`.
       Danach zeigt `ff802-ucm-bind status` die Bindungen weiter an.
+
+## Host-Test 2026-11-18: Ergebnis
+
+**Bestanden.** Der Portwechsel bindet das Profil automatisch, ohne
+manuelle Bindung und ohne WirePlumber-Neustart.
+
+| Punkt | Ergebnis |
+|---|---|
+| System | Kubuntu 26.04.1, PipeWire 1.6.2, WirePlumber 0.5.13 |
+| Gerät | originales RME Fireface 802, Seriennummer 24047128, Class-Compliant-Modus `0424:3fdd` |
+| alsa-lib | 1.2.15.3-1ubuntu1.1: Workaround weiterhin nötig |
+| Paket | `ff802-ucm-profile` 0.3.0 installiert |
+| Neuer USB-Port | `3-2.4.1.4.3` |
+| udev-Ereignis | `ACTION=change` mit `SOUND_INITIALIZED=1` |
+| Bindung am neuen Port | automatisch angelegt, keine manuelle Bindung (`ff802-ucm-bind bind` nicht ausgeführt) |
+| Geräte | sechs getrennte Stereoausgänge und ein Stereo-Eingang |
+| Benutzereinstellungen | individuelle Lautstärken erhalten, Standardausgang weiter Line2 (Analog 3/4) |
+| `ff802-t3-host.sh verify` | `PASSED (verify-03)` |
+| WirePlumber vor und nach dem Portwechsel | `MainPID=8863`, `ActiveState=active`: kein Neustart |
+
+Bezug zum Testplan: Schritt 4 ist für A5 bestanden. Für A1 ist zu
+unterscheiden:
+
+- **Funktional bestätigt:** Nach dem Wechsel auf den neuen USB-Port
+  `3-2.4.1.4.3` entstand die Bindung automatisch. Danach waren weder eine
+  manuelle UCM-Bindung noch ein WirePlumber-Neustart erforderlich
+  (dieselbe PID 8863).
+- **Nicht nachgewiesen:** die genaue zeitliche Reihenfolge, also dass der
+  udev-Hook die Bindung anlegt, bevor WirePlumber die Karte öffnet. Der
+  in Schritt 4 vorgesehene Vergleich der monotonen Zeitstempel von
+  `journalctl -o short-monotonic -t ff802-ucm-bind` und
+  `udevadm monitor` wurde nicht durchgeführt bzw. nicht festgehalten. Die
+  Reihenfolge gilt deshalb weiterhin nur als begründete Annahme.
+
+**Nicht als T3-Fehlschlag gewertet:** Ein vorheriger Versuch an einem
+zusätzlichen USB-Hub am Monitor führte zu keiner USB-Erkennung des
+Fireface. Ohne erkanntes USB-Gerät gibt es kein Soundkarten-Ereignis.
+Dieser Versuch hat T3 also nicht geprüft.
+
+**Offen (nicht berichtet):** Schritt 5 (erneut an Port B), 6 (weiterer
+Port), 7 (Kaltstart an einem neuen Port), 8 (anderes USB-Audiogerät),
+9 (Zusammenspiel mit T4) und 10 (Rückbau).
+
+**Offen aus Schritt 4:** der Zeitstempelvergleich zum Nachweis der
+zeitlichen Reihenfolge (A1).
