@@ -49,3 +49,8 @@ if(FF802_DPKG_DEB AND FF802_DPKG AND FF802_HAVE_TOOLS)
                 ${PROJECT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}/deb-auto-scratch)
     set_tests_properties(deb_auto_package PROPERTIES TIMEOUT 900)
 endif()
+
+# ff802-ucm-bind udev <N> (T3 0.3.0): automatic binding on every USB port.
+add_test(NAME ucm_bind_udev
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/test_ucm_bind_udev.sh
+            ${PROJECT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}/bind-udev-scratch)

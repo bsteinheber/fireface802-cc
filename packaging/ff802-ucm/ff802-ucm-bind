@@ -12,7 +12,16 @@
 #   status        show cards, bindings and whether the workaround is needed
 #   bind [--force]  bind the connected original Fireface 802
 #   auto          like bind, but never fails (used by the postinst)
+#   udev <N>      bind ALSA card N if it is an original Fireface 802 in CC
+#                 mode; run by 77-ff802-ucm-bind.rules, never fails (0.3.0)
 #   unbind        remove every binding created by this tool
+#
+# 'udev' makes the profile work on every USB port: the long name contains
+# the port, so each new port needs its own binding. The udev rule runs it
+# on the "change" event of the sound card, which udev normally relays to
+# PipeWire only after RUN programs have finished; it is short (no
+# waiting), idempotent and only ever adds a binding. It does nothing with
+# alsa-lib >= 1.2.16, never touches WirePlumber or any user state.
 #
 # Environment (tests and dpkg):
 #   DPKG_ROOT                     root of the installation (set by dpkg)
@@ -40,10 +49,13 @@ info() { echo "$PROG: $*"; }
 usage() {
     cat <<EOF
 Usage: $PROG status | bind [--force] | auto | unbind | --help | --version
+       $PROG udev <card number>   (internal: run by the udev rule)
 
 Binds the Fireface 802 UCM profile to the connected card (alsa-lib < 1.2.16).
-After bind or unbind, reconnect the Fireface (or restart WirePlumber) for
-PipeWire to pick up the change.
+Since 0.3.0 the udev rule binds the card automatically whenever it is
+connected, also on a new USB port. After a manual bind or unbind,
+reconnect the Fireface (or restart WirePlumber) for PipeWire to pick up
+the change.
 EOF
 }
 
@@ -104,6 +116,78 @@ record() {
     mkdir -p "$STATE"
     touch "$BINDINGS"
     grep -qxF -- "$1" "$BINDINGS" || printf '%s\n' "$1" >> "$BINDINGS"
+}
+
+# Long name of an original Fireface 802 at high speed, exactly as
+# snd-usb-audio builds it: "RME Fireface 802 (<serial>) at usb-<host
+# controller>-<port path>, high speed". Rejects the 802 FS ("802 FS"),
+# every other device and anything that is unsafe as a file name.
+strict_name_ok() {
+    name_ok "$1" || return 1
+    printf '%s\n' "$1" | grep -Eqx \
+        'RME Fireface 802 \([0-9]{1,16}\) at usb-[0-9A-Za-z:._-]{1,64}-[1-9][0-9]{0,2}(\.[1-9][0-9]{0,2}){0,6}, high speed'
+}
+
+# udev <N>: bind ALSA card N. Exits 0 in every case; each decision is
+# logged (stdout and syslog). Only ever adds a binding: a file that exists
+# under the card's name is never replaced, nothing is removed.
+cmd_udev() {
+    n=$1
+    ulog() {
+        echo "$PROG: udev card$n: $*"
+        if command -v logger > /dev/null 2>&1; then
+            logger -t "$PROG" -- "udev card$n: $*" 2>/dev/null || true
+        fi
+    }
+    case $n in
+        ""|*[!0-9]*|0?*) ulog "invalid card number; nothing done"; return 0 ;;
+    esac
+    [ "$n" -le 31 ] || { ulog "invalid card number; nothing done"; return 0; }
+    d=$PROC/card$n
+    usbid=$(cat "$d/usbid" 2>/dev/null || true)
+    [ "$usbid" = "$USBID" ] || { ulog "USB id '$usbid' is not $USBID; nothing done"; return 0; }
+    ln=$(sed -n "/^ *$n \[/{n;s/^ *//;s/ *\$//;p;q;}" "$PROC/cards" 2>/dev/null || true)
+    if ! strict_name_ok "$ln"; then
+        ulog "'$ln' is not an original Fireface 802 at high speed; nothing done"
+        return 0
+    fi
+    if ! workaround_needed; then
+        ulog "alsa-lib $(alsa_lib_version) loads USB-Audio/conf.d itself; no binding created"
+        return 0
+    fi
+    [ -f "$MASTER" ] || { ulog "master file missing; nothing done"; return 0; }
+    [ -d "$CONFD" ] && [ -w "$CONFD" ] || { ulog "$CONFD missing or not writable; nothing done"; return 0; }
+
+    # serialise simultaneous events (best effort, never blocks for long)
+    lockf=$ROOT/run/$PROG.lock
+    if command -v flock > /dev/null 2>&1 && [ -d "${lockf%/*}" ] && [ -w "${lockf%/*}" ]; then
+        exec 9>> "$lockf"
+        flock -w 5 9 || ulog "lock busy; continuing"
+    fi
+
+    f=$CONFD/$ln.conf
+    if ours "$f"; then
+        (record "$ln") 2>/dev/null || ulog "warning: cannot record the binding in $BINDINGS"
+        ulog "already bound: $ln"
+        return 0
+    fi
+    if [ -e "$f" ] || [ -L "$f" ]; then
+        ulog "$f exists and was not created by $PROG; left alone"
+        return 0
+    fi
+    # record first: a link is never created without an entry for unbind/postrm
+    if ! (record "$ln") 2>/dev/null; then
+        ulog "cannot record the binding in $BINDINGS; nothing done"
+        return 0
+    fi
+    if ln -s -- "$TARGET" "$f" 2>/dev/null; then
+        ulog "bound: $ln"
+    elif ours "$f"; then
+        ulog "already bound: $ln"
+    else
+        ulog "could not create $f; nothing done"
+    fi
+    return 0
 }
 
 cmd_status() {
@@ -199,6 +283,10 @@ case ${1:-} in
             *) usage >&2; exit 2 ;;
         esac ;;
     auto) cmd_bind 0 1 ;;
+    udev)
+        [ $# = 2 ] || { usage >&2; exit 2; }
+        cmd_udev "$2"
+        exit 0 ;;
     unbind) cmd_unbind ;;
     -h|--help) usage ;;
     --version) echo "$PROG $VERSION" ;;
