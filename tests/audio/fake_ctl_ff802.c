@@ -15,7 +15,10 @@
  *   ctl.!hw { @args [ CARD ] @args.CARD.type string type ff802fake card $CARD }
  *
  * Card fields can be changed with FF802_FAKE_LONGNAME, FF802_FAKE_NAME,
- * FF802_FAKE_ID and FF802_FAKE_COMPONENTS.
+ * FF802_FAKE_ID and FF802_FAKE_COMPONENTS. FF802_FAKE_LONGNAME_FILE names
+ * a file whose first line, if the file exists, is used as the long name;
+ * it is read at every open, so a running PipeWire session sees the card
+ * "on another USB port" after the next reconnect.
  *
  * snd_ctl_ext cannot report "components", but UCM needs them
  * (${CardComponents}, USB id). The plugin therefore wraps the card_info
@@ -27,6 +30,7 @@
 #include <alsa/control_external.h>
 
 #include <stddef.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -65,6 +69,28 @@ static const char *env_or(const char *name, const char *def)
 {
     const char *v = getenv(name);
     return v && v[0] ? v : def;
+}
+
+/* Long name: first line of $FF802_FAKE_LONGNAME_FILE, else the variable. */
+static void long_name(char *buf, size_t size)
+{
+    const char *path = getenv("FF802_FAKE_LONGNAME_FILE");
+    FILE *fp = (path && path[0]) ? fopen(path, "r") : NULL;
+
+    if (fp != NULL) {
+        if (fgets(buf, (int)size, fp) != NULL) {
+            buf[strcspn(buf, "\n")] = '\0';
+            fclose(fp);
+            if (buf[0] != '\0')
+                return;
+        } else {
+            fclose(fp);
+        }
+    }
+    strncpy(buf, env_or("FF802_FAKE_LONGNAME",
+                        "RME Fireface 802 (24047128) at usb-0000:00:14.0-2.4.1.1.3, high speed"),
+            size - 1);
+    buf[size - 1] = '\0';
 }
 
 static int fake_card_info(snd_ctl_t *ctl, snd_ctl_card_info_t *info)
@@ -196,10 +222,7 @@ SND_CTL_PLUGIN_DEFINE_FUNC(ff802fake)
     strncpy(f->ext.driver, "USB-Audio", sizeof(f->ext.driver) - 1);
     strncpy(f->ext.name, env_or("FF802_FAKE_NAME", "Fireface 802 (24047128)"),
             sizeof(f->ext.name) - 1);
-    strncpy(f->ext.longname,
-            env_or("FF802_FAKE_LONGNAME",
-                   "RME Fireface 802 (24047128) at usb-0000:00:14.0-2.4.1.1.3, high speed"),
-            sizeof(f->ext.longname) - 1);
+    long_name(f->ext.longname, sizeof(f->ext.longname));
     strncpy(f->ext.mixername, "USB Mixer", sizeof(f->ext.mixername) - 1);
     strncpy(f->components, env_or("FF802_FAKE_COMPONENTS", "USB0424:3fdd"),
             sizeof(f->components) - 1);

@@ -638,7 +638,98 @@ ok "after rollback: the card has its non-UCM sinks of precheck, default as recor
      [ "$(cat "$T"/t3-host/before.rolled-back-*/default-sink.txt)" = "ff802-test.other" ]'
 cp "$T/master.saved" "$MASTER"
 
-# --- 10. cleanup -----------------------------------------------------------------------
+# --- 10. another USB port: automatic binding by the udev hook (0.3.0) -------------
+# Installed layout below $PR (ff802-ucm-bind works on DPKG_ROOT=$PR): the
+# UCM tree with the binding of port A as the package's relative link to
+# the master file (the test master: LibraryConfig + package master). The
+# card's long name comes from a file, so it changes on reconnect. The
+# hook is run the way udev runs it for the card's "change" event: after
+# the card appeared in the kernel, before PipeWire handles the card. That
+# udev really orders it like this is checked in the host test.
+PR=$T/pkgroot
+CONFD_PR=$PR/usr/share/alsa/ucm2/conf.d/USB-Audio
+LN_A="RME Fireface 802 (24047128) at usb-0000:00:14.0-2.4.1.1.3, high speed"
+LN_B="RME Fireface 802 (24047128) at usb-0000:00:14.0-1, high speed"
+LN_C="RME Fireface 802 (24047128) at usb-0000:00:14.0-3.2, high speed"
+mkdir -p "$PR/usr/share/alsa" "$PR/usr/share/ff802-ucm" "$PR/var/lib/ff802-ucm" "$PR/run"
+cp -a "$T/t1/ucm2" "$PR/usr/share/alsa/ucm2"
+cp "$T/master.saved" "$PR/usr/share/ff802-ucm/longname-master.conf"
+rm -f "$CONFD_PR/$LN_A.conf"
+ln -s ../../../../ff802-ucm/longname-master.conf "$CONFD_PR/$LN_A.conf"
+printf '%s\n' "$LN_A" > "$PR/var/lib/ff802-ucm/bindings"
+hook_proc() { # hook_proc <dir> <long name>: /proc/asound of the card on that port
+    mkdir -p "$1/card1"
+    echo 0424:3fdd > "$1/card1/usbid"
+    printf ' 1 [F80224047128   ]: USB-Audio - Fireface 802 (24047128)\n                      %s\n' "$2" > "$1/cards"
+}
+udev_hook() { # udev_hook <proc dir> [<alsa-lib version>]: ff802-ucm-bind udev 1
+    env DPKG_ROOT="$PR" FF802_UCM_PROC_ASOUND="$1" \
+        FF802_UCM_ALSA_LIB_VERSION="${2:-1.2.15.3-1ubuntu1.1}" \
+        sh "$SRC/packaging/ff802-ucm/ff802-ucm-bind" udev 1 >> "$T/log/udev-hook.txt" 2>&1
+    echo $?
+}
+wp_state() { (cd "$T/state/wireplumber" 2>/dev/null && find . -type f -exec cksum {} + | sort); }
+ours_pr() { [ -L "$CONFD_PR/$1.conf" ] && [ "$(readlink "$CONFD_PR/$1.conf")" = ../../../../ff802-ucm/longname-master.conf ]; }
+
+session_stop
+ALSA_CONFIG_UCM2=$PR/usr/share/alsa/ucm2
+FF802_FAKE_LONGNAME_FILE=$T/enum/longname
+export ALSA_CONFIG_UCM2 FF802_FAKE_LONGNAME_FILE
+printf '%s\n' "$LN_A" > "$T/enum/longname"
+rm -f "$T/enum/present"
+session_start && add_other_sink
+plug
+ok "port A, bound by the package's relative link: six sinks" '[ "$(fireface_sinks | wc -l)" = 6 ]'
+set_volume "${OUT}Line3__sink" 0.30
+q wpctl set-default "$(node_id ${OUT}Line2__sink)"
+wait_until 10 'grep -qs "Line3=.*channelVolumes" "$T/state/wireplumber/default-routes" &&
+               grep -qsx "default.configured.audio.sink=${OUT}Line2__sink" "$T/state/wireplumber/default-nodes"'
+wp_pid=$(cat "$T/wp.pid")
+
+unplug
+sleep 1                                  # WirePlumber settles after the removal
+printf '%s\n' "$LN_B" > "$T/enum/longname"
+hook_proc "$T/proc-portB" "$LN_B"
+state_before=$(wp_state)
+rc=$(udev_hook "$T/proc-portB")
+ok "card on an unknown USB port B: the hook binds it, the binding of port A stays" \
+    '[ "$rc" = 0 ] && ours_pr "$LN_B" && ours_pr "$LN_A" &&
+     [ "$(cat "$PR/var/lib/ff802-ucm/bindings" | tr "\n" ";")" = "$LN_A;$LN_B;" ]'
+ok "the hook changes no WirePlumber state (volumes, defaults, streams)" '[ "$(wp_state)" = "$state_before" ]'
+plug
+ok "port B: six sinks and the source at once, same names, WirePlumber not restarted" \
+    '[ "$(fireface_sinks | tr "\n" " ")" = "${OUT}Headphones1__sink ${OUT}Headphones2__sink ${OUT}Line1__sink ${OUT}Line2__sink ${OUT}Line3__sink ${OUT}Line4__sink " ] &&
+     [ "$(fireface_sources)" = "${IN}Line5__source" ] && [ "$(cat "$T/wp.pid")" = "$wp_pid" ] &&
+     kill -0 "$wp_pid" 2>/dev/null'
+ok "port B: the user's settings apply unchanged (Line3 0.30, configured default Line2)" \
+    '[ "$(volume ${OUT}Line3__sink)" = "0.30" ] && [ "$(q pactl get-default-sink)" = "${OUT}Line2__sink" ] &&
+     [ "$(volume ${OUT}Headphones1__sink)" = "0.40" ]'
+peaks_reset
+play "${OUT}Line3__sink" "$T/sq1.raw"
+sleep 0.3
+ok "port B: Line3 reaches hardware channels 4/5 at the stored volume" \
+    'only_pair 4 5 $(( FS * 265 / 10000 )) $(( FS * 275 / 10000 ))'
+
+before_c=$(wp_state)
+for i in 1 2 3; do udev_hook "$T/proc-portB" > /dev/null; done
+ok "repeated change events on port B: no change, no restart" \
+    '[ "$(find "$CONFD_PR" -type l -lname ../../../../ff802-ucm/longname-master.conf | wc -l)" = 2 ] &&
+     [ "$(cat "$T/wp.pid")" = "$wp_pid" ] && [ "$(wp_state)" = "$before_c" ] &&
+     [ "$(grep -c "already bound: $LN_B" "$T/log/udev-hook.txt")" = 3 ]'
+
+unplug
+printf '%s\n' "$LN_C" > "$T/enum/longname"
+plug_unbound
+ok "control: port C without the hook gets no profile (the binding is what matters)" \
+    '[ -z "$(fireface_sinks)" ] && [ -n "$(fireface_any_sinks)" ]'
+unplug
+hook_proc "$T/proc-portC" "$LN_C"
+rc=$(udev_hook "$T/proc-portC" 1.2.16-1)
+ok "alsa-lib 1.2.16: the hook creates no binding" '[ "$rc" = 0 ] && [ ! -e "$CONFD_PR/$LN_C.conf" ]'
+rm -f "$T/enum/longname"
+unset FF802_FAKE_LONGNAME_FILE
+
+# --- 11. cleanup -----------------------------------------------------------------------
 session_stop
 left=""
 for p in $ALL_PIDS; do kill -0 "$p" 2>/dev/null && left="$left $p"; done
