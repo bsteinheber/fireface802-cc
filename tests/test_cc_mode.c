@@ -62,6 +62,47 @@ static void test_null_output(void)
     CHECK(ff802_cc_command(true, NULL) == FF802_ERR_NULL_ARG);
 }
 
+/* Transfer that switched a real unit from CC to proprietary mode
+ * (hardware test 2026-11-19, interface 3, bulk OUT 0x07). Literal. */
+static const uint8_t TESTED_CC_DISABLE_MIDI[16] = {
+    0x13, 0xF0, 0x00, 0x20, 0x13, 0x0D, 0x10, 0x00,
+    0x13, 0x7E, 0x7F, 0x13, 0x13, 0x6A, 0x0B, 0xF7
+};
+
+static void test_disable_midi(void)
+{
+    uint8_t out[16];
+    memset(out, 0xAA, sizeof out);
+    CHECK(ff802_cc_disable_midi(out) == FF802_OK);
+    CHECK_BYTES(out, TESTED_CC_DISABLE_MIDI, 16);
+    CHECK(ff802_cc_disable_midi(NULL) == FF802_ERR_NULL_ARG);
+}
+
+/* The tested bytes carry register 0x3D44 = 0xFFFE with valid parity. */
+static void test_disable_midi_decodes(void)
+{
+    const uint8_t *b = TESTED_CC_DISABLE_MIDI;
+    uint8_t sysex[12];
+    for (int p = 0; p < 4; p++) {
+        CHECK(b[4 * p] == 0x13);
+        for (int i = 0; i < 3; i++)
+            sysex[3 * p + i] = b[4 * p + 1 + i];
+    }
+    static const uint8_t head[6] = { 0xF0, 0x00, 0x20, 0x0D, 0x10, 0x00 };
+    CHECK_BYTES(sysex, head, 6);
+    CHECK(sysex[11] == 0xF7);
+    uint32_t w = 0;
+    for (int i = 0; i < 5; i++) {
+        CHECK(sysex[6 + i] <= 0x7F);
+        w |= (uint32_t)sysex[6 + i] << (7 * i);
+    }
+    CHECK_EQ_U32(w, 0xBD44FFFEu);
+    uint16_t addr = 0, value = 0;
+    CHECK(ff802_reg_decode(w, &addr, &value) == FF802_OK);
+    CHECK_EQ_U32(addr, 0x3D44u);
+    CHECK_EQ_U32(value, 0xFFFEu);
+}
+
 int main(void)
 {
     test_capture_enable();
@@ -69,5 +110,7 @@ int main(void)
     test_captures_decode();
     test_parity_bit_differs();
     test_null_output();
+    test_disable_midi();
+    test_disable_midi_decodes();
     TEST_EXIT();
 }
