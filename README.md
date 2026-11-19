@@ -3,16 +3,51 @@
 Linux-Werkzeug zur Umschaltung des **ursprünglichen RME Fireface 802**
 (nicht 802 FS) zwischen proprietärem USB-Modus und Class-Compliant-Modus.
 
+> **English summary:** Tools for using the original RME Fireface 802 (not
+> the 802 FS) under Linux. `ff802-cc` switches the interface between its
+> proprietary USB mode and class compliant (CC) mode, `ff802-cc-auto`
+> does the switch automatically when the unit is plugged in, and
+> `ff802-ucm-profile` adds an ALSA UCM profile with six stereo outputs and
+> one stereo input for PipeWire/WirePlumber. Built and tested on Kubuntu
+> (alsa-lib 1.2.15, PipeWire 1.6, WirePlumber 0.5) with one unit. The
+> documentation is in German. Not affiliated with or endorsed by RME; see
+> [Lizenz](#lizenz) and [Marken](#marken).
+
+## Sicherheitshinweise
+
+- **Lautstärke:** Vor dem ersten Anschließen, vor jeder Umschaltung und vor
+  Hardwaretests Lautsprecher und Kopfhörer leise stellen oder abnehmen.
+  Im CC-Modus gilt der im Gerät gespeicherte Mixer-Zustand (TotalMix);
+  Pegel und Routing können anders sein als erwartet. Neue Ausgänge starten
+  mit der WirePlumber-Vorgabe von 40 % (−23,9 dB). Eine einmal geänderte
+  Lautstärke speichert WirePlumber jedoch und stellt sie beim nächsten
+  Anstecken wieder her, auch 100 % (siehe
+  [docs/audio_t3.md](docs/audio_t3.md)). Vor dem Gerätemixer schützt
+  beides nicht.
+- **USB-Schreibzugriffe:** `ff802-cc enable|disable` und der Dienst von
+  `ff802-cc-auto` senden Registerbefehle an das Gerät. Sie sind nur für das
+  ursprüngliche Fireface 802 gedacht und nur mit einem Gerät getestet. Die
+  Befehle sind durch Beobachtung ermittelt und nicht vom Hersteller
+  dokumentiert. Benutzung auf eigene Gefahr, siehe
+  [docs/usb_comm.md](docs/usb_comm.md) (Risiken) und die MIT-Lizenz
+  (keine Gewährleistung).
+- **Zurück in den proprietären Modus ohne Linux:** TotalMix FX unter
+  Windows oder macOS setzt das Gerät automatisch in den Normalmodus
+  zurück, ebenso die optionale Fernbedienung ARC (Prog und B beim
+  Einschalten halten), siehe [docs/t4_disable.md](docs/t4_disable.md).
+- Während der Umschaltung keine Audiowiedergabe laufen lassen;
+  `ff802-cc disable` verweigert dann den Wechsel.
+
 ## Projektstand
 
 | Phase | Inhalt | Stand |
 |-------|--------|-------|
 | 1  | Kodierung der Registerbefehle und Tests | abgeschlossen |
 | 2a | Diagnoseprogramm `ff802-detect`: lesende Geräteerkennung | abgeschlossen, auf dem Host getestet |
-| 2b | Umschaltprogramm `ff802-cc` mit Diagnosemodus | abgeschlossen, Umschaltung auf dem Host erfolgreich getestet; `disable` (CC → proprietär) und Port-Reset nach `enable` umgesetzt (2026-11-19 am Gerät erfolgreich getestet); Debian-Paket `ff802-cc` 0.4.0 gebaut und getestet, **nicht installiert** |
-| 3 | ALSA-UCM-Profil mit sechs Stereo-Ausgängen für den CC-Modus, Debian-Paket `ff802-ucm-profile` (T1, T3) | Host-Test T1 bestanden; Version **0.3.0 auf dem Host installiert**, automatischer USB-Portwechsel auf dem Host erfolgreich getestet (2026-11-18, [docs/audio_t3_usb_port.md](docs/audio_t3_usb_port.md)); Kanalzuordnung unbestätigt (T2) |
-| 4 | Messwerkzeug `ff802-chanmap` für die Kanalzuordnung (Hardwaretest T2) | implementiert und im Container getestet, T2 nicht ausgeführt |
-| T4 | Automatischer Wechsel in den CC-Modus beim Anschließen/Systemstart, Debian-Paket `ff802-cc-auto`; Untersuchung `ff802-cc disable` | Version **0.1.0 auf dem Host installiert**, automatische Umschaltung in den Class-Compliant-Modus auf dem Host erfolgreich getestet; 0.1.1 (nur Dokumentation, Neubau) vorbereitet; `disable` ist Teil von `ff802-cc` |
+| 2b | Umschaltprogramm `ff802-cc` mit Diagnosemodus | abgeschlossen; `enable` mit Port-Reset und `disable` am 2026-11-19 am Gerät erfolgreich getestet; Paket `ff802-cc` **0.4.0 auf dem Host installiert** (gebaut aus Commit `e12a1d0`, siehe [docs/packages.md](docs/packages.md)) |
+| 3 | ALSA-UCM-Profil mit sechs Stereo-Ausgängen für den CC-Modus, Debian-Paket `ff802-ucm-profile` (T1, T3) | T1 bestanden, T3 funktional erfolgreich getestet (sechs Stereo-Ausgänge, ein Stereo-Eingang; Analog 3/4, Kopfhörer 9/10 und 11/12 mit realer Wiedergabe); Version **0.3.0 auf dem Host installiert**, automatischer USB-Portwechsel erfolgreich getestet (2026-11-18, [docs/audio_t3_usb_port.md](docs/audio_t3_usb_port.md)) |
+| 4 | Messwerkzeug `ff802-chanmap` für die Kanalzuordnung (Hardwaretest T2) | T2 laut Rückmeldung vom 2026-11-17 erfolgreich; die Messergebnisse liegen nicht im Repository, die Markierung `FF802-CHANNEL-MAP: UNVERIFIED` im Profil ist noch nicht umgestellt |
+| T4 | Automatischer Wechsel in den CC-Modus beim Anschließen/Systemstart, Debian-Paket `ff802-cc-auto`; Untersuchung `ff802-cc disable` | Version 0.1.0 auf dem Host installiert und aktiviert, automatische Umschaltung erfolgreich getestet; ob inzwischen 0.1.1 (nur Dokumentation, Neubau) installiert ist, ist nicht bestätigt; `disable` ist Teil von `ff802-cc` |
 
 Im Standard-Build kann **kein Programm Daten an das Gerät senden**. Die
 Schreibfunktion wird nur mit `-DFF802_ENABLE_USB_WRITE=ON` einkompiliert
@@ -80,8 +115,7 @@ ctest --test-dir build --output-on-failure
 
 Das Debian-Paket entsteht mit `cmake --build build --target deb` unter
 `build/deb/` (reproduzierbar). Installation und Entfernung: siehe
-[packaging/ff802-ucm/README.Debian](packaging/ff802-ucm/README.Debian), erst
-nach T2 und T3.
+[packaging/ff802-ucm/README.Debian](packaging/ff802-ucm/README.Debian).
 Das T4-Paket entsteht mit `cmake --build build --target deb-auto`
 (`build/deb/ff802-cc-auto_<Version>_amd64.deb`, siehe [docs/t4_usb_mode.md](docs/t4_usb_mode.md)),
 das Paket der manuellen Umschaltung mit `cmake --build build --target deb-cc`
@@ -91,32 +125,41 @@ Rückbau aller drei Pakete: [docs/packages.md](docs/packages.md).
 
 ## Programme auf dem Kubuntu-Host
 
-Mit dem Paket `ff802-cc` (0.4.0, vorbereitet) liegen `ff802-cc` und
-`ff802-detect` unter `/usr/bin`:
+Mit dem Paket `ff802-cc` liegen `ff802-cc` und `ff802-detect` unter
+`/usr/bin` (auf dem Entwicklungsrechner installiert: 0.4.0 aus Commit
+`e12a1d0`, siehe [docs/packages.md](docs/packages.md#installationsstand)):
 
 ```sh
 ff802-detect                 # Geräteerkennung (öffnet kein Gerät)
-ff802-cc --version           # ff802-cc 0.4.0 (git <Revision>, Release, USB writes enabled)
+ff802-cc --version           # ff802-cc <Version> (git <Revision>, Release, USB writes enabled)
 sudo ff802-cc enable         # proprietär -> CC, danach USB-Hub-Port-Reset
 sudo ff802-cc disable        # CC -> proprietär; verweigert bei ff802-cc-auto on
 ```
 
-Ohne das Paket laufen die im Container gebauten Programme direkt aus dem
-eingebundenen Projektverzeichnis, ohne Entwicklungswerkzeuge:
+Ohne das Paket laufen die im Dev-Container gebauten Programme auch direkt
+auf dem Host aus dem eingebundenen Projektverzeichnis, ohne
+Entwicklungswerkzeuge. `<Projekt>` steht für den Pfad des Checkouts auf
+dem Host:
 
 ```sh
+cd <Projekt>
+
 # Geräteerkennung (öffnet kein Gerät)
-/home/bernhard/Develop/fireface802-cc/build/ff802-detect
+build/ff802-detect
 
 # Diagnose vor der Umschaltung (öffnet das Gerät, beansprucht nichts, sendet nichts)
-/home/bernhard/Develop/fireface802-cc/build/ff802-cc check
+build/ff802-cc check
 
-# Umschaltung (im Standard-Build gesperrt; schreibfähiger Build: build-write)
+# Umschaltung (im Standard-Build gesperrt; schreibfähiger Build: build-write,
+# konfiguriert mit -DFF802_ENABLE_USB_WRITE=ON)
 # proprietär -> CC, danach automatischer USB-Hub-Port-Reset
-sudo /home/bernhard/Develop/fireface802-cc/build-write/ff802-cc enable
+sudo build-write/ff802-cc enable
 # CC -> proprietär (USB-MIDI-Interface 3); verweigert bei ff802-cc-auto on
-sudo /home/bernhard/Develop/fireface802-cc/build-write/ff802-cc disable
+sudo build-write/ff802-cc disable
 ```
+
+Ist das Paket installiert, nur noch `/usr/bin/ff802-cc` verwenden, damit
+eindeutig ist, welche Fassung läuft (`--version`).
 
 Details: [docs/cc_disable_port_reset.md](docs/cc_disable_port_reset.md).
 

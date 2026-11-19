@@ -1,8 +1,11 @@
 # Hardwaretest T2: Kanalzuordnung mit `ff802-chanmap`
 
-> **Stand 2026-11-17: Werkzeug implementiert und im Container geprüft,
-> T2 nicht ausgeführt.** T2 ist der erste Test, der Signale ausgibt und
-> aufnimmt, und braucht eine eigene Freigabe.
+> **Stand:** Werkzeug implementiert und im Container geprüft. **T2 wurde
+> laut Rückmeldung vom 2026-11-17 erfolgreich ausgeführt.** Die
+> Messergebnisse sind nicht im Repository dokumentiert, und die
+> Markierung `FF802-CHANNEL-MAP: UNVERIFIED` im Profil ist noch nicht auf
+> `VERIFIED` umgestellt. Der folgende Plan beschreibt den Test, wie er vor
+> der Ausführung festgelegt wurde.
 
 ## Ziel
 

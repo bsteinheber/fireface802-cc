@@ -1,9 +1,42 @@
 # Pakete: Übersicht, Versionen, Bau, Installation, Rückbau
 
-> **Stand 2026-11-19:** Auf dem Host installiert sind `ff802-ucm-profile`
-> 0.3.0 und `ff802-cc-auto` 0.1.0. `ff802-cc` 0.4.0 und `ff802-cc-auto`
-> 0.1.1 sind im Dev-Container gebaut und getestet, aber **nicht
-> installiert**.
+> **Stand 2026-11-19:** Auf dem Entwicklungsrechner installiert sind
+> `ff802-ucm-profile` 0.3.0, `ff802-cc-auto` 0.1.0 und `ff802-cc` 0.4.0
+> (gebaut aus Commit `e12a1d0`). Ob `ff802-cc-auto` 0.1.1 installiert
+> wurde, ist nicht bestätigt. Einzelheiten:
+> [Installationsstand](#installationsstand).
+
+## Installationsstand
+
+| Paket | installiert | Paket im Dev-Container (`build/deb/`) | SHA-256 |
+|---|---|---|---|
+| `ff802-ucm-profile` | 0.3.0 | 0.3.0, gebaut 2026-11-18 (Paket seit `c116416`) | `53bf3cf5c0e71c3612a30192a0f5e185484e3c72db2926b76ef888723dd79805` |
+| `ff802-cc-auto` | 0.1.0; 0.1.1 nicht bestätigt | 0.1.0, gebaut 2026-11-17 | `4735acddb02ae57f22cb26baca88c28cc9d9298a61259c806d85a2e7dfb52cef` |
+| | | 0.1.1, gebaut 2026-11-19 aus `e12a1d0` | `555356ccd2d1bad2c1d942911ef067fbdb7e471b2bd2ceeed165bc4f6ab8b162` |
+| `ff802-cc` | 0.4.0 | 0.4.0, gebaut 2026-11-19 aus `e12a1d0` | `14772f0720589a8aea2e6a09ba4fd49dfe23c7b5445070ace516ed270b0a04b0` |
+
+Ob die installierten Dateien genau diese `.deb` waren, ist nicht über
+Prüfsummen auf dem Host bestätigt.
+
+- **`ff802-cc` 0.4.0 stammt aus `e12a1d0`, nicht aus dem Tag `v0.4.0`.**
+  `e12a1d0` ist der Commit direkt vor `v0.4.0` (`c0acd9a`). Der einzige
+  Unterschied ist das historische Referenzskript
+  `tools/hw-test/ff802-disable-test.py`, das in keinem Paket enthalten
+  ist. Programme und Paketinhalt sind daher gleich.
+- `ff802-cc --version` und `/usr/share/doc/ff802-cc/BUILDINFO` zeigen
+  deshalb `e12a1d0`, nicht `c0acd9a`. Ein Neubau aus `v0.4.0` ergibt eine
+  andere Revision und damit andere Prüfsummen.
+- Prüfen auf dem Host (nur lesend):
+
+  ```sh
+  dpkg -l 'ff802-*'
+  ff802-cc --version     # ff802-cc 0.4.0 (git e12a1d0201ea, Release, USB writes enabled)
+  grep commit /usr/share/doc/ff802-cc/BUILDINFO   # git commit: e12a1d0201ea2b018b7ece39b89a0b7f712c5996
+  ```
+
+- Die installierten Pakete bleiben vorerst unverändert. Die nächsten
+  Paketversionen (Projektversion 0.4.1) unterscheiden sich von den
+  installierten nur in Lizenzangaben und Dokumentation.
 
 ## Die drei Pakete
 

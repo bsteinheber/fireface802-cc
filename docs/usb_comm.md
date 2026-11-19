@@ -191,10 +191,14 @@ Endpunkt und Bytes an. Nur die exakte Eingabe `ENABLE` löst die
    Windows-Treiber oder ein Gerätemenü.
    *T4:* Geklärt, siehe [t4_disable.md](t4_disable.md). TotalMix FX setzt das
    Gerät auf Windows oder macOS automatisch zurück; alternativ die ARC
-   (Prog + B (Mono) beim Einschalten). Einen belegten USB-Befehl dafür gibt es
+   (Prog + B (Mono) beim Einschalten). Einen belegten USB-Befehl dafür gab es
    nicht.
+   *Seit 2026-11-19:* `ff802-cc disable` schaltet per USB-MIDI-SysEx zurück
+   (am Gerät getestet), siehe [cc_disable_port_reset.md](cc_disable_port_reset.md).
 3. **CC-Kennung unbestätigt.** Dass `0424:3fdd` die CC-Kennung ist und
    `snd-usb-audio` das Gerät unterstützt, ist unter Linux nicht geprüft.
+   *Inzwischen bestätigt:* Nach der Umschaltung meldet sich das Gerät als
+   `0424:3fdd` und wird von `snd-usb-audio` als Karte eingebunden (T1).
 4. **Alternate Setting.** Das Werkzeug setzt kein Alternate Setting. Es
    geht davon aus, dass Interface 1 nach der Enumeration auf Setting 0
    steht. Hat der Windows-Treiber vorher ein Setting aktiv gewählt, weicht

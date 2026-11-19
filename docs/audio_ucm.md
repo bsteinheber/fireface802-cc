@@ -4,13 +4,18 @@
 > installiert (UCM-Dateien seit 0.1.0 unverändert).**
 > **T1 ist bestanden** ([Lauf 2 am 2026-11-17](#t1-lauf-2-am-2026-11-17):
 > 29/29 Prüfungen, Rückbau nachgewiesen). alsa-lib findet und wertet das
-> Profil mit der echten Karte aus, wenn es geladen wird. Die
-> Kanalzuordnung ist weiterhin **unbestätigt**
-> (`FF802-CHANNEL-MAP: UNVERIFIED`); das prüft T2, siehe
-> [audio_t2_plan.md](audio_t2_plan.md); das Messwerkzeug `ff802-chanmap` ist
-> implementiert. Die produktive Einbindung (Variante A1, Paket) beschreibt
+> Profil mit der echten Karte aus, wenn es geladen wird. **T2 und die
+> Funktionstests von T3** sind laut Rückmeldung vom 2026-11-17
+> erfolgreich: sechs Stereo-Ausgänge und ein Stereo-Eingang unter Kubuntu,
+> Analog 3/4, Kopfhörer 9/10 und 11/12 mit realer Wiedergabe geprüft. Die
+> Messergebnisse von T2 liegen nicht im Repository; die Markierung
+> `FF802-CHANNEL-MAP: UNVERIFIED` in den Profildateien ist deshalb noch
+> nicht umgestellt (siehe [audio_t2_plan.md](audio_t2_plan.md)). Die
+> produktive Einbindung (Variante A1, Paket) beschreibt
 > [audio_ucm_einbindung.md](audio_ucm_einbindung.md).
-> T2 und T3 brauchen jeweils eine eigene Freigabe.
+>
+> Die Abschnitte „Risiken vor T2 und T3“ und die Hinweise „unbestätigt“
+> in den Tabellen geben den Planungsstand vor diesen Tests wieder.
 
 ## Ziel
 
@@ -240,7 +245,7 @@ Empfohlen ist der vollständige Lauf mit Zustandsvergleich und garantiertem
 Rückbau:
 
 ```sh
-cd /home/bernhard/Develop/fireface802-cc
+cd <Projekt>                            # Checkout auf dem Host
 tools/hw-test/ff802-ucm-t1-host.sh      # Ausgaben in build-t1/ (git-ignoriert)
 echo $?
 ```

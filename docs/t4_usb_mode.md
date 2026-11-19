@@ -10,10 +10,11 @@
 > Welche Einzelschritte des [Host-Testplans](#host-testplan) ausgeführt
 > wurden, ist nicht dokumentiert.
 >
-> Vorbereitet, nicht installiert: `ff802-cc-auto` 0.1.1. Es enthält nur
-> Dokumentation und einen Neubau, die Funktion ist unverändert. Die
-> manuelle Umschaltung kommt als eigenes Paket `ff802-cc` 0.4.0. Siehe
-> [packages.md](packages.md).
+> `ff802-cc-auto` 0.1.1 enthält nur Dokumentation und einen Neubau, die
+> Funktion ist unverändert; ob es auf dem Host installiert wurde, ist
+> nicht bestätigt. Die manuelle Umschaltung ist das eigene Paket
+> `ff802-cc` 0.4.0, auf dem Host installiert (gebaut aus `e12a1d0`). Siehe
+> [packages.md](packages.md#installationsstand).
 
 T4 hat zwei Teile:
 

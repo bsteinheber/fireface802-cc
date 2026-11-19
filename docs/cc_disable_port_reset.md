@@ -2,7 +2,8 @@
 
 > **Stand:** Beide Verfahren wurden am 2026-11-19 von Hand am realen Gerät
 > erfolgreich getestet: Disable mit dem Python-Skript
-> `tools/hw-test/ff802-disable-test.py` (nicht eingecheckt), der Port-Reset
+> `tools/hw-test/ff802-disable-test.py` (seit `c0acd9a` als historische
+> Referenz im Repository, in keinem Paket), der Port-Reset
 > mit `echo 1/0 | sudo tee …/disable`. Die Umsetzung in `ff802-cc` ist im
 > Dev-Container mit simuliertem USB-Backend und nachgebautem sysfs
 > getestet. Danach, ebenfalls am 2026-11-19, wurde die integrierte Fassung
@@ -11,8 +12,8 @@
 > - `enable`: 4 Bytes übertragen, Port-Reset, Wechsel zu `0424:3fdd`.
 > - PipeWire hat danach alle sechs Ausgänge wieder erkannt.
 >
-> Als Debian-Paket `ff802-cc` 0.4.0 ist sie vorbereitet und nicht
-> installiert, siehe [packages.md](packages.md).
+> Als Debian-Paket `ff802-cc` 0.4.0 (gebaut aus `e12a1d0`) ist sie auf
+> dem Host installiert, siehe [packages.md](packages.md#installationsstand).
 
 ## Übersicht
 
@@ -170,8 +171,9 @@ Kein automatisierter Test schreibt auf USB oder in das echte `/sys`.
 
 ## Noch offen
 
-- Installation des Pakets `ff802-cc` 0.4.0 auf dem Host (Freigabe nötig),
-  danach nur noch `/usr/bin/ff802-cc` verwenden.
+- Am installierten Paket (`/usr/bin/ff802-cc`) sind `enable` und
+  `disable` nicht eigens dokumentiert getestet; getestet wurde
+  `build-write/ff802-cc` mit demselben Code.
 - Die Bedeutung von `0xFFFE` und der Kodierung mit CIN 3.
 - Die T4-Automatik nutzt den Port-Reset nicht (unverändert). Ihre
   README.Debian ist ab `ff802-cc-auto` 0.1.1 korrigiert.
