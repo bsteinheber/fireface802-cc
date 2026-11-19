@@ -158,6 +158,7 @@ static void test_cycle(void)
     fx_init(&fx);
     setup_hub(&fx);
     CHECK(ff802_port_resolve(fx.paths.sysfs_root, PORT_DEV, &p) == FF802_PORT_OK);
+    CHECK(ff802_port_writable(&p));
     hook h = { .fx = &fx };
     ff802_port_ops ops = { .sleep_ms = hook_sleep, .user = &h };
     CHECK(ff802_port_cycle(&p, 2000, &ops, &r) == 0);
@@ -179,6 +180,7 @@ static void test_cycle(void)
         snprintf(f, sizeof f, "%s/disable", p.dir);
         chmod(f, 0444);
         hook h2 = { .fx = &fx };
+        CHECK(!ff802_port_writable(&p));
         ops.user = &h2;
         CHECK(ff802_port_cycle(&p, 2000, &ops, &r) != 0);
         CHECK(!r.disabled && r.err_disable == EACCES && h2.calls == 0);
@@ -255,10 +257,133 @@ static void test_wait(void)
     fx_done(&fx);
 }
 
+static void test_find(void)
+{
+    fixture fx;
+    ff802_sysfs_dev d;
+    fx_init(&fx);
+    setup_hub(&fx);
+    fx_dev(&fx, "1-4", "0424", "3fdd", 1, 3, "480", "RME", "Fireface 802 (2)");
+    fx_dev(&fx, "1-5", "0424", "2514", 1, 4, "480", "Microchip", "Hub");
+    CHECK(ff802_port_find_devices(fx.paths.sysfs_root, FF802_MODE_PROPRIETARY, 0, 0, 0, &d) == 1);
+    CHECK(strcmp(d.kernel_name, PORT_DEV) == 0 && d.devnum == 18);
+    CHECK(ff802_port_find_devices(fx.paths.sysfs_root, FF802_MODE_CLASS_COMPLIANT, 0, 0, 0, &d) == 1);
+    fx_dev(&fx, "1-6", "2a39", "3fcd", 1, 5, "480", "RME", "Fireface 802 (3)");
+    CHECK(ff802_port_find_devices(fx.paths.sysfs_root, FF802_MODE_PROPRIETARY, 0, 0, 0, &d) == 2);
+    CHECK(ff802_port_find_devices(fx.paths.sysfs_root, FF802_MODE_PROPRIETARY, 1, 3, 18, &d) == 1);
+    CHECK(strcmp(d.kernel_name, PORT_DEV) == 0);
+    CHECK(ff802_port_find_devices(fx.paths.sysfs_root, FF802_MODE_PROPRIETARY, 1, 3, 99, &d) == 0);
+    CHECK(d.vid == 0);
+    fx_done(&fx);
+}
+
+/* After the enable command: the unit leaves during the off time and comes
+ * back in CC mode during the waiting. */
+static void test_port_switch(void)
+{
+    fixture fx;
+    ff802_sysfs_dev written;
+    ff802_psw_result r;
+    char buf[16];
+
+    fx_init(&fx);
+    setup_hub(&fx);
+    CHECK(ff802_sysfs_read(fx.paths.sysfs_root, PORT_DEV, &written) == FF802_SYSFS_OK);
+    hook h = { .fx = &fx, .unplug_first = 1, .appear_after = 5 };
+    ff802_port_ops ops = { .sleep_ms = hook_sleep, .user = &h };
+    CHECK(ff802_port_switch(fx.paths.sysfs_root, &written, 2000, 15000,
+                            FF802_MODE_CLASS_COMPLIANT, &ops, &r) == FF802_PSW_OK);
+    CHECK(h.ms[0] == 2000 && strcmp(h.during, "1\n") == 0);
+    CHECK(strcmp(disable_value(&fx, buf, sizeof buf), "0\n") == 0);
+    CHECK(r.found.vid == 0x0424 && r.found.pid == 0x3FDD && r.found.devnum == 19);
+    CHECK(strcmp(r.port.hub, HUB) == 0 && r.port.number == 3);
+    fx_done(&fx);
+
+    /* the device was reconnected meanwhile: nothing is written */
+    fx_init(&fx);
+    setup_hub(&fx);
+    CHECK(ff802_sysfs_read(fx.paths.sysfs_root, PORT_DEV, &written) == FF802_SYSFS_OK);
+    fx_ff802_prop(&fx, 25);
+    hook h1 = { .fx = &fx };
+    ops.user = &h1;
+    CHECK(ff802_port_switch(fx.paths.sysfs_root, &written, 2000, 15000,
+                            FF802_MODE_CLASS_COMPLIANT, &ops, &r) == FF802_PSW_CHANGED);
+    CHECK(h1.calls == 0 && strcmp(disable_value(&fx, buf, sizeof buf), "0\n") == 0);
+    /* already in CC mode (or another ID): nothing is written either */
+    fx_ff802_cc(&fx, 18);
+    CHECK(ff802_port_switch(fx.paths.sysfs_root, &written, 2000, 15000,
+                            FF802_MODE_CLASS_COMPLIANT, &ops, &r) == FF802_PSW_CHANGED);
+    fx_done(&fx);
+
+    /* the port's link points to another device: nothing is written */
+    fx_init(&fx);
+    setup_hub(&fx);
+    CHECK(ff802_sysfs_read(fx.paths.sysfs_root, PORT_DEV, &written) == FF802_SYSFS_OK);
+    fx_dev(&fx, "3-2.4.1.1.1", "046d", "c31c", 3, 5, "12", "Logitech", "Keyboard");
+    fx_port(&fx, HUB, HUB ":1.0", HUB "-port3", "3-2.4.1.1.1", 1);
+    hook h2 = { .fx = &fx };
+    ops.user = &h2;
+    CHECK(ff802_port_switch(fx.paths.sysfs_root, &written, 2000, 15000,
+                            FF802_MODE_CLASS_COMPLIANT, &ops, &r) == FF802_PSW_PORT);
+    CHECK(r.port_status == FF802_PORT_MISMATCH && h2.calls == 0);
+    fx_done(&fx);
+
+    if (getuid() != 0) {
+        /* not root: "1" fails, nothing waited for */
+        fx_init(&fx);
+        setup_hub(&fx);
+        CHECK(ff802_sysfs_read(fx.paths.sysfs_root, PORT_DEV, &written) == FF802_SYSFS_OK);
+        char f[600];
+        snprintf(f, sizeof f, "%s/bus/usb/devices/" HUB "/" HUB ":1.0/" HUB "-port3/disable",
+                 fx.paths.sysfs_root);
+        chmod(f, 0444);
+        hook h3 = { .fx = &fx };
+        ops.user = &h3;
+        CHECK(ff802_port_switch(fx.paths.sysfs_root, &written, 2000, 15000,
+                                FF802_MODE_CLASS_COMPLIANT, &ops, &r) == FF802_PSW_NOT_RESET);
+        CHECK(h3.calls == 0 && r.cycle.err_disable == EACCES);
+        fx_done(&fx);
+
+        /* "0" fails: reported as such, no waiting */
+        fx_init(&fx);
+        setup_hub(&fx);
+        CHECK(ff802_sysfs_read(fx.paths.sysfs_root, PORT_DEV, &written) == FF802_SYSFS_OK);
+        hook h4 = { .fx = &fx, .make_readonly = 1 };
+        ops.user = &h4;
+        CHECK(ff802_port_switch(fx.paths.sysfs_root, &written, 2000, 15000,
+                                FF802_MODE_CLASS_COMPLIANT, &ops, &r) == FF802_PSW_NOT_REENABLED);
+        CHECK(h4.calls == 1);
+        fx_done(&fx);
+    }
+
+    /* never comes back / comes back still proprietary */
+    fx_init(&fx);
+    setup_hub(&fx);
+    CHECK(ff802_sysfs_read(fx.paths.sysfs_root, PORT_DEV, &written) == FF802_SYSFS_OK);
+    hook h5 = { .fx = &fx, .unplug_first = 1 };
+    ops.user = &h5;
+    CHECK(ff802_port_switch(fx.paths.sysfs_root, &written, 2000, 1000,
+                            FF802_MODE_CLASS_COMPLIANT, &ops, &r) == FF802_PSW_NOT_BACK);
+    CHECK(strcmp(disable_value(&fx, buf, sizeof buf), "0\n") == 0);
+    fx_done(&fx);
+    fx_init(&fx);
+    setup_hub(&fx);
+    CHECK(ff802_sysfs_read(fx.paths.sysfs_root, PORT_DEV, &written) == FF802_SYSFS_OK);
+    hook h6 = { .fx = &fx, .unplug_first = 1, .appear_prop_after = 3 };
+    ops.user = &h6;
+    CHECK(ff802_port_switch(fx.paths.sysfs_root, &written, 2000, 1000,
+                            FF802_MODE_CLASS_COMPLIANT, &ops, &r) == FF802_PSW_OTHER_MODE);
+    CHECK(r.found.vid == 0x2A39 && r.found.devnum == 20);
+    fx_done(&fx);
+    CHECK(strstr(ff802_psw_status_str(FF802_PSW_NOT_REENABLED), "re-enable") != NULL);
+}
+
 int main(void)
 {
     test_resolve();
     test_cycle();
     test_wait();
+    test_find();
+    test_port_switch();
     TEST_EXIT();
 }

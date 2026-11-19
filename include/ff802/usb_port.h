@@ -51,6 +51,9 @@ ff802_port_status ff802_port_resolve(const char *sysfs_root,
 int ff802_port_belongs_to(const ff802_usb_port *port, const char *sysfs_root,
                           const char *kernel_name);
 
+/* The port's "disable" attribute can be written by this process (root). */
+int ff802_port_writable(const ff802_usb_port *port);
+
 /* Waiting hook, so the tests neither sleep nor depend on timing. */
 typedef struct ff802_port_ops {
     void (*sleep_ms)(void *user, unsigned ms);   /* NULL: nanosleep */
@@ -90,6 +93,48 @@ ff802_wait_status ff802_port_wait_mode(const char *sysfs_root,
                                        ff802_mode want, unsigned timeout_ms,
                                        const ff802_port_ops *ops,
                                        ff802_sysfs_dev *found);
+
+/*
+ * Devices in sysfs whose USB ID classifies as mode (and, with
+ * select_location, that are at bus/devnum). Returns their number; *first
+ * is the first one found (zeroed if none).
+ */
+size_t ff802_port_find_devices(const char *sysfs_root, ff802_mode mode,
+                               int select_location, uint8_t bus, uint8_t devnum,
+                               ff802_sysfs_dev *first);
+
+/* After the CC enable command: port reset and check of the new mode. */
+typedef enum ff802_psw_status {
+    FF802_PSW_OK = 0,           /* port reset, device back with the wanted ID */
+    FF802_PSW_CHANGED,          /* not the connection that was written: nothing done */
+    FF802_PSW_PORT,             /* port not found / not this device's: nothing done */
+    FF802_PSW_NOT_RESET,        /* "1" could not be written (port was re-enabled) */
+    FF802_PSW_NOT_REENABLED,    /* "0" could not be written: port may stay disabled */
+    FF802_PSW_NOT_BACK,         /* device did not come back in time */
+    FF802_PSW_OTHER_MODE        /* device came back with another USB ID */
+} ff802_psw_status;
+
+typedef struct ff802_psw_result {
+    ff802_psw_status        status;
+    ff802_port_status       port_status;
+    ff802_usb_port          port;
+    ff802_port_cycle_result cycle;
+    ff802_sysfs_dev         found;   /* device after the reset, if any */
+} ff802_psw_result;
+
+/*
+ * written: the sysfs entry of the device the command was sent to. Re-reads
+ * it (same kernel name, bus, devnum, USB ID), resolves its port, cycles it
+ * (off_ms) and waits up to wait_ms for the USB ID of mode want at the same
+ * kernel name.
+ */
+ff802_psw_status ff802_port_switch(const char *sysfs_root,
+                                   const ff802_sysfs_dev *written,
+                                   unsigned off_ms, unsigned wait_ms,
+                                   ff802_mode want, const ff802_port_ops *ops,
+                                   ff802_psw_result *r);
+
+const char *ff802_psw_status_str(ff802_psw_status st);
 
 #ifdef __cplusplus
 }

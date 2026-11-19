@@ -98,6 +98,14 @@ if(FF802_HAVE_TOOLS)
     # disable refuses without an interactive terminal, before reading
     # sysfs or touching USB (stdin is /dev/null)
     ff802_cli_test(cc_cli_disable 2 "'disable' requires an interactive terminal" "disable")
+    # --no-port-reset belongs to enable; enable refuses without a terminal
+    # before the port check
+    ff802_cli_test(cc_cli_no_port_reset_check 2 "only valid with 'enable'"
+        "--no-port-reset|check")
+    ff802_cli_test(cc_cli_no_port_reset_disable 2 "only valid with 'enable'"
+        "--no-port-reset|disable")
+    ff802_cli_test(cc_cli_enable_port_reset_needs_tty 2 "requires an interactive terminal"
+        "--no-port-reset|enable")
     ff802_cli_test(cc_cli_disable_device 2 "'disable' requires an interactive terminal"
         "--device|3:19|disable")
     ff802_cli_test(cc_cli_disable_help 0 "disable Switch a unit in class-compliant mode" "--help")

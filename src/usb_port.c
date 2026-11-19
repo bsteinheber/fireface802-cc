@@ -117,6 +117,13 @@ ff802_port_status ff802_port_resolve(const char *sysfs_root,
     return FF802_PORT_OK;
 }
 
+int ff802_port_writable(const ff802_usb_port *port)
+{
+    char attr[FF802_PORT_PATH_MAX + 16u];
+    int n = snprintf(attr, sizeof attr, "%s/disable", port->dir);
+    return n > 0 && (size_t)n < sizeof attr && access(attr, W_OK) == 0;
+}
+
 static void do_sleep(const ff802_port_ops *ops, unsigned ms)
 {
     if (ops != NULL && ops->sleep_ms != NULL) {
@@ -195,4 +202,83 @@ ff802_wait_status ff802_port_wait_mode(const char *sysfs_root,
         do_sleep(ops, 100u);
     }
     return seen ? FF802_WAIT_OTHER : FF802_WAIT_TIMEOUT;
+}
+
+size_t ff802_port_find_devices(const char *sysfs_root, ff802_mode mode,
+                               int select_location, uint8_t bus, uint8_t devnum,
+                               ff802_sysfs_dev *first)
+{
+    char dir[FF802_PORT_PATH_MAX];
+    size_t count = 0;
+
+    memset(first, 0, sizeof *first);
+    int n = snprintf(dir, sizeof dir, "%s/bus/usb/devices", sysfs_root);
+    if (n < 0 || (size_t)n >= sizeof dir)
+        return 0;
+    DIR *dh = opendir(dir);
+    if (dh == NULL)
+        return 0;
+    struct dirent *de;
+    while ((de = readdir(dh)) != NULL) {
+        ff802_sysfs_dev d;
+        if (!ff802_sysfs_valid_name(de->d_name) ||
+            ff802_sysfs_read(sysfs_root, de->d_name, &d) != FF802_SYSFS_OK)
+            continue;
+        if (ff802_classify(d.vid, d.pid) != mode)
+            continue;
+        if (select_location && (d.bus != bus || d.devnum != devnum))
+            continue;
+        if (count++ == 0)
+            *first = d;
+    }
+    closedir(dh);
+    return count;
+}
+
+const char *ff802_psw_status_str(ff802_psw_status st)
+{
+    switch (st) {
+    case FF802_PSW_OK:            return "port reset, device back in the new mode";
+    case FF802_PSW_CHANGED:       return "the device at the port is not the one the command "
+                                         "was sent to; port not reset";
+    case FF802_PSW_PORT:          return "USB hub port not found or not this device's; "
+                                         "port not reset";
+    case FF802_PSW_NOT_RESET:     return "could not disable the USB hub port (root needed?); "
+                                         "port not reset";
+    case FF802_PSW_NOT_REENABLED: return "could not re-enable the USB hub port";
+    case FF802_PSW_NOT_BACK:      return "the device did not come back in time";
+    case FF802_PSW_OTHER_MODE:    return "the device came back with another USB ID";
+    }
+    return "unknown port reset status";
+}
+
+ff802_psw_status ff802_port_switch(const char *sysfs_root,
+                                   const ff802_sysfs_dev *written,
+                                   unsigned off_ms, unsigned wait_ms,
+                                   ff802_mode want, const ff802_port_ops *ops,
+                                   ff802_psw_result *r)
+{
+    ff802_sysfs_dev now;
+
+    memset(r, 0, sizeof *r);
+    if (ff802_sysfs_read(sysfs_root, written->kernel_name, &now) != FF802_SYSFS_OK ||
+        now.bus != written->bus || now.devnum != written->devnum ||
+        now.vid != written->vid || now.pid != written->pid)
+        return r->status = FF802_PSW_CHANGED;
+
+    r->port_status = ff802_port_resolve(sysfs_root, written->kernel_name, &r->port);
+    if (r->port_status != FF802_PORT_OK)
+        return r->status = FF802_PSW_PORT;
+
+    ff802_port_cycle(&r->port, off_ms, ops, &r->cycle);
+    if (!r->cycle.disabled)          /* never disabled: "0" does not matter */
+        return r->status = FF802_PSW_NOT_RESET;
+    if (!r->cycle.enabled)
+        return r->status = FF802_PSW_NOT_REENABLED;
+
+    ff802_wait_status ws = ff802_port_wait_mode(sysfs_root, written->kernel_name, want,
+                                                wait_ms, ops, &r->found);
+    if (ws == FF802_WAIT_OK)
+        return r->status = FF802_PSW_OK;
+    return r->status = (ws == FF802_WAIT_OTHER) ? FF802_PSW_OTHER_MODE : FF802_PSW_NOT_BACK;
 }

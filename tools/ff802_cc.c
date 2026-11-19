@@ -4,7 +4,8 @@
  *
  *   ff802-cc check    diagnose only: never claims the interface or sends data
  *   ff802-cc enable   send the CC enable command once, after the user types
- *                     the confirmation word on an interactive terminal
+ *                     the confirmation word on an interactive terminal, then
+ *                     reset the USB hub port of the device (disable=1/0)
  *   ff802-cc disable  switch a unit in class-compliant mode back to
  *                     proprietary mode (USB-MIDI interface 3, as tested on
  *                     2026-11-19), after the user types the confirmation word
@@ -32,7 +33,7 @@ static void usage(FILE *out)
 {
     fprintf(out,
         "Usage: ff802-cc [--device BUS:ADDRESS] check\n"
-        "       ff802-cc [--device BUS:ADDRESS] enable\n"
+        "       ff802-cc [--device BUS:ADDRESS] [--no-port-reset] enable\n"
         "       ff802-cc [--device BUS:ADDRESS] disable\n"
         "       ff802-cc --help | --version\n"
         "\n"
@@ -43,8 +44,11 @@ static void usage(FILE *out)
         "          Never claims the interface and never sends data.\n"
         "  enable  Run the same checks, then ask for confirmation and send the\n"
         "          'enable class-compliant mode' command (01 00 44 BD) once to\n"
-        "          bulk OUT endpoint 0x0C. The mode is expected to change only\n"
-        "          after the next USB disconnect or power cycle.\n"
+        "          bulk OUT endpoint 0x0C. Then it resets the USB hub port of\n"
+        "          the device (sysfs disable=1, 2 s, disable=0; the port is\n"
+        "          found and checked before anything is sent; needs root) and\n"
+        "          waits for 0424:3fdd. With --no-port-reset: disconnect the\n"
+        "          device by hand afterwards.\n"
         "  disable Switch a unit in class-compliant mode (0424:3fdd) back to\n"
         "          proprietary mode: checks the unit (exactly one original\n"
         "          Fireface 802, interface 3 = USB-MIDI with bulk OUT 0x07, bound\n"
@@ -57,6 +61,7 @@ static void usage(FILE *out)
         "Options:\n"
         "  --device BUS:ADDRESS  select a device as listed by ff802-detect\n"
         "                        (required if several are connected)\n"
+        "  --no-port-reset       enable only: no USB hub port reset\n"
         "\n"
         "Exit status:\n"
         "  0 success, 1 no suitable device, 2 usage error,\n"
@@ -72,13 +77,23 @@ static void print_bytes(FILE *out, const uint8_t *b, size_t n)
         fprintf(out, "%s%02X", i ? " " : "", b[i]);
 }
 
+/* enable: USB hub port reset after the transfer (hardware test 2026-11-19) */
+#define PORT_OFF_MS  2000u
+#define PORT_WAIT_MS 15000u
+
+typedef struct enable_ctx {
+    int                    port_reset;  /* 0 with --no-port-reset */
+    const ff802_sysfs_dev *dev;         /* sysfs entry checked before */
+    const ff802_usb_port  *port;
+} enable_ctx;
+
 /* Interactive confirmation on the controlling terminal. */
 static int confirm_on_tty(void *user, const ff802_usb_dev *target,
                           const uint8_t cmd[FF802_REG_WORD_SIZE])
 {
+    const enable_ctx *c = user;
     char line[64];
     char desc[160];
-    (void)user;
 
     ff802_format_device(target, ff802_classify(target->vid, target->pid),
                         desc, sizeof desc);
@@ -88,20 +103,105 @@ static int confirm_on_tty(void *user, const ff802_usb_dev *target,
            desc, (unsigned)FF802_USB_INTERFACE, (unsigned)FF802_USB_EP_OUT,
            (unsigned)FF802_REG_WORD_SIZE);
     print_bytes(stdout, cmd, FF802_REG_WORD_SIZE);
-    printf("\n\nThe device is expected to switch only after the next USB\n"
-           "disconnect or power cycle. This has not been verified on Linux.\n"
-           "The command is sent exactly once and is not retried.\n\n"
-           "Type %s to send the command, anything else aborts: ",
-           FF802_CONFIRM_WORD);
+    if (c != NULL && c->port_reset)
+        printf("\n\nAfter the transfer the USB hub port of the device is reset:\n"
+               "  %s\n"
+               "  disable=1, %u s, disable=0 (only this port). The device is\n"
+               "  expected to come back as 0424:3fdd.\n"
+               "The command is sent exactly once and is not retried.\n\n"
+               "Type %s to send the command, anything else aborts: ",
+               c->port->dir, PORT_OFF_MS / 1000u, FF802_CONFIRM_WORD);
+    else
+        printf("\n\nThe device is expected to switch only after the next USB\n"
+               "disconnect or power cycle (no port reset: --no-port-reset).\n"
+               "The command is sent exactly once and is not retried.\n\n"
+               "Type %s to send the command, anything else aborts: ",
+               FF802_CONFIRM_WORD);
     fflush(stdout);
 
-    if (fgets(line, sizeof line, stdin) == NULL)
+    if (fgets(line, sizeof line, stdin) == NULL || !ff802_confirm_answer_ok(line))
         return 0;
-    return ff802_confirm_answer_ok(line);
+    if (c != NULL && c->port_reset && !ff802_sysfs_matches_usb_dev(c->dev, target)) {
+        fprintf(stderr, "ff802-cc: the selected device is not the one whose port was "
+                        "checked; nothing sent\n");
+        return 0;
+    }
+    return 1;
+}
+
+/*
+ * Before an enable with port reset: the device that will be written and
+ * its hub port, which must be writable (root). Nothing is sent otherwise.
+ * Returns -1 if all is well, else the exit code.
+ */
+static int enable_preflight(const ff802_sw_options *opt, const char *sysfs,
+                            ff802_sysfs_dev *dev, ff802_usb_port *port)
+{
+    size_t n = ff802_port_find_devices(sysfs, FF802_MODE_PROPRIETARY, opt->select_location,
+                                       opt->bus, opt->address, dev);
+    if (n != 1) {
+        fprintf(stderr, "ff802-cc: %s\n", n == 0 ? ff802_sw_status_str(FF802_SW_NOT_FOUND)
+                                                 : ff802_sw_status_str(FF802_SW_AMBIGUOUS));
+        fprintf(stderr, "%s\nNothing was sent.\n",
+                ff802_sw_status_hint(n == 0 ? FF802_SW_NOT_FOUND : FF802_SW_AMBIGUOUS));
+        return FF802_CC_EXIT_NOT_FOUND;
+    }
+    ff802_port_status ps = ff802_port_resolve(sysfs, dev->kernel_name, port);
+    if (ps != FF802_PORT_OK) {
+        fprintf(stderr, "ff802-cc: %s: %s\nNothing was sent. Use --no-port-reset to send "
+                        "anyway and disconnect the device by hand.\n",
+                dev->kernel_name, ff802_port_status_str(ps));
+        return FF802_CC_EXIT_CHECK_FAILED;
+    }
+    if (!ff802_port_writable(port)) {
+        fprintf(stderr, "ff802-cc: the USB hub port %s cannot be written (root needed: "
+                        "sudo).\nNothing was sent. Use --no-port-reset to send without "
+                        "the port reset.\n", port->dir);
+        return FF802_CC_EXIT_CHECK_FAILED;
+    }
+    printf("Fireface 802 in proprietary mode at %s (bus %03u, device %03u), hub port %s\n",
+           dev->kernel_name, (unsigned)dev->bus, (unsigned)dev->devnum, port->dir);
+    return -1;
+}
+
+/* After a successful enable transfer. Returns the exit code. */
+static int enable_port_reset(const char *sysfs, const ff802_sysfs_dev *dev)
+{
+    ff802_psw_result r;
+    printf("Resetting the USB hub port: disable=1, %u s, disable=0 ...\n",
+           PORT_OFF_MS / 1000u);
+    fflush(stdout);
+    ff802_psw_status st = ff802_port_switch(sysfs, dev, PORT_OFF_MS, PORT_WAIT_MS,
+                                            FF802_MODE_CLASS_COMPLIANT, NULL, &r);
+    if (st == FF802_PSW_OK) {
+        printf("Switched: %s is now %04x:%04x (bus %03u, device %03u), class-compliant "
+               "mode.\n", r.found.kernel_name, (unsigned)r.found.vid, (unsigned)r.found.pid,
+               (unsigned)r.found.bus, (unsigned)r.found.devnum);
+        return FF802_CC_EXIT_OK;
+    }
+    fprintf(stderr, "ff802-cc: %s", ff802_psw_status_str(st));
+    if (st == FF802_PSW_PORT)
+        fprintf(stderr, " (%s)", ff802_port_status_str(r.port_status));
+    fprintf(stderr, "\n");
+    if (st == FF802_PSW_NOT_RESET)
+        fprintf(stderr, "Writing 1 to %s/disable failed: %s.\n", r.port.dir,
+                strerror(r.cycle.err_disable));
+    if (st == FF802_PSW_NOT_REENABLED)
+        fprintf(stderr, "IMPORTANT: writing 0 to %s/disable failed (%s); the port may "
+                        "stay disabled. Re-enable it as root:\n"
+                        "  echo 0 | sudo tee %s/disable\n", r.port.dir,
+                strerror(r.cycle.err_enable), r.port.dir);
+    if (st == FF802_PSW_OTHER_MODE)
+        fprintf(stderr, "The device came back as %04x:%04x.\n", (unsigned)r.found.vid,
+                (unsigned)r.found.pid);
+    fprintf(stderr, "The command was transferred; nothing was retried. If the device is "
+                    "not in class-compliant mode, disconnect and reconnect it by hand and "
+                    "check with ff802-detect.\n");
+    return FF802_CC_EXIT_SWITCH_UNCONFIRMED;
 }
 
 static void print_result(const ff802_sw_options *opt,
-                         const ff802_sw_result *res)
+                         const ff802_sw_result *res, int port_reset)
 {
     if (res->status == FF802_SW_OK) {
         if (opt->action == FF802_SW_CHECK) {
@@ -111,6 +211,8 @@ static void print_result(const ff802_sw_options *opt,
             print_bytes(stdout, cmd, sizeof cmd);
             printf("\nUSB writes in this build: %s\n",
                    ff802_usb_comm_write_enabled() ? "enabled" : "disabled");
+        } else if (port_reset) {
+            printf("\nCommand transferred (%zu bytes).\n", res->transferred);
         } else {
             printf("\nCommand transferred (%zu bytes).\n"
                    "Next: disconnect the device (or power-cycle it), reconnect\n"
@@ -312,6 +414,7 @@ int main(int argc, char **argv)
 {
     ff802_sw_options opt;
     const char *command = NULL;
+    int no_port_reset = 0;
 
     memset(&opt, 0, sizeof opt);
 
@@ -337,6 +440,10 @@ int main(int argc, char **argv)
             i++;
             continue;
         }
+        if (strcmp(a, "--no-port-reset") == 0) {
+            no_port_reset = 1;
+            continue;
+        }
         if (command == NULL && (strcmp(a, "check") == 0 ||
                                 strcmp(a, "enable") == 0 ||
                                 strcmp(a, "disable") == 0)) {
@@ -353,8 +460,20 @@ int main(int argc, char **argv)
         return FF802_CC_EXIT_USAGE;
     }
 
+    if (no_port_reset && strcmp(command, "enable") != 0) {
+        fprintf(stderr, "ff802-cc: --no-port-reset is only valid with 'enable'\n");
+        return FF802_CC_EXIT_USAGE;
+    }
+
     if (strcmp(command, "disable") == 0)
         return cmd_disable(&opt);
+
+    const char *sysfs = "/sys";
+    ff802_sysfs_dev dev;
+    ff802_usb_port port;
+    enable_ctx ectx = { .port_reset = 0, .dev = &dev, .port = &port };
+    memset(&dev, 0, sizeof dev);
+    memset(&port, 0, sizeof port);
 
     if (strcmp(command, "enable") == 0) {
         /* Refuse before touching USB if no human can confirm. */
@@ -363,8 +482,15 @@ int main(int argc, char **argv)
                             "terminal for confirmation.\n");
             return FF802_CC_EXIT_USAGE;
         }
+        if (!no_port_reset) {
+            int rc = enable_preflight(&opt, sysfs, &dev, &port);
+            if (rc >= 0)
+                return rc;
+            ectx.port_reset = 1;
+        }
         opt.action = FF802_SW_ENABLE_CC;
         opt.confirm = confirm_on_tty;
+        opt.confirm_user = &ectx;
     } else {
         opt.action = FF802_SW_CHECK;
     }
@@ -381,6 +507,8 @@ int main(int argc, char **argv)
     ff802_switch_run(&be, &opt, stdout, &res);
     ff802_usb_comm_exit(&be);
 
-    print_result(&opt, &res);
+    print_result(&opt, &res, ectx.port_reset);
+    if (res.status == FF802_SW_OK && opt.action == FF802_SW_ENABLE_CC && ectx.port_reset)
+        return enable_port_reset(sysfs, &dev);
     return ff802_sw_exit_code(res.status);
 }
