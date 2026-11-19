@@ -9,6 +9,11 @@
 > (siehe [Ereignisablauf](#ereignisablauf-automatik-an-gerät-proprietär)).
 > Welche Einzelschritte des [Host-Testplans](#host-testplan) ausgeführt
 > wurden, ist nicht dokumentiert.
+>
+> Vorbereitet, nicht installiert: `ff802-cc-auto` 0.1.1. Es enthält nur
+> Dokumentation und einen Neubau, die Funktion ist unverändert. Die
+> manuelle Umschaltung kommt als eigenes Paket `ff802-cc` 0.4.0. Siehe
+> [packages.md](packages.md).
 
 T4 hat zwei Teile:
 

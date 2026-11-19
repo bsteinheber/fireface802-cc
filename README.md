@@ -9,10 +9,10 @@ Linux-Werkzeug zur Umschaltung des **ursprünglichen RME Fireface 802**
 |-------|--------|-------|
 | 1  | Kodierung der Registerbefehle und Tests | abgeschlossen |
 | 2a | Diagnoseprogramm `ff802-detect`: lesende Geräteerkennung | abgeschlossen, auf dem Host getestet |
-| 2b | Umschaltprogramm `ff802-cc` mit Diagnosemodus | abgeschlossen, Umschaltung auf dem Host erfolgreich getestet; `disable` (CC → proprietär) und Port-Reset nach `enable` umgesetzt (2026-11-19 von Hand am Gerät getestet, integrierte Fassung noch nicht) |
+| 2b | Umschaltprogramm `ff802-cc` mit Diagnosemodus | abgeschlossen, Umschaltung auf dem Host erfolgreich getestet; `disable` (CC → proprietär) und Port-Reset nach `enable` umgesetzt (2026-11-19 am Gerät erfolgreich getestet); Debian-Paket `ff802-cc` 0.4.0 gebaut und getestet, **nicht installiert** |
 | 3 | ALSA-UCM-Profil mit sechs Stereo-Ausgängen für den CC-Modus, Debian-Paket `ff802-ucm-profile` (T1, T3) | Host-Test T1 bestanden; Version **0.3.0 auf dem Host installiert**, automatischer USB-Portwechsel auf dem Host erfolgreich getestet (2026-11-18, [docs/audio_t3_usb_port.md](docs/audio_t3_usb_port.md)); Kanalzuordnung unbestätigt (T2) |
 | 4 | Messwerkzeug `ff802-chanmap` für die Kanalzuordnung (Hardwaretest T2) | implementiert und im Container getestet, T2 nicht ausgeführt |
-| T4 | Automatischer Wechsel in den CC-Modus beim Anschließen/Systemstart, Debian-Paket `ff802-cc-auto`; Untersuchung `ff802-cc disable` | Version **0.1.0 auf dem Host installiert**, automatische Umschaltung in den Class-Compliant-Modus auf dem Host erfolgreich getestet; `disable` nicht möglich (kein belegtes Verfahren) |
+| T4 | Automatischer Wechsel in den CC-Modus beim Anschließen/Systemstart, Debian-Paket `ff802-cc-auto`; Untersuchung `ff802-cc disable` | Version **0.1.0 auf dem Host installiert**, automatische Umschaltung in den Class-Compliant-Modus auf dem Host erfolgreich getestet; 0.1.1 (nur Dokumentation, Neubau) vorbereitet; `disable` ist Teil von `ff802-cc` |
 
 Im Standard-Build kann **kein Programm Daten an das Gerät senden**. Die
 Schreibfunktion wird nur mit `-DFF802_ENABLE_USB_WRITE=ON` einkompiliert
@@ -44,7 +44,7 @@ tests/audio/                 Tests des UCM-Profils: statisch, alsa-lib-Parser, A
 tests/chanmap/               Tests von ff802-chanmap mit simuliertem Gerät
 tests/packaging/             Pakettest in isolierter Wurzel
 tests/auto/                  T4: simuliertes sysfs/USB, Dienst-Ablauf, Benachrichtigung, Steuerung, Units
-packaging/                   Debian-Pakete ff802-ucm-profile (build-deb.sh) und ff802-cc-auto (build-deb-auto.sh)
+packaging/                   Debian-Pakete ff802-ucm-profile (build-deb.sh), ff802-cc-auto (build-deb-auto.sh), ff802-cc (build-deb-cc.sh)
 audio/ucm2/                  ALSA-UCM-Profil (Aufbau wie /usr/share/alsa/ucm2)
 tools/hw-test/               Skripte für Host-Tests (nur nach Freigabe ausführen)
 docs/                        Protokoll, Erkennung, Kommunikation, UCM-Profil
@@ -83,13 +83,26 @@ Das Debian-Paket entsteht mit `cmake --build build --target deb` unter
 [packaging/ff802-ucm/README.Debian](packaging/ff802-ucm/README.Debian), erst
 nach T2 und T3.
 Das T4-Paket entsteht mit `cmake --build build --target deb-auto`
-(`build/deb/ff802-cc-auto_<Version>_amd64.deb`, siehe [docs/t4_usb_mode.md](docs/t4_usb_mode.md)).
+(`build/deb/ff802-cc-auto_<Version>_amd64.deb`, siehe [docs/t4_usb_mode.md](docs/t4_usb_mode.md)),
+das Paket der manuellen Umschaltung mit `cmake --build build --target deb-cc`
+(`build/deb/ff802-cc_<Version>_amd64.deb`, Release-Build aus einem sauberen
+Commit). Projekt- und Paketversionen, Installation, Aktualisierung und
+Rückbau aller drei Pakete: [docs/packages.md](docs/packages.md).
 
 ## Programme auf dem Kubuntu-Host
 
-Die im Container gebauten Programme liegen im eingebundenen
-Projektverzeichnis und laufen ohne Entwicklungswerkzeuge und ohne
-Root-Rechte.
+Mit dem Paket `ff802-cc` (0.4.0, vorbereitet) liegen `ff802-cc` und
+`ff802-detect` unter `/usr/bin`:
+
+```sh
+ff802-detect                 # Geräteerkennung (öffnet kein Gerät)
+ff802-cc --version           # ff802-cc 0.4.0 (git <Revision>, Release, USB writes enabled)
+sudo ff802-cc enable         # proprietär -> CC, danach USB-Hub-Port-Reset
+sudo ff802-cc disable        # CC -> proprietär; verweigert bei ff802-cc-auto on
+```
+
+Ohne das Paket laufen die im Container gebauten Programme direkt aus dem
+eingebundenen Projektverzeichnis, ohne Entwicklungswerkzeuge:
 
 ```sh
 # Geräteerkennung (öffnet kein Gerät)
@@ -143,7 +156,7 @@ neuer), x86-64.
 | `test_write_gate` | Backend meldet die konfigurierte Schreibfähigkeit |
 | `check_forbidden_usb_calls` | Quelltextprüfung: Schreib-APIs nur in `src/usb_comm.c`, verbotene APIs nirgends |
 | `detect_binary_symbols`, `cc_binary_symbols` | Prüfung der importierten Symbole der fertigen Programme mit `nm` |
-| `cli_*`, `cc_cli_*` | Kommandozeilen beider Programme ohne USB-Zugriff |
+| `cli_*`, `cc_cli_*` | Kommandozeilen beider Programme ohne USB-Zugriff; `--version` mit Projektversion, Git-Revision und Build-Typ |
 | `ucm_profile_static` | Struktur und Inhalt des UCM-Profils gegen eine eigene Erwartungstabelle |
 | `ucm_alsa_syntax` | Syntax des UCM-Profils mit dem alsa-lib-Parser (braucht `libasound2-dev`) |
 | `ucm_alsa_eval` | Auswertung des Profils durch die echte alsa-lib mit nachgebildeter Fireface-Karte; führt das T1-Skript im Container aus (braucht `alsa-ucm-conf` und alsa-lib 1.2.15.x) |
@@ -156,6 +169,7 @@ neuer), x86-64.
 | `auto_flow`, `auto_notify`, `auto_control`, `auto_units` | T4: Dienstaufruf wie systemd (auch gleichzeitig), Benachrichtigung mit Test-Doubles, `ff802-cc-auto on/off/status`, udev-Regel und Units (`systemd-analyze`) |
 | `autoswitch_binary_symbols`, `autoswitch_sim_no_libusb` | T4: Symbole des Dienstprogramms; Simulationsbuild ohne libusb |
 | `deb_auto_package` | T4-Paket: reproduzierbar, Inhalt, Installation/Upgrade/Entfernung/Purge in isolierter Wurzel mit Stolperdrähten |
+| `deb_cc_package` | Paket `ff802-cc`: Bau nur aus sauberem Commit, bitgleich aus zwei Checkouts und beim Neubau, Inhalt, Programme, Zusammenspiel mit `ff802-cc-auto` in isolierter Wurzel |
 | `reproducible_release_build` | Release-Build mit `-Werror` in zwei Verzeichnissen, Programme byte-gleich |
 
 Fehlen die Voraussetzungen von `ucm_alsa_syntax`, `ucm_alsa_eval` oder `pw_integration`, werden sie
@@ -177,6 +191,7 @@ Keiner der automatisierten Tests greift auf USB-Hardware oder eine Soundkarte zu
 - [docs/t4_usb_mode.md](docs/t4_usb_mode.md): T4, automatischer CC-Moduswechsel: Architektur, Sicherheit, Installation, Aktivierung, Diagnose, Rollback, Tests
 - [docs/t4_disable.md](docs/t4_disable.md): T4, Untersuchung `ff802-cc disable` (Rückweg in den proprietären Modus)
 - [docs/cc_disable_port_reset.md](docs/cc_disable_port_reset.md): `ff802-cc disable` (USB-MIDI-SysEx) und USB-Hub-Port-Reset nach `enable`
+- [docs/packages.md](docs/packages.md): die drei Debian-Pakete, Projekt- und Paketversion, Bau, Installation, Aktualisierung, Rückbau
 
 ## Lizenz
 
