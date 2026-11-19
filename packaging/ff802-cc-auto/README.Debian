@@ -49,14 +49,28 @@ show each event once. If nobody was logged in (switch at boot), the
 notification is shown at login while it is still relevant. A missing
 notification never affects the USB side.
 
-Switching back to proprietary mode
-----------------------------------
+Automatic and manual switching
+------------------------------
 
-Not possible from Linux ("ff802-cc disable" explains why): connect the
-unit to Windows/macOS with TotalMix FX, which resets it to normal mode, or
-use the optional ARC (hold Prog and B (Mono) while switching the unit on).
-To stay in proprietary mode on Linux, turn the automation off first:
-ff802-cc-auto off.
+Automatic (this package, ff802-cc-auto): only proprietary -> class-
+compliant, when the unit is connected or present at boot and the
+automation is on. It never switches back, never resets a USB port, and
+asks you to reconnect the cable.
+
+Manual (the ff802-cc tool of the project, NOT part of this package; run
+with sudo from the project's write-enabled build):
+
+  sudo ff802-cc enable    proprietary -> class-compliant, then resets the
+                          USB hub port of the unit (no reconnecting)
+  sudo ff802-cc disable   class-compliant -> proprietary (USB-MIDI
+                          interface 3); refused while the automation is on
+
+To stay in proprietary mode on Linux, turn the automation off first
+(ff802-cc-auto off), then use "ff802-cc disable". Otherwise the
+automation switches the unit back to class-compliant mode at the next
+connection. Without Linux the way back is TotalMix FX on Windows/macOS,
+which resets the unit to normal mode, or the optional ARC (hold Prog and
+B (Mono) while switching the unit on).
 
 Diagnosis
 ---------

@@ -136,10 +136,18 @@ vorgesehen.
 
 `libusb_open` öffnet `/dev/bus/usb/BBB/DDD` zum Lesen und Schreiben.
 Unter Kubuntu gehört diese Datei standardmäßig `root` mit den Rechten
-`0664`. Ohne passende udev-Regel meldet daher schon `ff802-cc check`
-`access to the USB device denied`. Root-Rechte sind **nicht** vorgesehen.
+`0664`. Ohne Root-Rechte meldet daher schon `ff802-cc check`
+`access to the USB device denied`.
 
-Das Projekt installiert **keine** udev-Regel. Falls die Regel nach eigener
+**Aktuelles Vorgehen (seit 2026-11-19):** `ff802-cc` läuft mit `sudo`.
+Das gilt für `enable`, `enable --no-port-reset` und `disable`, wie bei
+den Hardwaretests. `enable` braucht root außerdem für den USB-Hub-Port-Reset
+(sysfs `disable`). Ohne Schreibrecht auf den Port lehnt `enable` ab, bevor
+etwas gesendet wird. Es gibt dafür weder eine udev-Regel noch eine
+polkit-Konfiguration.
+
+Das Projekt installiert **keine** udev-Regel. Eine Regel ersetzt `sudo`
+nur für den USB-Zugriff, nicht für den Port-Reset. Falls sie nach eigener
 Entscheidung auf dem Host eingerichtet werden soll, ist eine mögliche
 Variante (Datei `/etc/udev/rules.d/70-fireface802.rules`):
 
