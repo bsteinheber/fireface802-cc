@@ -1,3 +1,15 @@
+ff802-ucm-profile (0.3.1) unstable; urgency=medium
+
+  * License: the UCM files (/usr/share/alsa/ucm2/USB-Audio/...) and the
+    master file are BSD-3-Clause, everything else MIT (copyright file in
+    DEP-5 format). The master file contains fragments of
+    USB-Audio/USB-Audio.conf from alsa-ucm-conf and now carries the ALSA
+    project copyright notice and an SPDX header (comment only).
+  * No functional change: UCM files unchanged, binding tool, udev rule
+    and maintainer scripts unchanged.
+
+ -- Bernhard Steinheber <bernhard@steinheber.info>  Thu, 19 Nov 2026 18:00:00 +0100
+
 ff802-ucm-profile (0.3.0) unstable; urgency=medium
 
   * Automatic binding on every USB port: 77-ff802-ucm-bind.rules runs

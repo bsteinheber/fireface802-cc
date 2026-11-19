@@ -1,3 +1,13 @@
+ff802-cc-auto (0.1.2) unstable; urgency=medium
+
+  * Rebuilt from project version 0.4.1 (ff802-cc-autoswitch reports
+    0.4.1). License: MIT (copyright file in DEP-5 format), with a note
+    that the project is not affiliated with RME.
+  * No functional change: the program, the units, the udev rule, the
+    polkit policy and the maintainer scripts behave as in 0.1.0/0.1.1.
+
+ -- Bernhard Steinheber <bernhard@steinheber.info>  Thu, 19 Nov 2026 18:00:00 +0100
+
 ff802-cc-auto (0.1.1) unstable; urgency=medium
 
   * Documentation: README.Debian and the package description distinguish

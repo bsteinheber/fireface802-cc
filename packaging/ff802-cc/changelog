@@ -1,3 +1,12 @@
+ff802-cc (0.4.1) unstable; urgency=medium
+
+  * Project version 0.4.1, the first public release of fireface802-cc.
+  * License: MIT (debian/copyright in DEP-5 format), with a note that the
+    project is not affiliated with RME.
+  * No functional change of ff802-cc or ff802-detect since 0.4.0.
+
+ -- Bernhard Steinheber <bernhard@steinheber.info>  Thu, 19 Nov 2026 18:00:00 +0100
+
 ff802-cc (0.4.0) unstable; urgency=medium
 
   * Initial package: ff802-cc and ff802-detect of fireface802-cc (project

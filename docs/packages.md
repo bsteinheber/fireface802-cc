@@ -40,11 +40,17 @@ Prüfsummen auf dem Host bestätigt.
 
 ## Die drei Pakete
 
-| Paket | Paketversion | Inhalt | hängt ab von |
+| Paket | Paketversion (Quellen) | Inhalt | hängt ab von |
 |---|---|---|---|
-| `ff802-ucm-profile` | 0.3.0 | UCM-Profil (sechs Stereo-Ausgänge, ein Eingang), `ff802-ucm-bind`, udev-Regel für die Bindung an jedem Port | `alsa-ucm-conf`, `libasound2t64` |
-| `ff802-cc-auto` | 0.1.1 (vorbereitet; installiert: 0.1.0) | **automatische** Umschaltung proprietär → CC beim Anschließen (T4) | `libc6`, `libusb-1.0-0`, `systemd`, `udev` |
-| `ff802-cc` | 0.4.0 (neu) | **manuelle** Umschaltung: `ff802-cc enable` (mit USB-Hub-Port-Reset) und `ff802-cc disable`, dazu `ff802-detect` | `libc6`, `libusb-1.0-0` |
+| `ff802-ucm-profile` | 0.3.1 (installiert: 0.3.0) | UCM-Profil (sechs Stereo-Ausgänge, ein Eingang), `ff802-ucm-bind`, udev-Regel für die Bindung an jedem Port | `alsa-ucm-conf`, `libasound2t64` |
+| `ff802-cc-auto` | 0.1.2 (installiert: 0.1.0, 0.1.1 nicht bestätigt) | **automatische** Umschaltung proprietär → CC beim Anschließen (T4) | `libc6`, `libusb-1.0-0`, `systemd`, `udev` |
+| `ff802-cc` | 0.4.1 (installiert: 0.4.0) | **manuelle** Umschaltung: `ff802-cc enable` (mit USB-Hub-Port-Reset) und `ff802-cc disable`, dazu `ff802-detect` | `libc6`, `libusb-1.0-0` |
+
+Gegenüber den installierten Fassungen ändern sich in 0.3.1, 0.1.2 und
+0.4.1 nur die Lizenzangaben (`copyright`), der Changelog und die
+Projektversion in `--version`; bei `ff802-ucm-profile` zusätzlich ein
+Kommentarkopf (Copyright, SPDX) in `longname-master.conf`. Die Funktion
+ist unverändert.
 
 Die Pakete hängen nicht voneinander ab, und keine Datei gehört zu zwei
 Paketen (geprüft in `deb_cc_package`). `ff802-cc` schlägt die beiden
@@ -56,21 +62,21 @@ aus. `ff802-cc disable` wird abgelehnt, solange die Automatik an ist.
 
 | Begriff | Wo festgelegt | Wo sichtbar | Beispiel |
 |---|---|---|---|
-| **Projektversion** | `project(VERSION …)` in `CMakeLists.txt` | `--version` aller Programme | `0.4.0` |
-| **Git-Revision** | ermittelt von CMake beim Konfigurieren (12 Hexziffern, „+dirty“ bei uncommitteten Änderungen an versionierten Dateien, „unknown“ ohne Git) | `--version` von `ff802-cc` und `ff802-detect`, `BUILDINFO` | `8440f8311881` |
-| **Paketversion** | erste Zeile von `packaging/<paket>/changelog` | `dpkg -l`, Dateiname der `.deb` | `ff802-cc 0.4.0`, `ff802-cc-auto 0.1.1` |
+| **Projektversion** | `project(VERSION …)` in `CMakeLists.txt` | `--version` aller Programme | `0.4.1` |
+| **Git-Revision** | ermittelt von CMake beim Konfigurieren (12 Hexziffern, „+dirty“ bei uncommitteten Änderungen an versionierten Dateien, „unknown“ ohne Git) | `--version` von `ff802-cc` und `ff802-detect`, `BUILDINFO` | `e12a1d0201ea` |
+| **Paketversion** | erste Zeile von `packaging/<paket>/changelog` | `dpkg -l`, Dateiname der `.deb` | `ff802-cc 0.4.1`, `ff802-cc-auto 0.1.2` |
 
 Die Paketversion kann von der Projektversion abweichen:
-- `ff802-cc-auto` 0.1.1 enthält ein Programm mit Projektversion 0.4.0.
-- Eine reine Paketänderung bekäme zum Beispiel `0.4.0-2`.
+- `ff802-cc-auto` 0.1.2 enthält ein Programm mit Projektversion 0.4.1.
+- Eine reine Paketänderung bekäme zum Beispiel `0.4.1-2`.
 - Der Override der Bauskripte ändert nur die Paketversion, etwa für
   Upgrade-Tests.
 
 ```
 $ ff802-cc --version
-ff802-cc 0.4.0 (git 8440f8311881, Release, USB writes enabled)
+ff802-cc 0.4.1 (git <Revision>, Release, USB writes enabled)
 $ ff802-detect --version
-ff802-detect 0.4.0 (git 8440f8311881, Release)
+ff802-detect 0.4.1 (git <Revision>, Release)
 ```
 
 „+dirty“ zeigt den Zustand **beim Konfigurieren**. Ändert man in einem
@@ -83,9 +89,9 @@ frisch aus einem sauberen Checkout konfiguriert.
 
 ```sh
 cmake -S . -B build && cmake --build build
-cmake --build build --target deb       # build/deb/ff802-ucm-profile_0.3.0_all.deb
-cmake --build build --target deb-auto  # build/deb/ff802-cc-auto_0.1.1_amd64.deb
-cmake --build build --target deb-cc    # build/deb/ff802-cc_0.4.0_amd64.deb
+cmake --build build --target deb       # build/deb/ff802-ucm-profile_0.3.1_all.deb
+cmake --build build --target deb-auto  # build/deb/ff802-cc-auto_0.1.2_amd64.deb
+cmake --build build --target deb-cc    # build/deb/ff802-cc_0.4.1_amd64.deb
 ctest --test-dir build                 # u. a. deb_package, deb_auto_package, deb_cc_package
 ```
 
@@ -103,11 +109,16 @@ So baut `deb-cc` (`packaging/build-deb-cc.sh`):
   (gleiches Dev-Container-Image) ergibt dieselbe `.deb`, auch aus einem
   anderen Checkout-Pfad und bei einem späteren Neubau (geprüft).
 
+Für ein Release die Pakete aus dem Commit bauen, der getaggt wird, damit
+`--version` und `BUILDINFO` die Revision des Tags zeigen (anders als bei
+0.4.0, siehe [Installationsstand](#installationsstand)).
+
 ## Installation und Aktualisierung (Host, Administrator, nach Freigabe)
 
 ```sh
-sudo apt install ./ff802-cc_0.4.0_amd64.deb            # neu
-sudo apt install ./ff802-cc-auto_0.1.1_amd64.deb       # Upgrade von 0.1.0
+sudo apt install ./ff802-cc_0.4.1_amd64.deb            # Upgrade von 0.4.0
+sudo apt install ./ff802-cc-auto_0.1.2_amd64.deb       # Upgrade von 0.1.0 oder 0.1.1
+sudo apt install ./ff802-ucm-profile_0.3.1_all.deb     # Upgrade von 0.3.0
 ff802-cc --version
 ff802-cc-auto status
 dpkg -l 'ff802-*'
@@ -119,10 +130,8 @@ dpkg -l 'ff802-*'
   gestartet.
 - `ff802-cc` hat keine Maintainer-Skripte. Aufruf: `sudo ff802-cc enable`
   bzw. `sudo ff802-cc disable`.
-- `ff802-ucm-profile` 0.3.0 bleibt unverändert.
-- Danach bitte nur noch `/usr/bin/ff802-cc` verwenden, nicht mehr
-  `build-write/ff802-cc`. So ist eindeutig, welche Fassung läuft
-  (`--version`).
+- Nur noch `/usr/bin/ff802-cc` verwenden, nicht `build-write/ff802-cc`.
+  So ist eindeutig, welche Fassung läuft (`--version`).
 
 ## Rückbau
 
