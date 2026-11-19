@@ -57,8 +57,8 @@ compliant, when the unit is connected or present at boot and the
 automation is on. It never switches back, never resets a USB port, and
 asks you to reconnect the cable.
 
-Manual (the ff802-cc tool of the project, NOT part of this package; run
-with sudo from the project's write-enabled build):
+Manual (package ff802-cc, NOT part of this package and not required by
+it; run with sudo):
 
   sudo ff802-cc enable    proprietary -> class-compliant, then resets the
                           USB hub port of the unit (no reconnecting)

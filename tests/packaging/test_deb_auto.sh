@@ -53,7 +53,7 @@ calls() { cat "$TW/calls.log" 2>/dev/null; }
 # --- build -----------------------------------------------------------------------
 DEB=$(sh "$SRC/packaging/build-deb-auto.sh" "$T/deb" 2> "$T/build.err")
 DEB2=$(sh "$SRC/packaging/build-deb-auto.sh" "$T/deb2" 2>> "$T/build.err")
-ok "package builds" '[ -f "$DEB" ] && [ "${DEB##*/}" = "ff802-cc-auto_0.1.0_${ARCH}.deb" ]'
+ok "package builds" '[ -f "$DEB" ] && [ "${DEB##*/}" = "ff802-cc-auto_0.1.1_${ARCH}.deb" ]'
 [ -f "$DEB" ] || { cat "$T/build.err"; exit 1; }
 ok "build is reproducible (identical bytes in another directory)" 'cmp -s "$DEB" "$DEB2"'
 ok "19: building the package called no tripwire (nothing executed, no system access)" '[ -z "$(calls)" ]'
@@ -121,25 +121,28 @@ ok "packaged files equal the repository" '[ "$same" = 1 ]'
 BIN=$X/usr/libexec/ff802-cc/ff802-cc-autoswitch
 syms=$(nm -D --undefined-only "$BIN" | awk '{ print $2 }' | sed 's/@.*//')
 has() { printf '%s\n' "$syms" | grep -qx "$1"; }
+# loops as functions: a "return" inside ok's eval would leave ok itself
+none_of() { for s in "$@"; do has "$s" && return 1; done; return 0; }
+scripts_parse() { for s in postinst prerm postrm; do sh -n "$X/DEBIAN/$s" || return 1; done; return 0; }
 ok "packaged program can write (claim, bulk transfer, release are linked)" \
     'has libusb_claim_interface && has libusb_bulk_transfer && has libusb_release_interface && has libusb_open'
 ok "packaged program has no forbidden USB call (reset, detach, config, control transfer, ...)" \
-    'for s in libusb_reset_device libusb_detach_kernel_driver libusb_set_auto_detach_kernel_driver \
+    'none_of libusb_reset_device libusb_detach_kernel_driver libusb_set_auto_detach_kernel_driver \
               libusb_set_configuration libusb_set_interface_alt_setting libusb_control_transfer \
               libusb_interrupt_transfer libusb_submit_transfer libusb_open_device_with_vid_pid \
-              libusb_clear_halt; do has "$s" && return 1; done; true'
+              libusb_clear_halt'
 ok "packaged program is the installed build, not the simulation" \
     '! grep -aq "SIMULATED backend" "$BIN" && ! grep -aq "FF802_AUTO_ROOT must be" "$BIN" &&
      grep -aq "only started by ff802-cc-auto@.service" "$BIN"'
 ok "control: name, version, architecture, dependencies, off after installation" \
-    'grep -qx "Package: ff802-cc-auto" "$X/DEBIAN/control" && grep -qx "Version: 0.1.0" "$X/DEBIAN/control" &&
+    'grep -qx "Package: ff802-cc-auto" "$X/DEBIAN/control" && grep -qx "Version: 0.1.1" "$X/DEBIAN/control" &&
      grep -qx "Architecture: $ARCH" "$X/DEBIAN/control" &&
      grep -qx "Depends: libc6 (>= 2.34), libusb-1.0-0 (>= 2:1.0.22), systemd, udev" "$X/DEBIAN/control" &&
      grep -q "The automation is off after installation" "$X/DEBIAN/control"'
 ok "md5sums cover every file" \
     '[ "$(cut -d" " -f3 "$X/DEBIAN/md5sums" | sort)" = "$(cd "$X" && find usr -type f | sort)" ] &&
      (cd "$X" && md5sum -c --quiet DEBIAN/md5sums)'
-ok "maintainer scripts pass sh -n" 'for s in postinst prerm postrm; do sh -n "$X/DEBIAN/$s" || return 1; done'
+ok "maintainer scripts pass sh -n" 'scripts_parse'
 ok "19: maintainer scripts never trigger udev, start or enable units, or run the program" \
     '! grep -Eq "udevadm +trigger|systemctl +(start|restart|enable|reload-or)|ff802-cc-autoswitch|--service" \
          "$X/DEBIAN/postinst" "$X/DEBIAN/prerm" "$X/DEBIAN/postrm"'
@@ -183,7 +186,7 @@ ok "installed files are in place" \
 
 # turn it on with the installed helper (test root), then upgrade: state kept
 FF802_AUTO_ROOT=$R sh "$R/usr/libexec/ff802-cc/ff802-cc-auto-on" > "$T/on.txt" 2>&1
-DEB11=$(sh "$SRC/packaging/build-deb-auto.sh" "$T/deb11" 0.1.1 2>> "$T/build.err")
+DEB11=$(sh "$SRC/packaging/build-deb-auto.sh" "$T/deb11" 0.1.2 2>> "$T/build.err")
 rc=$(run upgrade.txt dpkg_r -i "$DEB11")
 ok "upgrade keeps the automation state (on) and reports it" \
     '[ "$rc" = 0 ] && [ "$(cat "$R/var/lib/ff802-cc-auto/mode")" = on ] &&

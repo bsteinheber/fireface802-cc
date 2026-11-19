@@ -1,3 +1,19 @@
+ff802-cc-auto (0.1.1) unstable; urgency=medium
+
+  * Documentation: README.Debian and the package description distinguish
+    the automatic switch of this package (proprietary -> class-compliant
+    only, never back, no port reset) from the manual switch of the
+    separate package ff802-cc (enable with USB hub port reset, disable;
+    disable is refused while the automation is on). No longer claims that
+    switching back is not possible from Linux.
+  * Rebuilt; no functional change: ff802-cc-autoswitch, the units, the
+    udev rule, the polkit policy and the maintainer scripts behave as in
+    0.1.0 (the program binary differs only because a shared USB backend
+    structure gained a field used by ff802-cc disable; it reports project
+    version 0.4.0).
+
+ -- Bernhard Steinheber <bernhard@steinheber.info>  Thu, 19 Nov 2026 16:00:00 +0100
+
 ff802-cc-auto (0.1.0) unstable; urgency=medium
 
   * Initial package (T4): automatic switch of the original RME Fireface 802
