@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(fireface802-cc
-    VERSION 0.3.0
+    VERSION 0.4.0
     DESCRIPTION "Switch the original RME Fireface 802 between proprietary USB and class-compliant mode"
     LANGUAGES C)
 
@@ -14,6 +14,55 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 endif()
 
 option(FF802_WERROR "Treat compiler warnings as errors" ON)
+
+# Version identification of ff802-cc and ff802-detect (--version):
+# project version, Git revision (12 hex digits), build type, write gate.
+# The revision is determined here, at configure time: "+dirty" if tracked
+# files differ from HEAD (untracked files are not part of the build),
+# "unknown" without Git. A new commit re-runs the configuration (HEAD and
+# the branch ref are configure dependencies). The release packages are
+# built from a clean checkout in a fresh build directory, so the same
+# commit always gives the same programs.
+set(FF802_GIT_REVISION "unknown")
+find_package(Git QUIET)
+if(GIT_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.git")
+    execute_process(
+        COMMAND "${GIT_EXECUTABLE}" -C "${CMAKE_CURRENT_SOURCE_DIR}" rev-parse --short=12 HEAD
+        OUTPUT_VARIABLE git_rev RESULT_VARIABLE git_rc
+        OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+    if(git_rc EQUAL 0 AND git_rev MATCHES "^[0-9a-f]+$")
+        set(FF802_GIT_REVISION "${git_rev}")
+        execute_process(
+            COMMAND "${GIT_EXECUTABLE}" -C "${CMAKE_CURRENT_SOURCE_DIR}"
+                    status --porcelain --untracked-files=no
+            OUTPUT_VARIABLE git_changes RESULT_VARIABLE git_rc2 ERROR_QUIET)
+        if(NOT git_rc2 EQUAL 0 OR NOT git_changes STREQUAL "")
+            string(APPEND FF802_GIT_REVISION "+dirty")
+        endif()
+    endif()
+    set(git_dir "${CMAKE_CURRENT_SOURCE_DIR}/.git")
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${git_dir}/HEAD")
+    file(READ "${git_dir}/HEAD" git_head)
+    if(git_head MATCHES "^ref: ([^\n]+)")
+        if(EXISTS "${git_dir}/${CMAKE_MATCH_1}")
+            set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+                         "${git_dir}/${CMAKE_MATCH_1}")
+        endif()
+    endif()
+    if(EXISTS "${git_dir}/packed-refs")
+        set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${git_dir}/packed-refs")
+    endif()
+endif()
+# Read back by packaging/build-deb-cc.sh to verify the compiled revision.
+set(FF802_GIT_REVISION_DETECTED "${FF802_GIT_REVISION}" CACHE INTERNAL
+    "Git revision compiled into ff802-cc and ff802-detect")
+if(CMAKE_BUILD_TYPE)
+    set(FF802_BUILD_TYPE_NAME "${CMAKE_BUILD_TYPE}")
+else()
+    set(FF802_BUILD_TYPE_NAME "unspecified")
+endif()
+message(STATUS "fireface802-cc ${PROJECT_VERSION}, git ${FF802_GIT_REVISION}, "
+               "${FF802_BUILD_TYPE_NAME}")
 
 # Common warning flags, applied per target via ff802_set_warnings().
 function(ff802_set_warnings target)

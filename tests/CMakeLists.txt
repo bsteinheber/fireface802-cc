@@ -57,9 +57,17 @@ if(FF802_HAVE_TOOLS)
     set_tests_properties(cli_help_text PROPERTIES
         PASS_REGULAR_EXPRESSION "Usage: ff802-detect")
 
+    # --version: project version, Git revision of the configuration, build type
+    string(REPLACE "+" "\\+" rev_re "${FF802_GIT_REVISION}")
     add_test(NAME cli_version COMMAND ff802-detect --version)
     set_tests_properties(cli_version PROPERTIES
-        PASS_REGULAR_EXPRESSION "^ff802-detect ${PROJECT_VERSION}\n$")
+        PASS_REGULAR_EXPRESSION
+        "^ff802-detect ${PROJECT_VERSION} \\(git ${rev_re}, ${FF802_BUILD_TYPE_NAME}\\)\n$")
+    if(NOT FF802_GIT_REVISION STREQUAL "unknown")
+        add_test(NAME cli_version_revision_format
+            COMMAND sh -c "\"$0\" --version | grep -Eqx 'ff802-cc [0-9]+\\.[0-9]+\\.[0-9]+ \\(git [0-9a-f]{12}(\\+dirty)?, [A-Za-z]+, USB writes (enabled|disabled)\\)'"
+                    $<TARGET_FILE:ff802-cc>)
+    endif()
 
     add_test(NAME cli_unknown_arg COMMAND ff802-detect --bogus)
     set_tests_properties(cli_unknown_arg PROPERTIES WILL_FAIL TRUE)
@@ -91,7 +99,8 @@ if(FF802_HAVE_TOOLS)
     endfunction()
     ff802_cli_test(cc_cli_help 0 "Usage: ff802-cc" "--help")
     ff802_cli_test(cc_cli_version 0
-        "^ff802-cc ${PROJECT_VERSION} \\(USB writes ${write_word}\\)\n$" "--version")
+        "^ff802-cc ${PROJECT_VERSION} \\(git ${rev_re}, ${FF802_BUILD_TYPE_NAME}, USB writes ${write_word}\\)\n$"
+        "--version")
     ff802_cli_test(cc_cli_no_command 2 "Usage: ff802-cc")
     ff802_cli_test(cc_cli_unknown_command 2 "unexpected argument 'switch'" "switch")
     ff802_cli_test(cc_cli_two_commands 2 "unexpected argument" "check|enable")

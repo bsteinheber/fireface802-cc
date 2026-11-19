@@ -11,7 +11,9 @@ ff802_set_warnings(ff802_usb)
 add_executable(ff802-detect ff802_detect.c)
 target_link_libraries(ff802-detect PRIVATE ff802_usb ff802_detect)
 target_compile_definitions(ff802-detect PRIVATE
-    FF802_VERSION="${PROJECT_VERSION}")
+    FF802_VERSION="${PROJECT_VERSION}"
+    FF802_GIT_REVISION="${FF802_GIT_REVISION}"
+    FF802_BUILD_TYPE="${FF802_BUILD_TYPE_NAME}")
 set_target_properties(ff802-detect PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 ff802_set_warnings(ff802-detect)
@@ -36,7 +38,9 @@ ff802_set_warnings(ff802_comm)
 add_executable(ff802-cc ff802_cc.c)
 target_link_libraries(ff802-cc PRIVATE ff802_comm ff802_switch ff802_auto)
 target_compile_definitions(ff802-cc PRIVATE
-    FF802_VERSION="${PROJECT_VERSION}")
+    FF802_VERSION="${PROJECT_VERSION}"
+    FF802_GIT_REVISION="${FF802_GIT_REVISION}"
+    FF802_BUILD_TYPE="${FF802_BUILD_TYPE_NAME}")
 set_target_properties(ff802-cc PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 ff802_set_warnings(ff802-cc)

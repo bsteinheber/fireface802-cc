@@ -28,6 +28,12 @@
 #ifndef FF802_VERSION
 #define FF802_VERSION "unknown"
 #endif
+#ifndef FF802_GIT_REVISION
+#define FF802_GIT_REVISION "unknown"
+#endif
+#ifndef FF802_BUILD_TYPE
+#define FF802_BUILD_TYPE "unspecified"
+#endif
 
 static void usage(FILE *out)
 {
@@ -430,7 +436,8 @@ int main(int argc, char **argv)
             return FF802_CC_EXIT_OK;
         }
         if (strcmp(a, "-V") == 0 || strcmp(a, "--version") == 0) {
-            printf("ff802-cc %s (USB writes %s)\n", FF802_VERSION,
+            printf("ff802-cc %s (git %s, %s, USB writes %s)\n", FF802_VERSION,
+                   FF802_GIT_REVISION, FF802_BUILD_TYPE,
                    ff802_usb_comm_write_enabled() ? "enabled" : "disabled");
             return FF802_CC_EXIT_OK;
         }

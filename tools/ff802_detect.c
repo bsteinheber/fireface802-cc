@@ -14,6 +14,12 @@
 #ifndef FF802_VERSION
 #define FF802_VERSION "unknown"
 #endif
+#ifndef FF802_GIT_REVISION
+#define FF802_GIT_REVISION "unknown"
+#endif
+#ifndef FF802_BUILD_TYPE
+#define FF802_BUILD_TYPE "unspecified"
+#endif
 
 static void usage(FILE *out)
 {
@@ -38,7 +44,8 @@ int main(int argc, char **argv)
             return 0;
         }
         if (strcmp(argv[i], "-V") == 0 || strcmp(argv[i], "--version") == 0) {
-            printf("ff802-detect %s\n", FF802_VERSION);
+            printf("ff802-detect %s (git %s, %s)\n", FF802_VERSION,
+                   FF802_GIT_REVISION, FF802_BUILD_TYPE);
             return 0;
         }
         fprintf(stderr, "ff802-detect: unknown argument '%s'\n\n", argv[i]);
