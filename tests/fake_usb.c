@@ -120,6 +120,19 @@ static ff802_usb_err f_claim(void *self, ff802_usb_handle h, uint8_t iface)
     return FF802_USB_OK;
 }
 
+static ff802_usb_err f_claim_detach(void *self, ff802_usb_handle h, uint8_t iface)
+{
+    fake_usb *f = self;
+    (void)h;
+    trace(f, "claim_detach");
+    f->n_claim_detach++;
+    f->last_iface = iface;
+    if (f->err_claim_detach != FF802_USB_OK)
+        return f->err_claim_detach;
+    f->claimed++;
+    return FF802_USB_OK;
+}
+
 static ff802_usb_err f_release(void *self, ff802_usb_handle h, uint8_t iface)
 {
     fake_usb *f = self;
@@ -162,6 +175,7 @@ ff802_usb_backend fake_usb_backend(fake_usb *f)
         .claim = f_claim,
         .release = f_release,
         .bulk_write = f_write,
+        .claim_detach = f_claim_detach,
     };
     return be;
 }

@@ -118,7 +118,8 @@ enum {
     FF802_CC_EXIT_USAGE = 2,         /* invalid command line */
     FF802_CC_EXIT_CHECK_FAILED = 3,  /* precondition failed, nothing sent */
     FF802_CC_EXIT_WRITE_FAILED = 4,  /* transfer failed, device state unknown */
-    FF802_CC_EXIT_NOT_SENT = 5       /* aborted by user or writes disabled */
+    FF802_CC_EXIT_NOT_SENT = 5,      /* aborted by user or writes disabled */
+    FF802_CC_EXIT_SWITCH_UNCONFIRMED = 6 /* transferred, new mode not detected */
 };
 
 int ff802_sw_exit_code(ff802_sw_status st);

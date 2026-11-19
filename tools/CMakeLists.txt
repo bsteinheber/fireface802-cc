@@ -19,7 +19,8 @@ ff802_set_warnings(ff802-detect)
 # USB communication backend: the only module allowed to open, claim and
 # write. Claim and write are compiled in only with FF802_ENABLE_USB_WRITE.
 add_library(ff802_comm STATIC
-    ${PROJECT_SOURCE_DIR}/src/usb_comm.c)
+    ${PROJECT_SOURCE_DIR}/src/usb_comm.c
+    ${PROJECT_SOURCE_DIR}/src/usb_comm_detach.c)
 target_include_directories(ff802_comm PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(ff802_comm
     PUBLIC ff802_switch
@@ -33,7 +34,7 @@ ff802_set_warnings(ff802_comm)
 
 # Mode switch tool.
 add_executable(ff802-cc ff802_cc.c)
-target_link_libraries(ff802-cc PRIVATE ff802_comm ff802_switch)
+target_link_libraries(ff802-cc PRIVATE ff802_comm ff802_switch ff802_auto)
 target_compile_definitions(ff802-cc PRIVATE
     FF802_VERSION="${PROJECT_VERSION}")
 set_target_properties(ff802-cc PROPERTIES

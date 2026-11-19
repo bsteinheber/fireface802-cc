@@ -116,6 +116,15 @@ typedef struct ff802_usb_backend {
                                 uint8_t endpoint, const uint8_t *data,
                                 size_t len, unsigned timeout_ms,
                                 size_t *transferred);
+
+    /*
+     * Disable path only (ff802-cc disable, interface 3): claim the
+     * interface and let libusb detach the kernel driver bound to it (libusb
+     * auto-detach); release() then lets libusb re-attach it. NULL unless explicitly enabled with
+     * ff802_usb_comm_allow_detach_claim(); the enable path never uses it.
+     */
+    ff802_usb_err (*claim_detach)(void *self, ff802_usb_handle handle,
+                                  uint8_t iface);
 } ff802_usb_backend;
 
 #ifdef __cplusplus

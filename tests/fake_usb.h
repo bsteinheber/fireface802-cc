@@ -25,10 +25,12 @@ typedef struct fake_usb {
     ff802_usb_err err_claim;
     ff802_usb_err err_write;
     ff802_usb_err err_release;
+    ff802_usb_err err_claim_detach;
 
     /* Observations. */
     char     trace[256];
     int      n_open, n_close, n_claim, n_release, n_write, n_list, n_free;
+    int      n_claim_detach;        /* claims with kernel driver auto-detach */
     int      open_handles;          /* opened minus closed */
     int      claimed;               /* claimed minus released */
     uint8_t  last_iface;

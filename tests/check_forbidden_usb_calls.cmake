@@ -48,8 +48,15 @@ set(COMM_ONLY
 )
 
 set(COMM_FILE "${SOURCE_DIR}/src/usb_comm.c")
+# ff802-cc disable only: claim with libusb_set_auto_detach_kernel_driver
+# (hardware test 2026-11-19). The only file that may use it, and only
+# together with libusb_claim_interface.
+set(DETACH_FILE "${SOURCE_DIR}/src/usb_comm_detach.c")
+set(DETACH_ALLOWED libusb_set_auto_detach_kernel_driver)
+set(DETACH_FILE_COMM libusb_claim_interface)
 set(COMM_HEADER_ALLOWED
     "${SOURCE_DIR}/src/usb_comm.c"
+    "${SOURCE_DIR}/src/usb_comm_detach.c"
     "${SOURCE_DIR}/tools/ff802_cc.c"
     "${SOURCE_DIR}/tools/ff802_cc_autoswitch.c")
 
@@ -81,6 +88,9 @@ foreach(src IN LISTS sources)
     file(READ "${src}" content)
 
     foreach(fn IN LISTS ALWAYS_FORBIDDEN)
+        if(src STREQUAL DETACH_FILE AND fn IN_LIST DETACH_ALLOWED)
+            continue()
+        endif()
         if(content MATCHES "(^|[^A-Za-z0-9_])${fn}([^A-Za-z0-9_]|$)")
             report("forbidden USB call '${fn}' in ${src}")
         endif()
@@ -88,6 +98,9 @@ foreach(src IN LISTS sources)
 
     if(NOT src STREQUAL COMM_FILE)
         foreach(fn IN LISTS COMM_ONLY)
+            if(src STREQUAL DETACH_FILE AND fn IN_LIST DETACH_FILE_COMM)
+                continue()
+            endif()
             if(content MATCHES "(^|[^A-Za-z0-9_])${fn}([^A-Za-z0-9_]|$)")
                 report("'${fn}' is only allowed in src/usb_comm.c, found in ${src}")
             endif()

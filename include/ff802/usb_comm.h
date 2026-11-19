@@ -29,6 +29,14 @@ ff802_usb_err ff802_usb_comm_init(ff802_usb_backend *be);
 /* Release everything acquired by ff802_usb_comm_init(). */
 void ff802_usb_comm_exit(ff802_usb_backend *be);
 
+/*
+ * Enable be->claim_detach for ff802-cc disable (src/usb_comm_detach.c,
+ * the only place that may detach a kernel driver, and only through
+ * libusb auto-detach). Programs that do not call this
+ * function do not even contain the detach call (static library).
+ */
+void ff802_usb_comm_allow_detach_claim(ff802_usb_backend *be);
+
 #ifdef __cplusplus
 }
 #endif

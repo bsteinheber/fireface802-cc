@@ -21,8 +21,16 @@ set_target_properties(test_usb_port PROPERTIES C_EXTENSIONS ON)
 ff802_set_warnings(test_usb_port)
 add_test(NAME test_usb_port COMMAND test_usb_port)
 
+# Preconditions of ff802-cc disable (fake sysfs, /proc/asound, T4 state).
+add_executable(test_disable_check test_disable_check.c)
+target_include_directories(test_disable_check PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/auto)
+target_link_libraries(test_disable_check PRIVATE ff802_auto)
+set_target_properties(test_disable_check PROPERTIES C_EXTENSIONS ON)
+ff802_set_warnings(test_disable_check)
+add_test(NAME test_disable_check COMMAND test_disable_check)
+
 # Tests using the simulated USB backend.
-foreach(name test_usb_backend test_cc_switch)
+foreach(name test_usb_backend test_cc_switch test_cc_disable)
     add_executable(${name} ${name}.c fake_usb.c)
     target_link_libraries(${name} PRIVATE ff802_switch)
     ff802_set_warnings(${name})
@@ -87,10 +95,12 @@ if(FF802_HAVE_TOOLS)
     ff802_cli_test(cc_cli_no_command 2 "Usage: ff802-cc")
     ff802_cli_test(cc_cli_unknown_command 2 "unexpected argument 'switch'" "switch")
     ff802_cli_test(cc_cli_two_commands 2 "unexpected argument" "check|enable")
-    # disable has no USB path: explains the alternatives, exit 5 (not sent)
-    ff802_cli_test(cc_cli_disable 5
-        "not available. Nothing was sent.*TotalMix FX resets it to normal mode.*Prog and\n    B \\(Mono\\).*ff802-cc-auto off" "disable")
-    ff802_cli_test(cc_cli_disable_device 2 "takes no --device" "--device|3:18|disable")
+    # disable refuses without an interactive terminal, before reading
+    # sysfs or touching USB (stdin is /dev/null)
+    ff802_cli_test(cc_cli_disable 2 "'disable' requires an interactive terminal" "disable")
+    ff802_cli_test(cc_cli_disable_device 2 "'disable' requires an interactive terminal"
+        "--device|3:19|disable")
+    ff802_cli_test(cc_cli_disable_help 0 "disable Switch a unit in class-compliant mode" "--help")
     ff802_cli_test(cc_cli_disable_twice 2 "unexpected argument" "disable|disable")
     ff802_cli_test(cc_cli_device_missing 2 "--device expects" "--device")
     ff802_cli_test(cc_cli_device_invalid 2 "--device expects" "--device|3-18|check")
@@ -112,10 +122,14 @@ if(FF802_HAVE_TOOLS)
             -P ${CMAKE_CURRENT_SOURCE_DIR}/check_binary_symbols.cmake)
 
     if(FF802_ENABLE_USB_WRITE)
+        # ff802-cc disable needs libusb auto-detach (only that one detach
+        # function; libusb_detach_kernel_driver and reset stay forbidden).
+        string(REPLACE "|libusb_set_auto_detach_kernel_driver" "" cc_forbidden
+               "${always_forbidden}")
         add_test(NAME cc_binary_symbols
             COMMAND ${CMAKE_COMMAND} -DNM=${CMAKE_NM} -DBINARY=$<TARGET_FILE:ff802-cc>
-                "-DFORBIDDEN=${always_forbidden}"
-                "-DREQUIRED=libusb_open|${write_symbols}"
+                "-DFORBIDDEN=${cc_forbidden}"
+                "-DREQUIRED=libusb_open|${write_symbols}|libusb_set_auto_detach_kernel_driver"
                 -P ${CMAKE_CURRENT_SOURCE_DIR}/check_binary_symbols.cmake)
     else()
         # Write gate closed: claim, release and bulk transfer are absent.

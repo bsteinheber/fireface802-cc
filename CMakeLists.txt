@@ -46,7 +46,8 @@ ff802_set_warnings(ff802_detect)
 # Pure CC switch sequence on an abstract USB backend (no libusb).
 add_library(ff802_switch STATIC
     src/usb_backend.c
-    src/cc_switch.c)
+    src/cc_switch.c
+    src/cc_disable.c)
 target_include_directories(ff802_switch PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(ff802_switch PUBLIC ff802_protocol ff802_detect)
@@ -58,7 +59,8 @@ add_library(ff802_auto STATIC
     src/auto_sysfs.c
     src/auto_state.c
     src/auto_switch.c
-    src/usb_port.c)
+    src/usb_port.c
+    src/disable_check.c)
 target_include_directories(ff802_auto PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(ff802_auto PUBLIC ff802_switch)
