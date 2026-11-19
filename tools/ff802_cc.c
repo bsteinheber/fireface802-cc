@@ -241,6 +241,11 @@ static void print_result(const ff802_sw_options *opt,
         hint = "The device node could not be opened: either the device was "
                "unplugged, or /dev/bus/usb is not available (e.g. inside a "
                "container without USB access).";
+    if (res->status == FF802_SW_ACCESS_DENIED)
+        hint = "No write access to the USB device node. Run ff802-cc with sudo, "
+               "as in the tested procedure (enable also needs root for the USB "
+               "hub port reset). The project installs no udev rule for this "
+               "(see docs/usb_comm.md).";
     if (hint != NULL)
         fprintf(stderr, "%s\n", hint);
     if (res->release_failed)
