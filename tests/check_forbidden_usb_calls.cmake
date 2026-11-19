@@ -58,6 +58,17 @@ file(GLOB_RECURSE sources
     "${SOURCE_DIR}/include/*.h"
     "${SOURCE_DIR}/tools/*.c" "${SOURCE_DIR}/tools/*.h")
 
+# sysfs USB control: only the hub port "disable" attribute, only in
+# src/usb_port.c; no usbreset, no "authorized", no driver bind/unbind.
+set(SYSFS_FORBIDDEN
+    "/authorized"
+    "\"usbreset"
+    "USBDEVFS_RESET"
+    "/unbind"
+    "drivers/[A-Za-z0-9_-]+/bind"
+)
+set(PORT_FILE "${SOURCE_DIR}/src/usb_port.c")
+
 set(violations 0)
 
 function(report msg)
@@ -81,6 +92,15 @@ foreach(src IN LISTS sources)
                 report("'${fn}' is only allowed in src/usb_comm.c, found in ${src}")
             endif()
         endforeach()
+    endif()
+
+    foreach(pat IN LISTS SYSFS_FORBIDDEN)
+        if(content MATCHES "${pat}")
+            report("forbidden USB sysfs control '${pat}' in ${src}")
+        endif()
+    endforeach()
+    if(NOT src STREQUAL PORT_FILE AND content MATCHES "/disable\"")
+        report("the hub port 'disable' attribute may only be written in src/usb_port.c, found in ${src}")
     endif()
 
     if(content MATCHES "#[ \t]*include[ \t]*[<\"]ff802/usb_comm\\.h[>\"]")

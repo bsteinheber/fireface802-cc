@@ -13,6 +13,14 @@ ff802_add_test(test_cc_mode ff802_protocol)
 ff802_add_test(test_device_id ff802_detect)
 ff802_add_test(test_detect ff802_detect)
 
+# Hub port of a device (fake sysfs tree of tests/auto).
+add_executable(test_usb_port test_usb_port.c)
+target_include_directories(test_usb_port PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/auto)
+target_link_libraries(test_usb_port PRIVATE ff802_auto)
+set_target_properties(test_usb_port PROPERTIES C_EXTENSIONS ON)
+ff802_set_warnings(test_usb_port)
+add_test(NAME test_usb_port COMMAND test_usb_port)
+
 # Tests using the simulated USB backend.
 foreach(name test_usb_backend test_cc_switch)
     add_executable(${name} ${name}.c fake_usb.c)
