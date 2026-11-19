@@ -6,3 +6,11 @@ build-*/
 .vscode/
 *.swp
 *~
+
+# Packages and other generated files (packages are built into build/deb)
+*.deb
+__pycache__/
+*.pyc
+
+# Local Claude Code settings
+.claude/
