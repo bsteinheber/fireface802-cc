@@ -1,0 +1,13 @@
+ff802-cc (0.4.0) unstable; urgency=medium
+
+  * Initial package: ff802-cc and ff802-detect of fireface802-cc (project
+    version 0.4.0) for the original RME Fireface 802, built as a Release
+    build with USB writes enabled.
+  * ff802-cc enable: proprietary -> class-compliant mode, then reset of the
+    USB hub port of the unit (sysfs disable=1, 2 s, disable=0).
+  * ff802-cc disable: class-compliant -> proprietary mode over USB-MIDI
+    interface 3; refused while ff802-cc-auto is on or audio is running.
+  * Both tested on the device on 2026-11-19. Run with sudo.
+  * --version shows project version, Git revision, build type, write gate.
+
+ -- Bernhard Steinheber <bernhard@steinheber.info>  Thu, 19 Nov 2026 16:00:00 +0100

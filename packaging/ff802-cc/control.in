@@ -1,0 +1,23 @@
+Package: ff802-cc
+Version: @VERSION@
+Architecture: @ARCH@
+Maintainer: Bernhard Steinheber <bernhard@steinheber.info>
+Installed-Size: @SIZE@
+Depends: libc6 (>= 2.34), libusb-1.0-0 (>= 2:1.0.22)
+Suggests: ff802-cc-auto, ff802-ucm-profile
+Section: sound
+Priority: optional
+Description: manual USB mode switch for the original RME Fireface 802
+ ff802-cc switches an original RME Fireface 802 (not the 802 FS) by hand
+ between proprietary USB mode (2a39:3fcd) and class-compliant mode
+ (0424:3fdd), after an interactive confirmation:
+ .
+  sudo ff802-cc enable    proprietary -> class-compliant, then resets the
+                          USB hub port of the unit
+  sudo ff802-cc disable   class-compliant -> proprietary
+ .
+ ff802-detect lists the unit and its mode without opening it.
+ .
+ Independent of ff802-cc-auto (the automatic switch at connection) and of
+ ff802-ucm-profile (the audio configuration); disable is refused while
+ ff802-cc-auto is on. No udev rule, no service, no maintainer script.

@@ -1,0 +1,74 @@
+ff802-cc
+========
+
+Manual USB mode switch for the original RME Fireface 802 (not the 802 FS).
+
+  sudo ff802-cc check     read only: is a unit in proprietary mode there,
+                          do its USB descriptors match? Sends nothing.
+  sudo ff802-cc enable    proprietary (2a39:3fcd) -> class-compliant
+                          (0424:3fdd): sends 01 00 44 BD to interface 1,
+                          bulk OUT 0x0C, then resets the USB hub port of
+                          the unit (sysfs disable=1, 2 s, disable=0) and
+                          waits for 0424:3fdd
+  sudo ff802-cc --no-port-reset enable
+                          the same without the port reset: disconnect and
+                          reconnect the unit by hand afterwards
+  sudo ff802-cc disable   class-compliant -> proprietary: sends 16 bytes
+                          to USB-MIDI interface 3, bulk OUT 0x07 (libusb
+                          detaches snd-usb-audio from that interface; the
+                          ALSA card disappears), waits for 2a39:3fcd
+  ff802-detect            lists the unit and its mode (never opens it)
+
+Every switch shows the target and the bytes and needs the typed word
+ENABLE or DISABLE on an interactive terminal. Nothing is ever retried.
+Both directions were tested on the device on 2026-11-19.
+
+Safety and preconditions
+------------------------
+
+- Root is needed (sudo): for the USB device node and, for enable, for
+  the hub port. No udev rule or polkit rule is installed.
+- enable resolves the hub port before anything is sent; it must be the
+  port of exactly this unit, otherwise nothing is sent.
+- disable refuses while the automation of ff802-cc-auto is on (it would
+  switch the unit straight back): run "ff802-cc-auto off" first. It also
+  refuses while audio is playing or recording on the unit.
+- Volume: after enable the unit appears as an audio device; with
+  ff802-cc-auto/ff802-ucm-profile its six outputs come back with the
+  volumes stored by WirePlumber.
+
+Exit status: 0 switched (or check passed), 1 no suitable unit, 2 usage,
+3 precondition failed (nothing sent), 4 transfer failed (unit state
+unknown), 5 not sent (aborted), 6 transferred, new mode not detected.
+
+Versions
+--------
+
+  ff802-cc --version       (example)
+  ff802-cc 0.4.0 (git 8440f8311881, Release, USB writes enabled)
+
+- Project version (0.4.0): version of the fireface802-cc sources, set in
+  CMakeLists.txt; shown by --version of all programs.
+- Git revision (12 hex digits): the commit the programs were built from,
+  determined by CMake at configure time.
+- Package version (changelog of this package, 0.4.0 here): version
+  of the Debian package ff802-cc. It may differ from the project version,
+  e.g. 0.4.0-2 for a package-only change, or 0.4.1 built for an upgrade
+  test.
+- /usr/share/doc/ff802-cc/BUILDINFO: commit, build type, compiler, CMake
+  and libusb versions and SOURCE_DATE_EPOCH of the build. The package is
+  built reproducibly: the same commit built with the same tool versions
+  gives the same .deb.
+
+Relation to the other packages
+------------------------------
+
+Independent: ff802-cc needs neither ff802-cc-auto nor ff802-ucm-profile,
+and they do not need it. Files of the three packages do not overlap.
+ff802-cc only reads the automation state /var/lib/ff802-cc-auto/mode
+(missing = off).
+
+Removal
+-------
+
+  sudo apt remove ff802-cc     (no configuration, nothing left behind)

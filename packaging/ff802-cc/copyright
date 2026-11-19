@@ -1,0 +1,8 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: fireface802-cc
+Comment: The license of the project has not been determined yet.
+
+Files: *
+Copyright: 2026 Bernhard Steinheber
+License: none
+ No license has been granted yet. All rights reserved by the author.

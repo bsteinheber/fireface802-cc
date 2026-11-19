@@ -54,3 +54,20 @@ endif()
 add_test(NAME ucm_bind_udev
     COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/test_ucm_bind_udev.sh
             ${PROJECT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}/bind-udev-scratch)
+
+# Debian package ff802-cc (manual switch: ff802-cc, ff802-detect), release
+# build from a clean Git checkout. cmake --build <dir> --target deb-cc
+# -> <dir>/deb/ff802-cc_<version>_<arch>.deb (refused with uncommitted changes)
+find_program(FF802_GIT git)
+if(FF802_DPKG_DEB AND FF802_HAVE_TOOLS AND FF802_GIT)
+    add_custom_target(deb-cc
+        COMMAND sh ${PROJECT_SOURCE_DIR}/packaging/build-deb-cc.sh ${CMAKE_BINARY_DIR}/deb
+        COMMENT "Building the ff802-cc Debian package"
+        VERBATIM)
+endif()
+if(FF802_DPKG_DEB AND FF802_DPKG AND FF802_HAVE_TOOLS AND FF802_GIT)
+    add_test(NAME deb_cc_package
+        COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/test_deb_cc.sh
+                ${PROJECT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}/deb-cc-scratch)
+    set_tests_properties(deb_cc_package PROPERTIES TIMEOUT 900)
+endif()
