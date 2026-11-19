@@ -195,4 +195,27 @@ Keiner der automatisierten Tests greift auf USB-Hardware oder eine Soundkarte zu
 
 ## Lizenz
 
-Noch nicht festgelegt.
+| Dateien | Lizenz | Copyright |
+|---|---|---|
+| alle Dateien, soweit unten nicht anders angegeben (Quellcode, Skripte, Tests, Paketierung, Dokumentation) | MIT, siehe [LICENSE](LICENSE) | 2026 Bernhard Steinheber |
+| [audio/ucm2/](audio/ucm2/) (UCM-Profil) | BSD-3-Clause, siehe [LICENSES/BSD-3-Clause.txt](LICENSES/BSD-3-Clause.txt) | 2026 Bernhard Steinheber |
+| [packaging/ff802-ucm/longname-master.conf](packaging/ff802-ucm/longname-master.conf) | BSD-3-Clause, wie oben | 2026 Bernhard Steinheber; 2019-2026 Advanced Linux Sound Architecture (ALSA) project |
+
+- Das UCM-Profil steht unter derselben Lizenz wie `alsa-ucm-conf`.
+- `longname-master.conf` enthält Abschnitte aus `USB-Audio/USB-Audio.conf`
+  von `alsa-ucm-conf` (BSD-3-Clause). Deshalb steht dort zusätzlich der
+  Copyright-Hinweis des ALSA-Projekts.
+- Die Debian-Pakete enthalten dieselbe Zuordnung in
+  `/usr/share/doc/<paket>/copyright` (Format DEP-5).
+- Die Dokumentation zitiert kurze, mit Quelle belegte Stellen aus dem
+  Handbuch von RME und aus Forenbeiträgen. Diese Zitate bleiben Eigentum
+  ihrer Urheber und fallen nicht unter die MIT-Lizenz.
+- Die Dateien in [tests/audio/fixtures/t1/](tests/audio/fixtures/t1/) sind
+  Ausgaben von `alsaucm` für dieses Profil.
+
+### Marken
+
+RME, Fireface und TotalMix sind Marken ihrer jeweiligen Inhaber. Sie
+werden hier nur verwendet, um die unterstützte Hardware zu benennen.
+Dieses Projekt steht in keiner Verbindung zu RME und wird von RME weder
+unterstützt noch geprüft.
