@@ -9,7 +9,7 @@ Linux-Werkzeug zur Umschaltung des **ursprünglichen RME Fireface 802**
 |-------|--------|-------|
 | 1  | Kodierung der Registerbefehle und Tests | abgeschlossen |
 | 2a | Diagnoseprogramm `ff802-detect`: lesende Geräteerkennung | abgeschlossen, auf dem Host getestet |
-| 2b | Umschaltprogramm `ff802-cc` mit Diagnosemodus | abgeschlossen, Umschaltung auf dem Host erfolgreich getestet |
+| 2b | Umschaltprogramm `ff802-cc` mit Diagnosemodus | abgeschlossen, Umschaltung auf dem Host erfolgreich getestet; `disable` (CC → proprietär) und Port-Reset nach `enable` umgesetzt (2026-11-19 von Hand am Gerät getestet, integrierte Fassung noch nicht) |
 | 3 | ALSA-UCM-Profil mit sechs Stereo-Ausgängen für den CC-Modus, Debian-Paket `ff802-ucm-profile` (T1, T3) | Host-Test T1 bestanden; Version **0.3.0 auf dem Host installiert**, automatischer USB-Portwechsel auf dem Host erfolgreich getestet (2026-11-18, [docs/audio_t3_usb_port.md](docs/audio_t3_usb_port.md)); Kanalzuordnung unbestätigt (T2) |
 | 4 | Messwerkzeug `ff802-chanmap` für die Kanalzuordnung (Hardwaretest T2) | implementiert und im Container getestet, T2 nicht ausgeführt |
 | T4 | Automatischer Wechsel in den CC-Modus beim Anschließen/Systemstart, Debian-Paket `ff802-cc-auto`; Untersuchung `ff802-cc disable` | Version **0.1.0 auf dem Host installiert**, automatische Umschaltung in den Class-Compliant-Modus auf dem Host erfolgreich getestet; `disable` nicht möglich (kein belegtes Verfahren) |
@@ -98,18 +98,24 @@ Root-Rechte.
 # Diagnose vor der Umschaltung (öffnet das Gerät, beansprucht nichts, sendet nichts)
 /home/bernhard/Develop/fireface802-cc/build/ff802-cc check
 
-# Umschaltung (im Standard-Build gesperrt)
-/home/bernhard/Develop/fireface802-cc/build/ff802-cc enable
+# Umschaltung (im Standard-Build gesperrt; schreibfähiger Build: build-write)
+# proprietär -> CC, danach automatischer USB-Hub-Port-Reset
+sudo /home/bernhard/Develop/fireface802-cc/build-write/ff802-cc enable
+# CC -> proprietär (USB-MIDI-Interface 3); verweigert bei ff802-cc-auto on
+sudo /home/bernhard/Develop/fireface802-cc/build-write/ff802-cc disable
 ```
+
+Details: [docs/cc_disable_port_reset.md](docs/cc_disable_port_reset.md).
 
 | Exit | `ff802-detect` | `ff802-cc` |
 |:----:|----------------|------------|
-| 0 | Gerät gefunden | Prüfung bestanden bzw. Befehl übertragen |
+| 0 | Gerät gefunden | Prüfung bestanden bzw. umgeschaltet |
 | 1 | kein Gerät | kein passendes Gerät |
 | 2 | Fehler | Bedienfehler |
 | 3 | – | Vorbedingung nicht erfüllt, nichts gesendet |
 | 4 | – | Übertragung fehlgeschlagen, Gerätezustand unbekannt |
-| 5 | – | nicht gesendet (abgebrochen, Schreiben gesperrt oder `disable`) |
+| 5 | – | nicht gesendet (abgebrochen oder Schreiben gesperrt) |
+| 6 | – | übertragen, aber der neue Modus wurde nicht erkannt |
 
 `ff802-cc check` braucht Schreibrechte auf die Gerätedatei. Ohne udev-Regel
 meldet es `access to the USB device denied`. Eine udev-Regel wird nicht
@@ -133,6 +139,7 @@ neuer), x86-64.
 | `test_device_id`, `test_detect` | Geräteerkennung mit simulierten Gerätelisten |
 | `test_usb_backend` | Layout-Prüfung, Bestätigungswort, `--device`-Syntax, Exit-Codes |
 | `test_cc_switch` | Kompletter Ablauf gegen ein simuliertes USB-Backend: Reihenfolge, genau ein Schreibversuch, Freigabe aller Ressourcen, alle Fehlerfälle |
+| `test_cc_disable`, `test_disable_check`, `test_usb_port` | `ff802-cc disable` (Ablauf, Vorprüfung) und USB-Hub-Port-Reset nach `enable`, gegen simuliertes Backend und nachgebautes sysfs |
 | `test_write_gate` | Backend meldet die konfigurierte Schreibfähigkeit |
 | `check_forbidden_usb_calls` | Quelltextprüfung: Schreib-APIs nur in `src/usb_comm.c`, verbotene APIs nirgends |
 | `detect_binary_symbols`, `cc_binary_symbols` | Prüfung der importierten Symbole der fertigen Programme mit `nm` |
@@ -169,6 +176,7 @@ Keiner der automatisierten Tests greift auf USB-Hardware oder eine Soundkarte zu
 - [docs/audio_t3_usb_port.md](docs/audio_t3_usb_port.md): T3 0.3.0, automatische UCM-Bindung an jedem USB-Port (udev-Hook), Annahmen, Host-Testplan
 - [docs/t4_usb_mode.md](docs/t4_usb_mode.md): T4, automatischer CC-Moduswechsel: Architektur, Sicherheit, Installation, Aktivierung, Diagnose, Rollback, Tests
 - [docs/t4_disable.md](docs/t4_disable.md): T4, Untersuchung `ff802-cc disable` (Rückweg in den proprietären Modus)
+- [docs/cc_disable_port_reset.md](docs/cc_disable_port_reset.md): `ff802-cc disable` (USB-MIDI-SysEx) und USB-Hub-Port-Reset nach `enable`
 
 ## Lizenz
 

@@ -6,9 +6,17 @@ Class-Compliant-Modus (CC-Modus) an ein ursprüngliches Fireface 802
 ersten echten Schreibzugriffs.
 
 > **Stand:** Der Schreibpfad ist implementiert und mit einem simulierten
-> USB-Backend getestet. Ein echter Schreibzugriff auf das Gerät hat **noch
-> nicht** stattgefunden. Im Standard-Build ist er technisch unmöglich
-> (siehe „Build-Sperre“).
+> USB-Backend getestet; `ff802-cc enable` wurde auf dem Host erfolgreich
+> am Gerät ausgeführt. Im Standard-Build ist ein Schreibzugriff technisch
+> unmöglich (siehe „Build-Sperre“).
+>
+> **Neu:** `ff802-cc disable` (CC → proprietär, Interface 3, mit
+> libusb-Auto-Detach von `snd-usb-audio`) und der USB-Hub-Port-Reset nach
+> `enable` sind in [cc_disable_port_reset.md](cc_disable_port_reset.md)
+> beschrieben. Die Abschnitte unten beschreiben den Enable-Ablauf. Die dort
+> genannten Verbote gelten weiter, mit einer einzigen Ausnahme:
+> `libusb_set_auto_detach_kernel_driver` ist für Disable in
+> `src/usb_comm_detach.c` erlaubt.
 
 ## Architektur
 

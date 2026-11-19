@@ -1,11 +1,15 @@
 # T4: Untersuchung `ff802-cc disable` (CC-Modus → proprietärer Modus)
 
-> **Ergebnis:** Für das originale Fireface 802 gibt es **kein belegtes
-> Verfahren**, das Gerät per USB aus dem Class-Compliant-Modus zurück in
-> den proprietären Modus zu schalten. `ff802-cc disable` sendet deshalb
-> nichts. Es erklärt den Stand und die sicheren Alternativen und endet mit
-> Exit 5 („nicht gesendet“). **Offener Punkt**, siehe unten
-> „Was für eine Umsetzung nötig wäre“.
+> **Überholt am 2026-11-19:** Das Verfahren ist inzwischen gefunden und am
+> Gerät erfolgreich getestet. Es ist Register `0x3D44` als RME-SysEx auf dem
+> USB-MIDI-Interface 3 (Bulk OUT `0x07`). `ff802-cc disable` setzt es um,
+> siehe [cc_disable_port_reset.md](cc_disable_port_reset.md). Die
+> Untersuchung unten vom 2026-11-17 bleibt als Hintergrund erhalten.
+> Interface 3 war dort nur als MIDI-Interface aufgeführt; dass es den
+> Befehl annimmt, war damals nicht bekannt.
+>
+> Ursprüngliches Ergebnis (2026-11-17): Für das originale Fireface 802 gab
+> es **kein belegtes Verfahren**, und `ff802-cc disable` sendete nichts.
 
 Stand: 2026-11-17. Untersucht im Dev-Container. Es gab keine USB-Zugriffe:
 Die Deskriptoren stammen aus dem schreibgeschützt eingebundenen sysfs des

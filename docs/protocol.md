@@ -92,8 +92,26 @@ Register `0x3D44` steuert den Class-Compliant-Modus (CC-Modus):
 > entspricht das sehr wahrscheinlich der TotalMix-Option „Activate CC mode on
 > disconnect“. `0x0001` lässt das Gerät beim nächsten Trennen im CC-Modus
 > starten, was am Gerät bestätigt ist. `0x0000` nimmt die Option im
-> proprietären Modus zurück, was nicht getestet ist. Einen Rückweg *aus* dem
-> CC-Modus bietet das Register nicht: Dort fehlt Endpunkt `0x0C`.
+> proprietären Modus zurück, was nicht getestet ist. Über Endpunkt `0x0C`
+> gibt es keinen Rückweg *aus* dem CC-Modus, denn dort fehlt dieser Endpunkt.
+
+### CC-Modus verlassen: dasselbe Register als SysEx (Test 2026-11-19)
+
+Im CC-Modus nimmt das Gerät Registerwörter als RME-SysEx auf dem
+USB-MIDI-Interface 3 an (Bulk OUT `0x07`, Kabel 1). Am 2026-11-19 hat
+dieser Transfer das Gerät sofort in den proprietären Modus geschaltet:
+
+```
+Wort          ff802_reg_encode(0x3D44, 0xFFFE) = 0xBD44FFFE
+7-Bit-Gruppen 7E 7F 13 6A 0B             (Bits 0-6, 7-13, ..., LSB zuerst)
+SysEx         F0 00 20 0D 10 00  7E 7F 13 6A 0B  F7
+USB-MIDI      13 F0 00 20 | 13 0D 10 00 | 13 7E 7F 13 | 13 6A 0B F7
+```
+
+Das Kopfbyte `0x13` (Kabel 1, CIN 3) stammt aus dem getesteten Transfer,
+nicht aus dem USB-MIDI-Standard. Was der Wert `0xFFFE` bedeutet, ist
+nicht dokumentiert. Code: `ff802_cc_disable_midi()`, Ablauf siehe
+[cc_disable_port_reset.md](cc_disable_port_reset.md).
 
 ### Herleitung der aufgezeichneten Befehle
 

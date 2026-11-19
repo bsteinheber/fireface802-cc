@@ -15,7 +15,7 @@ T4 hat zwei Teile:
 | Teil | Funktion | Stand |
 |---|---|---|
 | A | Automatischer Wechsel proprietär → Class-Compliant beim Anschließen und beim Systemstart | implementiert (Paket `ff802-cc-auto`) |
-| B | `ff802-cc disable`: Class-Compliant → proprietär | **nicht möglich**, kein belegtes Verfahren; siehe [t4_disable.md](t4_disable.md) |
+| B | `ff802-cc disable`: Class-Compliant → proprietär | seit 2026-11-19 als eigener, manueller Befehl umgesetzt (nicht Teil der Automatik), siehe [cc_disable_port_reset.md](cc_disable_port_reset.md); verweigert bei eingeschalteter Automatik |
 
 Die Automatik schaltet **ausschließlich** in Richtung Class-Compliant.
 
@@ -122,7 +122,7 @@ USB-Reset noch eine Stromunterbrechung.
 | Höchstens ein Versuch pro Anschluss | Eintrag vor jedem USB-Zugriff, unter Sperre | `auto_flow` 6/18, 10 gleichzeitige Ereignisse → 1 Transfer |
 | Keine Wiederholung | `cc_switch` sendet einmal; Dienst ohne `Restart` | `test_auto_switch`, `auto_units` |
 | Identität vor dem Schreiben erneut prüfen | Bestätigungs-Callback prüft sysfs, Port, Modus, Bytes | `test_auto_switch` (Umstecken, Entfernen, CC, „off“ zwischen Erkennung und Write) |
-| Keine Rückumschaltung | kein Codepfad; `ff802-cc disable` sendet nichts | `cc_cli_disable`, Quelltext |
+| Keine Rückumschaltung durch die Automatik | kein Codepfad in `ff802-cc-autoswitch`; `ff802-cc disable` ist ein eigener, manueller Befehl | `autoswitch_binary_symbols`, Quelltext |
 | Keine Reset-/Detach-/Control-Aufrufe | statische Quelltextprüfung, `nm` der Programme | `check_forbidden_usb_calls`, `*_binary_symbols`, `deb_auto_package` |
 | Installation ≠ Aktivierung | Standard „off“, `postinst` ohne `udevadm trigger` oder Start | `deb_auto_package` |
 | Keine erweiterten Zugriffsrechte | keine `uaccess`- oder `MODE`-Regel; nur der Systemdienst schreibt | `auto_units`, `deb_auto_package` |
@@ -158,8 +158,8 @@ proprietären Modus:
    Neustarts nicht.
 4. Später wieder: `ff802-cc-auto on` (Administrator)
 
-Sollte `ff802-cc disable` später möglich werden, muss es die Automatik
-vorher abschalten oder bei eingeschalteter Automatik verweigern.
+`ff802-cc disable` (seit 2026-11-19) verweigert, solange die Automatik an
+ist. Sonst würde sie das Gerät nach dem Wechsel sofort zurückschalten.
 
 ## Benachrichtigungen
 
@@ -259,11 +259,11 @@ cmake -S . -B build && cmake --build build && ctest --test-dir build
 | 10 | Wiederanschluss im CC-Modus | `test_auto_switch`, `auto_flow` |
 | 11 | Automatik deaktiviert | `test_auto_switch`, `auto_flow`, `auto_control` |
 | 12 | nach Neustart weiter deaktiviert | dto. (`/run` geleert) |
-| 13 | manuelles Disable bei aktiver Automatik | `cc_cli_disable`: sendet nichts, verweist auf `ff802-cc-auto off` |
+| 13 | manuelles Disable bei aktiver Automatik | `test_disable_check`: verweigert, verweist auf `ff802-cc-auto off` |
 | 14 | kein Re-Enable nach bewusster Rückkehr | `auto_control` (off, Umstecken, Neustart) |
 | 15 | manuelles Enable weiterhin funktionsfähig | `test_cc_switch`, `cc_cli_*` (unverändert) |
 | 16 | Abbruch der interaktiven Bestätigung | `test_cc_switch` (`test_enable_not_confirmed`), `test_usb_backend` |
-| 17 | fehlgeschlagener Disable-Transfer | entfällt: `disable` hat keinen USB-Pfad |
+| 17 | fehlgeschlagener Disable-Transfer | `test_cc_disable` (Timeout, Stall, I/O, unvollständig, Gerät weg) |
 | 18 | gleichzeitige Ereignisse | `test_auto_sysfs` (8 Prozesse), `auto_flow` (10 Ereignisse, veraltetes und aktuelles) |
 | 19 | keine Schreibzugriffe beim Paketbau | `deb_auto_package` (Stolperdrähte, statische Prüfung) |
 | 20 | Deaktivierung und Rollback | `deb_auto_package`, `auto_control` |
@@ -287,7 +287,9 @@ cmake -S . -B build && cmake --build build && ctest --test-dir build
   erneut. Das ist harmlos, denn die Option ist bereits gesetzt.
 - **Ruhezustand:** Laut Handbuch wechselt das Gerät dabei nicht in den
   CC-Modus, weil keine Trennung stattfindet.
-- **`ff802-cc disable`** ist offen, siehe [t4_disable.md](t4_disable.md).
+- **`ff802-cc disable`** ist seit 2026-11-19 umgesetzt, siehe
+  [cc_disable_port_reset.md](cc_disable_port_reset.md). Am Gerät ist es in der
+  integrierten Form noch nicht getestet.
 
 ## Host-Testplan
 
