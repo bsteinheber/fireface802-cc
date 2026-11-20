@@ -26,8 +26,13 @@ nur die Dokumentation.
 | Kopfhörer 11/12 | … Headphones Output 11/12 (`Headphones2`) | 10/11 | ✓ |
 | Analog IN 1/2 | … Analog Input 1/2 (`Line5`, Quelle) | Capture 0/1 | ✓ |
 
-Die Kanalzuordnung ist die des Profils. Physisch bestätigt sind bisher nur
-Analog OUT 1 → Playback 0 und OUT 2 → Playback 1 (T2).
+Die Kanalzuordnung ist die des Profils. Physisch bestätigt sind Analog
+OUT 1 → Playback 0 und OUT 2 → Playback 1 (T2). Analog 3/4, Kopfhörer
+9/10 und Kopfhörer 11/12 wurden auf dem Host mit realer Wiedergabe
+erfolgreich getestet; die Kopfhörer erst, nachdem die
+Software-Playback-Fader im internen Mixer passend eingestellt waren
+(siehe [mixer_routing.md](mixer_routing.md)). Analog 5/6, 7/8 und der
+Eingang sind am Gerät nicht einzeln dokumentiert.
 
 ## Wie es funktioniert
 

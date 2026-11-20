@@ -1,264 +1,691 @@
 # fireface802-cc
 
-Linux-Werkzeug zur Umschaltung des **ursprünglichen RME Fireface 802**
-(nicht 802 FS) zwischen proprietärem USB-Modus und Class-Compliant-Modus.
+**English** | [Deutsch](README.de.md)
 
-> **English summary:** Tools for using the original RME Fireface 802 (not
-> the 802 FS) under Linux. `ff802-cc` switches the interface between its
-> proprietary USB mode and class compliant (CC) mode, `ff802-cc-auto`
-> does the switch automatically when the unit is plugged in, and
-> `ff802-ucm-profile` adds an ALSA UCM profile with six stereo outputs and
-> one stereo input for PipeWire/WirePlumber. Built and tested on Kubuntu
-> (alsa-lib 1.2.15, PipeWire 1.6, WirePlumber 0.5) with one unit. The
-> documentation is in German. Not affiliated with or endorsed by RME; see
-> [Lizenz](#lizenz) and [Marken](#marken).
+**Using the original RME Fireface 802 under Linux:**
+switching to class compliant mode, by hand or automatically when the unit
+is connected, and an audio profile with six stereo outputs and one stereo
+input for PipeWire.
 
-## Sicherheitshinweise
+> **In short:** Out of the box, the Fireface 802 talks to the computer
+> over an RME-specific USB protocol for which Linux has no driver. In a
+> second operating mode, *class compliant mode*, it speaks a standardised
+> USB audio protocol that Linux understands out of the box. This project
+> switches the unit into that mode from Linux (and back) and makes its
+> outputs appear in the desktop audio settings with sensible names, each
+> usable on its own. It does **not** set the internal mixer of the
+> Fireface, and it does not replace TotalMix FX.
 
-- **Lautstärke:** Vor dem ersten Anschließen, vor jeder Umschaltung und vor
-  Hardwaretests Lautsprecher und Kopfhörer leise stellen oder abnehmen.
-  Im CC-Modus gilt der im Gerät gespeicherte Mixer-Zustand (TotalMix);
-  Pegel und Routing können anders sein als erwartet. Neue Ausgänge starten
-  mit der WirePlumber-Vorgabe von 40 % (−23,9 dB). Eine einmal geänderte
-  Lautstärke speichert WirePlumber jedoch und stellt sie beim nächsten
-  Anstecken wieder her, auch 100 % (siehe
-  [docs/audio_t3.md](docs/audio_t3.md)). Vor dem Gerätemixer schützt
-  beides nicht.
-- **USB-Schreibzugriffe:** `ff802-cc enable|disable` und der Dienst von
-  `ff802-cc-auto` senden Registerbefehle an das Gerät. Sie sind nur für das
-  ursprüngliche Fireface 802 gedacht und nur mit einem Gerät getestet. Die
-  Befehle sind durch Beobachtung ermittelt und nicht vom Hersteller
-  dokumentiert. Benutzung auf eigene Gefahr, siehe
-  [docs/usb_comm.md](docs/usb_comm.md) (Risiken) und die MIT-Lizenz
-  (keine Gewährleistung).
-- **Zurück in den proprietären Modus ohne Linux:** TotalMix FX unter
-  Windows oder macOS setzt das Gerät automatisch in den Normalmodus
-  zurück, ebenso die optionale Fernbedienung ARC (Prog und B beim
-  Einschalten halten), siehe [docs/t4_disable.md](docs/t4_disable.md).
-- Während der Umschaltung keine Audiowiedergabe laufen lassen;
-  `ff802-cc disable` verweigert dann den Wechsel.
+Tested with **one** unit (original Fireface 802, not the 802 FS) on
+Kubuntu 26.04.1 LTS. Not an RME project, see
+[License and manufacturer](#13-license-trademarks-and-independence-from-the-manufacturer).
 
-## Projektstand
+## Contents
 
-| Phase | Inhalt | Stand |
-|-------|--------|-------|
-| 1  | Kodierung der Registerbefehle und Tests | abgeschlossen |
-| 2a | Diagnoseprogramm `ff802-detect`: lesende Geräteerkennung | abgeschlossen, auf dem Host getestet |
-| 2b | Umschaltprogramm `ff802-cc` mit Diagnosemodus | abgeschlossen; `enable` mit Port-Reset und `disable` am 2026-11-19 am Gerät erfolgreich getestet; Paket `ff802-cc` **0.4.0 auf dem Host installiert** (gebaut aus Commit `e12a1d0`, siehe [docs/packages.md](docs/packages.md)) |
-| 3 | ALSA-UCM-Profil mit sechs Stereo-Ausgängen für den CC-Modus, Debian-Paket `ff802-ucm-profile` (T1, T3) | T1 bestanden, T3 funktional erfolgreich getestet (sechs Stereo-Ausgänge, ein Stereo-Eingang; Analog 3/4, Kopfhörer 9/10 und 11/12 mit realer Wiedergabe); Version **0.3.0 auf dem Host installiert**, automatischer USB-Portwechsel erfolgreich getestet (2026-11-18, [docs/audio_t3_usb_port.md](docs/audio_t3_usb_port.md)) |
-| 4 | Messwerkzeug `ff802-chanmap` für die Kanalzuordnung (Hardwaretest T2) | T2 laut Rückmeldung vom 2026-11-17 erfolgreich; die Messergebnisse liegen nicht im Repository, die Markierung `FF802-CHANNEL-MAP: UNVERIFIED` im Profil ist noch nicht umgestellt |
-| T4 | Automatischer Wechsel in den CC-Modus beim Anschließen/Systemstart, Debian-Paket `ff802-cc-auto`; Untersuchung `ff802-cc disable` | Version 0.1.0 auf dem Host installiert und aktiviert, automatische Umschaltung erfolgreich getestet; ob inzwischen 0.1.1 (nur Dokumentation, Neubau) installiert ist, ist nicht bestätigt; `disable` ist Teil von `ff802-cc` |
+1. [What is this about?](#1-what-is-this-about)
+2. [What does class compliant (CC) mean?](#2-what-does-class-compliant-cc-mean)
+3. [From application to speaker: USB audio and the internal mixer](#3-from-application-to-speaker-usb-audio-and-the-internal-mixer)
+4. [The three packages](#4-the-three-packages)
+5. [Features and test status](#5-features-and-test-status)
+6. [Known limitations](#6-known-limitations)
+7. [Safety notes](#7-safety-notes)
+8. [Installation](#8-installation)
+9. [Usage](#9-usage)
+10. [Troubleshooting](#10-troubleshooting)
+11. [Technical documentation](#11-technical-documentation)
+12. [Development and build](#12-development-and-build)
+13. [License, trademarks and independence from the manufacturer](#13-license-trademarks-and-independence-from-the-manufacturer)
 
-Im Standard-Build kann **kein Programm Daten an das Gerät senden**. Die
-Schreibfunktion wird nur mit `-DFF802_ENABLE_USB_WRITE=ON` einkompiliert
-(siehe [docs/usb_comm.md](docs/usb_comm.md)). Das Paket `ff802-cc-auto`
-enthält einen so gebauten Dienst; seine Automatik ist nach der Installation
-aus (siehe [docs/t4_usb_mode.md](docs/t4_usb_mode.md)).
+---
 
-## Aufbau
+## 1. What is this about?
+
+### The unit
+
+The **RME Fireface 802** is an audio interface: an external device that
+connects analogue and digital audio signals (microphones, instruments,
+speakers, headphones) to the computer. It has many analogue inputs and
+outputs, two headphone outputs and digital interfaces. It connects to the
+computer over USB or FireWire; this project is about **USB** only.
+
+The unit contains its own digital mixer. On Windows and macOS it is
+operated with the RME software **TotalMix FX**.
+
+### The problem on Linux
+
+Out of the box, the Fireface 802 uses a **vendor-specific protocol** on
+its USB port. RME supplies drivers for it for Windows and macOS, but not
+for Linux. Linux does see the unit as a USB device, but cannot play any
+sound through it.
+
+The unit also offers a **class compliant mode** (CC), in which Linux can
+run it with its standard driver. This mode has to be switched on first,
+though. According to the RME manual, this is done with an option in
+TotalMix FX (that is, on Windows or macOS) or with the optional ARC remote
+control. Anyone switching between Windows and Linux therefore keeps
+facing the same question: how do I get the unit into the right mode from
+Linux?
+
+Once CC mode is active, the Fireface appears on Linux as **one** sound
+card with 22 playback and 22 capture channels. Desktop applications
+cannot do much with that: they expect individual stereo outputs such as
+"Headphones" or "Analog 1/2".
+
+### What this project solves
+
+- **Switching from Linux:** proprietary → CC and CC → proprietary,
+  without Windows, macOS or remote control.
+- **Automatically when connected** (optional): if the unit arrives in
+  proprietary mode, Linux prepares it for CC mode.
+- **Understandable outputs:** six stereo outputs (Analog 1/2, 3/4, 5/6,
+  7/8, Headphones 9/10 and 11/12) and one stereo input (Analog 1/2), each
+  selectable on its own in KDE Plasma and other PipeWire front ends.
+
+---
+
+## 2. What does class compliant (CC) mean?
+
+### Standardised USB device classes
+
+So that not every USB device needs its own driver, there are **USB
+device classes**: public standards that define how a certain kind of
+device talks to the computer. Keyboards, mice, USB sticks and webcams use
+such classes. The operating system ships a ready-made driver for each
+class; that is why these devices work without installing anything.
+
+For audio devices there is the **USB Audio** class. A device that follows
+this standard is called **class compliant**. Linux runs such devices with
+the kernel driver **`snd-usb-audio`**.
+
+### The two USB operating modes of the Fireface 802
+
+| | Proprietary mode | Class compliant mode |
+|---|---|---|
+| Protocol | RME-specific USB protocol | standardised USB audio protocol |
+| Driver | RME driver for Windows/macOS | on Linux `snd-usb-audio` (part of the kernel) |
+| Mixer software | TotalMix FX | none from RME for Linux |
+| USB ID (VID:PID) | `2a39:3fcd` | `0424:3fdd` |
+| on Linux | visible as a USB device, but **no sound** | sound card with 22 input and output channels |
+
+The USB ID is the number a USB device reports to the computer (vendor
+ID : product ID). The Fireface changes it with the operating mode; that
+is how the software tells which mode it is in. Both IDs are confirmed on
+our unit.
+
+### How the sound reaches applications on Linux
+
+In CC mode, three layers are involved:
+
+| Layer | Task |
+|---|---|
+| **`snd-usb-audio`** | kernel driver: talks to the unit over USB |
+| **ALSA** (*Advanced Linux Sound Architecture*) | the audio layer of Linux: turns the unit into a sound card with channels. A **UCM profile** (*Use Case Manager*) describes which channels are which sockets and what they are called. |
+| **PipeWire** (with WirePlumber) | the desktop audio service: routes the sound of applications to the outputs, controls volumes, remembers settings. KDE Plasma and other front ends show what PipeWire offers. |
+
+No special RME driver is **needed** for this.
+
+### Important
+
+> **CC mode is not a sound or quality setting.** It only determines *which
+> language* the computer and the audio interface use to talk to each other
+> over USB. Converters, preamps and the internal mixer of the Fireface
+> stay the same.
+
+What does differ: in CC mode there is no TotalMix FX on Linux. The
+internal mixer keeps working, but this project cannot set it (see next
+section).
+
+---
+
+## 3. From application to speaker: USB audio and the internal mixer
+
+Linux recognising the Fireface and showing outputs does not yet mean
+that anything arrives at the sockets. Simplified, the sound takes this
+path:
+
+```text
+Linux application (e.g. music player)
+       │
+       ▼
+PipeWire / ALSA            ← this is where this project (UCM profile)
+       │                     and the desktop volume controls act
+       ▼
+USB audio transfer         ← only possible in CC mode (ff802-cc, ff802-cc-auto)
+       │
+       ▼
+Fireface 802
+       │
+       ▼
+Internal digital mixer     ← decides which USB channel goes to which socket
+       │                     (set e.g. with TotalMix FX, not by Linux)
+       ▼
+Physical audio outputs
+       │
+       ▼
+Speakers / headphones
+```
+
+So three things have to be right, and they are independent of each
+other:
+
+1. **USB operating mode:** the unit has to be in CC mode, otherwise there
+   is no sound card on Linux. This project takes care of that.
+2. **Audio channels in ALSA and PipeWire:** the 22 USB channels have to
+   appear as named outputs and be mapped correctly. The UCM profile of
+   this project takes care of that.
+3. **Routing in the internal mixer:** inside the Fireface, each USB
+   channel ("Software Playback") reaches a hardware output only through a
+   mixer control (*fader*). If that fader is at zero, or the channel is
+   routed to another socket, you hear nothing, or the sound comes out in
+   the wrong place. **This project does not set this.**
+
+### Our observation
+
+In our tests, Linux demonstrably transferred the audio data to the
+Fireface; even so, nothing was audible at the headphone outputs at first
+(for a while the sound came out at Analog 1/2 instead). The cause was the
+faders in the internal mixer for the Software Playback channels concerned.
+Only after these faders had been set appropriately (with TotalMix FX, or
+with the third-party tool oscmix) was the sound audible at the intended
+outputs. After that, the outputs also worked on Linux.
+
+Whether the values set in TotalMix FX stay in effect after switching to
+CC mode is not clear and is not documented by RME. Our observations show
+that this is not always the case: after the unit had been used on Windows
+in between, the routing in CC mode differed from what TotalMix FX had
+shown before.
+
+**Automatic setup of the internal mixer routing is currently not
+implemented in this project.**
+
+Observations, conclusions and open questions in detail:
+[docs/mixer_routing.md](docs/mixer_routing.md) (German).
+
+---
+
+## 4. The three packages
+
+| Package | Purpose | Contains |
+|---|---|---|
+| **`ff802-cc`** | switch the mode **by hand**, detect the unit and its mode | `ff802-cc` (`check`, `enable`, `disable`), `ff802-detect` |
+| **`ff802-cc-auto`** | prepare CC mode **automatically** when the unit is connected | service, udev rule, systemd units, control command `ff802-cc-auto`, desktop notification |
+| **`ff802-ucm-profile`** | six named stereo outputs and one input on the desktop | UCM profile, helper `ff802-ucm-bind`, udev rule for the profile binding |
+
+### `ff802-cc`: manual switching
+
+- `ff802-detect` lists connected Fireface 802 units with their mode. It
+  does not open the unit and does not need root.
+- `sudo ff802-cc check` only checks, read-only, whether a unit in
+  proprietary mode is present and suitable. It sends nothing.
+- `sudo ff802-cc enable` switches proprietary → CC and then briefly
+  resets the unit's USB port so that it re-appears in CC mode (no
+  replugging needed).
+- `sudo ff802-cc disable` switches CC → proprietary.
+- Before every switch: a check that exactly the right unit is meant, the
+  target is shown, and you confirm by typing `ENABLE` or `DISABLE`.
+  Nothing is retried. `disable` refuses while the automation is on or
+  while audio is running on the unit.
+
+### `ff802-cc-auto`: automatic switching
+
+- After installation the automation is **off**. Turn it on:
+  `ff802-cc-auto on` (administrator), off: `ff802-cc-auto off`, state:
+  `ff802-cc-auto status`.
+- When it is on and the unit is connected in proprietary mode (or is
+  connected like that at boot), a system service sends the switch command
+  once. A desktop notification then asks you to **briefly unplug and
+  replug** the USB cable; after that the unit appears in CC mode.
+- It switches **only** towards CC, never back, and does not reset any USB
+  port.
+- Working together with `ff802-cc`: if you want the unit in proprietary
+  mode on Linux, first turn the automation off, then run
+  `ff802-cc disable`. Otherwise the automation would switch it again at
+  the next connection; that is why `disable` refuses while the automation
+  is on.
+
+### `ff802-ucm-profile`: audio profile
+
+- Splits the 22 channels of the unit into named stereo pairs:
+
+  | Output in Plasma | USB channels |
+  |---|---|
+  | Fireface 802 (…) Analog Output 1/2 | 1–2 |
+  | … Analog Output 3/4 | 3–4 |
+  | … Analog Output 5/6 | 5–6 |
+  | … Analog Output 7/8 | 7–8 |
+  | … Headphones Output 9/10 | 9–10 |
+  | … Headphones Output 11/12 | 11–12 |
+  | … Analog Input 1/2 (input) | capture 1–2 |
+
+- All six outputs can be used at the same time and chosen per
+  application.
+- No PipeWire or WirePlumber configuration is needed; WirePlumber 0.5
+  does the splitting itself.
+- Because of a bug in alsa-lib before 1.2.16, `ff802-ucm-bind` binds the
+  profile to the connected card; a udev rule does this on every
+  connection, also on a new USB port.
+
+### Why three packages?
+
+The parts are independent of each other and are installed as needed:
+
+| I want to … | Packages |
+|---|---|
+| listen to music / record on Linux, the unit already arrives in CC mode | `ff802-ucm-profile` |
+| switch between Windows and Linux, Linux should prepare the unit itself | `ff802-cc-auto` + `ff802-ucm-profile` |
+| switch the mode deliberately by hand (also back to proprietary mode) | `ff802-cc` (+ `ff802-ucm-profile` for sound) |
+| everything | all three |
+
+No package depends on another, and no file belongs to two packages. The
+automation deliberately contains only the one direction and no switching
+back; switching back and the port reset live separately in `ff802-cc`,
+which you only run by hand with `sudo`.
+
+---
+
+## 5. Features and test status
+
+**Automated tests** run in the dev container without a unit: 73 tests
+with simulated USB, a reconstructed sysfs, an emulated sound card, a
+private PipeWire session and package installation into an isolated root.
+They never access USB hardware or a real sound card.
+
+**Hardware tests** were carried out by hand on the one available Fireface
+802 on Kubuntu 26.04.1.
+
+| Feature | automated tests | tested on the unit |
+|---|:---:|---|
+| detection of unit and mode (`ff802-detect`) | yes | yes |
+| diagnosis `ff802-cc check` | yes | yes |
+| `ff802-cc enable` (proprietary → CC) with port reset | yes | yes, 2026-11-19 ¹ |
+| `ff802-cc disable` (CC → proprietary) | yes | yes, 2026-11-19 ¹ |
+| automatic switching `ff802-cc-auto` | yes | yes (with replugging) |
+| UCM profile is loaded by alsa-lib with the real card (T1) | yes | yes, 29/29 checks |
+| six outputs and one input in PipeWire/Plasma (T3) | yes | yes |
+| profile binding on another USB port | yes | yes, 2026-11-18 |
+| channel mapping, heard with real playback | – | Analog 1/2, Analog 3/4, Headphones 9/10 and 11/12 ² |
+| channel mapping Analog 5/6, 7/8 and input 1/2 | yes (simulation) | not individually documented ² |
+| start volume 40 % for new outputs | yes | not individually documented |
+
+¹ Tested with the self-built program (`build-write/ff802-cc`) with the
+same switching logic as in the package `ff802-cc` 0.4.0/0.4.1.
+² According to the test report, the measurement test T2 (channel mapping)
+was run successfully; the individual measurements are not in the
+repository, and the profile is still marked "UNVERIFIED" internally.
+
+---
+
+## 6. Known limitations
+
+### Confirmed
+
+- **No mixer:** the internal mixer of the Fireface is neither read nor
+  set. This project is **not a replacement for TotalMix FX**.
+- **No automatic routing:** mixer routing and faders are not set up. An
+  output can appear in Plasma and receive sound without anything being
+  audible at the socket (see
+  [section 3](#3-from-application-to-speaker-usb-audio-and-the-internal-mixer)).
+- **Automation needs replugging:** after the automatic switch, the USB
+  cable has to be unplugged briefly. Only `ff802-cc enable` resets the
+  port itself.
+- **No volume limit of its own:** new outputs start at 40 % (WirePlumber
+  default). WirePlumber remembers a volume once it has been changed and
+  restores it, also 100 %.
+- **Only one unit tested:** all hardware tests with exactly one Fireface
+  802 (original model) on one computer.
+- **Only the original Fireface 802:** the Fireface 802 FS and other RME
+  devices are detected and **refused**. There is no compatibility promise
+  for other models.
+- **USB only**, not FireWire. Ready-made packages of the programs only for
+  x86-64 (amd64).
+
+### Not yet investigated or open
+
+- How the mixer states of proprietary and CC mode relate to each other
+  (storage in the unit, behaviour after use on Windows).
+- Channel mapping of Analog 5/6, 7/8 and Analog Input 1/2 with a real
+  signal (see footnote ² above).
+- Other Linux distributions and versions, other PipeWire or WirePlumber
+  versions.
+- Meaning of individual values in the switch commands: they were found by
+  observation and are not documented by RME.
+- From alsa-lib 1.2.16 on, `ff802-ucm-bind` is no longer needed; the
+  profile has not been tested on the unit with such a version.
+
+---
+
+## 7. Safety notes
+
+**Volume**
+- Before connecting for the first time, before every switch and before
+  playing anything for the first time: turn the headphone knobs on the
+  unit fully down, take off headphones, turn amplifiers and active
+  speakers down or off.
+- In CC mode the internal mixer works with a state that this project
+  neither knows nor sets. Levels and routing can differ from what you
+  expect, including being louder.
+- The volume in Plasma only controls the digital level. The mixer in the
+  unit can additionally amplify or attenuate behind it.
+- WirePlumber restores remembered volumes (including 100 %) after every
+  connection. Check the volumes before the first playback after
+  connecting.
+
+**Switching the mode interrupts the sound**
+- When switching, the unit re-registers on USB. The sound card disappears
+  from ALSA and PipeWire and re-appears (in CC mode). Running playback and
+  recording stop; applications may move to another device.
+- Stop all playback and recording first. `ff802-cc disable` refuses to
+  switch while audio is running on the unit.
+- After switching to proprietary mode, there is no more sound from the
+  Fireface on Linux.
+
+**Permissions**
+- `ff802-cc check`, `enable` and `disable` need root (`sudo`).
+- `ff802-cc-auto on` needs administrator rights (prompt via polkit, or
+  `sudo`); the logged-in user may run `off` without a password; anyone
+  may run `status`.
+- `ff802-detect` and `ff802-cc-auto status` only read.
+
+**USB writes**
+- `ff802-cc enable|disable` and the service of `ff802-cc-auto` send
+  control commands to the unit. The commands were found by observation
+  and are not documented by RME. Use at your own risk (see the MIT
+  license: no warranty). Risks: [docs/usb_comm.md](docs/usb_comm.md)
+  (German).
+
+**Back without Linux**
+- TotalMix FX on Windows or macOS automatically resets a unit in CC mode
+  to normal mode when it is connected. Alternatively with the ARC remote
+  control: hold Prog and B (Mono) while switching the unit on
+  ([docs/t4_disable.md](docs/t4_disable.md), German).
+
+---
+
+## 8. Installation
+
+### Tested environment
+
+| | tested |
+|---|---|
+| System | Kubuntu 26.04.1 LTS, KDE Plasma, x86-64 |
+| Audio | alsa-lib 1.2.15.3, alsa-ucm-conf 1.2.15.3, PipeWire 1.6.2, WirePlumber 0.5.13 |
+| Unit | one original RME Fireface 802 (not 802 FS), over USB |
+
+Package dependencies (`apt` installs them automatically):
+
+| Package | depends on | recommends |
+|---|---|---|
+| `ff802-cc` | `libc6` (≥ 2.34), `libusb-1.0-0` | – |
+| `ff802-cc-auto` | `libc6` (≥ 2.34), `libusb-1.0-0`, `systemd`, `udev` | `pkexec`, `libnotify-bin` |
+| `ff802-ucm-profile` | `alsa-ucm-conf` (≥ 1.2.15.3), `libasound2t64` (≥ 1.2.15.3) | – |
+
+### Getting the packages
+
+The `.deb` files are built reproducibly from this repository (see
+[Development and build](#12-development-and-build)):
 
 ```
-include/ff802/reg_codec.h    Registerkodierung (Adresse, Wert, Parität, LE)
-include/ff802/cc_mode.h      Befehl für Register 0x3D44 (CC an/aus)
-include/ff802/device_id.h    USB-Kennungen und Zuordnung VID:PID -> Modus
-include/ff802/detect.h       Erkennung und Bericht auf einfachen Gerätedatensätzen
-include/ff802/usb_enum.h     Lesende libusb-Enumeration
-include/ff802/usb_backend.h  Abstrakte USB-Schnittstelle, Layout-Prüfung
-include/ff802/cc_switch.h    Ablaufsteuerung der Umschaltung
-include/ff802/usb_comm.h     libusb-Backend für die Kommunikation (einziges Modul mit Schreibzugriff)
-include/ff802/chanmap.h      ff802-chanmap: Signal, Wächter, Erkennung, Ablauf, Reservierung, Auswertung
-include/ff802/chanmap_alsa.h ff802-chanmap: ALSA-Backend (nur hw:CARD=<id>, Mixer nur lesend)
-include/ff802/auto_*.h        T4: sysfs-Identität, Zustand/Ereignisse, automatischer Ablauf (ohne libusb)
-src/                         Implementierung
-tools/ff802_detect.c         Programm ff802-detect (schreibfrei)
-tools/ff802_cc.c             Programm ff802-cc
-tools/ff802_chanmap.c        Programm ff802-chanmap (Loopback-Messung, T2)
-tools/ff802_cc_autoswitch.c  T4: Dienstprogramm ff802-cc-autoswitch (nur von systemd gestartet)
-tests/                       CTest-Tests, simuliertes USB-Backend, Sicherheitsprüfungen
-tests/audio/                 Tests des UCM-Profils: statisch, alsa-lib-Parser, Auswertung mit nachgebildeter Karte, T1-Simulation
-tests/chanmap/               Tests von ff802-chanmap mit simuliertem Gerät
-tests/packaging/             Pakettest in isolierter Wurzel
-tests/auto/                  T4: simuliertes sysfs/USB, Dienst-Ablauf, Benachrichtigung, Steuerung, Units
-packaging/                   Debian-Pakete ff802-ucm-profile (build-deb.sh), ff802-cc-auto (build-deb-auto.sh), ff802-cc (build-deb-cc.sh)
-audio/ucm2/                  ALSA-UCM-Profil (Aufbau wie /usr/share/alsa/ucm2)
-tools/hw-test/               Skripte für Host-Tests (nur nach Freigabe ausführen)
-docs/                        Protokoll, Erkennung, Kommunikation, UCM-Profil
+ff802-cc_0.4.1_amd64.deb
+ff802-cc-auto_0.1.2_amd64.deb
+ff802-ucm-profile_0.3.1_all.deb
 ```
 
-| Bibliothek | Inhalt | libusb | darf schreiben |
-|------------|--------|:------:|:--------------:|
-| `ff802_protocol` | `reg_codec`, `cc_mode` | nein | – |
-| `ff802_detect` | `device_id`, `detect` | nein | – |
-| `ff802_switch` | `usb_backend`, `cc_switch` | nein | nur über Backend |
-| `ff802_usb` | `usb_enum` | ja | nein |
-| `ff802_comm` | `usb_comm` | ja | nur mit `FF802_ENABLE_USB_WRITE=ON` |
-| `ff802_chanmap` | `chanmap_*` ohne ALSA | nein | – |
-| `ff802_chanmap_alsa` | `chanmap_alsa` (alsa-lib) | nein | Audio nur mit −40 dBFS, Mixer nie |
-| `ff802_auto` | `auto_sysfs`, `auto_state`, `auto_switch` | nein | nur über Backend |
+> **Publication pending:** the three packages and a `SHA256SUMS` file are
+> to be attached to the GitHub release `v0.4.1` (releases of the
+> repository: <https://github.com/bsteinheber/fireface802-cc/releases>).
+> Until then, build the packages yourself.
 
-## Bauen und Testen (im Dev-Container)
+Verify the checksums (in the folder with the packages and the
+`SHA256SUMS` file):
+
+```sh
+sha256sum -c SHA256SUMS
+```
+
+### Installing
+
+Read the [safety notes](#7-safety-notes) first.
+
+**1. Audio profile** (preferably with the unit connected in CC mode):
+
+```sh
+sudo apt install ./ff802-ucm-profile_0.3.1_all.deb
+sudo ff802-ucm-bind status
+```
+
+Then unplug the Fireface once and plug it in again. If no unit is
+connected, the udev rule does the binding at the next connection.
+
+**2. Manual switching** (optional):
+
+```sh
+sudo apt install ./ff802-cc_0.4.1_amd64.deb
+ff802-cc --version
+```
+
+**3. Automation** (optional):
+
+```sh
+sudo apt install ./ff802-cc-auto_0.1.2_amd64.deb
+ff802-cc-auto status       # after installation: off
+ff802-cc-auto on           # turn on (asks for the administrator password)
+```
+
+During installation, the packages only reload the udev rules and the
+systemd configuration. They do not restart any services and do not
+switch the unit.
+
+### Checking the installation
+
+```sh
+dpkg -l 'ff802-*'
+ff802-cc --version         # ff802-cc 0.4.1 (git <revision>, Release, USB writes enabled)
+ff802-cc-auto status
+sudo ff802-ucm-bind status
+```
+
+### Updating and removing
+
+```sh
+sudo apt install ./<package>_<new version>_<arch>.deb   # update, settings are kept
+sudo apt remove ff802-cc
+sudo apt purge ff802-cc-auto          # also removes the automation state
+sudo apt remove ff802-ucm-profile     # removes profile, udev rule and bindings
+```
+
+Removing does not change the USB mode of the unit. Details:
+[docs/packages.md](docs/packages.md) (German) and the `README.Debian` of
+the packages (`/usr/share/doc/<package>/README.Debian`).
+
+---
+
+## 9. Usage
+
+### Which mode is active?
+
+```sh
+ff802-detect
+```
+
+```
+Scanned 26 USB device(s).
+Bus 003 Device 018: ID 2a39:3fcd mode=proprietary port=3-2.4.1.1.3 bcdDevice=0.01
+  Fireface 802, proprietary USB mode
+Found 1 Fireface 802 device(s).
+```
+
+`mode=proprietary` or `mode=class-compliant`. Does not open the unit,
+changes nothing. Exit status 0: unit found, 1: none found.
+
+### Switching to CC mode by hand
+
+```sh
+sudo ff802-cc check        # optional: check only, sends nothing
+sudo ff802-cc enable       # shows target and command, then type ENABLE
+```
+
+Effect: the unit receives the switch command, then its USB port is
+switched off for about 2 seconds and on again. It re-appears as
+`0424:3fdd`; with `ff802-ucm-profile` the six outputs appear in Plasma.
+If the port reset is not possible, `enable` sends nothing and names the
+alternative:
+
+```sh
+sudo ff802-cc --no-port-reset enable   # then briefly unplug the USB cable yourself
+```
+
+### Switching to proprietary mode by hand
+
+```sh
+ff802-cc-auto off          # only if ff802-cc-auto is installed and on
+sudo ff802-cc disable      # shows target and command, then type DISABLE
+```
+
+Effect: the sound card of the Fireface immediately disappears from ALSA
+and PipeWire; the unit re-appears as `2a39:3fcd`. After that there is no
+more sound from the Fireface on Linux; on Windows/macOS it works with the
+RME driver again.
+
+If several suitable units are connected, select one with
+`--device BUS:ADDRESS` (values from `ff802-detect`).
+
+### Automation
+
+```sh
+ff802-cc-auto status       # state, connected unit, last result
+ff802-cc-auto on           # turn on (administrator)
+ff802-cc-auto off          # turn off (logged-in user)
+```
+
+The state survives reboots. `off` only prevents further automatic
+switches; it does not change the mode of the unit.
+
+### Checking the audio outputs
+
+- In KDE Plasma: System Settings → Sound, or the volume icon. There you
+  find "Fireface 802 (…) Analog Output 1/2" to "Headphones Output 11/12"
+  and "Analog Input 1/2".
+- In a terminal:
+
+  ```sh
+  wpctl status               # devices and outputs in PipeWire
+  pactl list cards           # the Fireface with the profile "HiFi"
+  sudo ff802-ucm-bind status # is the profile bound to the card?
+  ```
+
+---
+
+## 10. Troubleshooting
+
+| Observation | likely cause | what to do |
+|---|---|---|
+| `ff802-detect` shows `mode=proprietary`, no sound | unit not in CC mode | `sudo ff802-cc enable` or the automation |
+| automation on, but the unit stays proprietary | cable not unplugged after the notification | briefly unplug the cable; `ff802-cc-auto status`, `journalctl -t ff802-cc-auto -b` |
+| Fireface in Plasma as one card without the six outputs | profile not bound | `sudo ff802-ucm-bind status`, `journalctl -b -t ff802-ucm-bind`; if needed `sudo ff802-ucm-bind bind` and reconnect the unit |
+| output visible, level meter moves, but **nothing audible** | routing/faders in the internal mixer | check routing and faders in the unit (TotalMix FX or oscmix), see [docs/mixer_routing.md](docs/mixer_routing.md) |
+| sound at the wrong output | routing in the internal mixer | as above |
+| `ff802-cc disable` refuses | automation on or audio running | `ff802-cc-auto off`, stop playback |
+| `ff802-cc`: `access to the USB device denied` | missing permissions | run with `sudo` |
+| `ff802-cc`: exit 6 | sent, new mode not detected | briefly unplug the cable, then `ff802-detect` |
+
+Exit status of `ff802-cc`:
+
+| Exit | Meaning |
+|:---:|---|
+| 0 | success (for `enable`/`disable`: new mode detected) |
+| 1 | no suitable unit, or several |
+| 2 | usage error, no terminal |
+| 3 | precondition not met, nothing sent |
+| 4 | transfer failed, unit state unknown |
+| 5 | not sent (aborted, writing disabled in the build) |
+| 6 | sent, but new mode not detected |
+
+Further diagnosis of the automation: `systemctl list-units 'ff802-cc-auto@*'`,
+`journalctl --user -t ff802-cc-notify -b` (notifications).
+
+---
+
+## 11. Technical documentation
+
+The documents under `docs/` are in German.
+
+| Topic | Document |
+|---|---|
+| Register protocol, control commands | [docs/protocol.md](docs/protocol.md) |
+| Device detection | [docs/detection.md](docs/detection.md) |
+| USB communication, safety concept, risks | [docs/usb_comm.md](docs/usb_comm.md) |
+| `ff802-cc disable` and port reset | [docs/cc_disable_port_reset.md](docs/cc_disable_port_reset.md) |
+| Way back to proprietary mode (research) | [docs/t4_disable.md](docs/t4_disable.md) |
+| Automation: architecture, safety, diagnosis, removal | [docs/t4_usb_mode.md](docs/t4_usb_mode.md) |
+| UCM profile, host test T1, volume safety | [docs/audio_ucm.md](docs/audio_ucm.md) |
+| Integration of the UCM profile (variants, alsa-lib bug) | [docs/audio_ucm_einbindung.md](docs/audio_ucm_einbindung.md) |
+| Channel mapping, measurement tool `ff802-chanmap` (T2) | [docs/audio_t2_plan.md](docs/audio_t2_plan.md) |
+| PipeWire, WirePlumber, Plasma (T3) | [docs/audio_t3.md](docs/audio_t3.md) |
+| Profile binding on every USB port | [docs/audio_t3_usb_port.md](docs/audio_t3_usb_port.md) |
+| Packages, versions, installation status | [docs/packages.md](docs/packages.md) |
+| Internal mixer, Software Playback faders, observations | [docs/mixer_routing.md](docs/mixer_routing.md) |
+| Source layout, build options, tests, development phases | [docs/development.md](docs/development.md) |
+
+The names T1–T4 denote the test phases of development: T1 loading the
+UCM profile, T2 channel mapping, T3 integration into PipeWire/Plasma, T4
+USB mode management.
+
+---
+
+## 12. Development and build
+
+Development and builds happen in a **dev container** (`.devcontainer/`)
+with all tools; the computer with the Fireface needs no development
+tools.
 
 ```sh
 cmake -S . -B build
 cmake --build build
-ctest --test-dir build --output-on-failure
+ctest --test-dir build --output-on-failure     # 73 tests, no hardware
 ```
 
-| CMake-Option | Standard | Bedeutung |
-|--------------|----------|-----------|
-| `FF802_ENABLE_USB_WRITE` | `OFF` | Claim und Bulk-Write einkompilieren |
-| `FF802_BUILD_TOOLS` | `ON` | Programme bauen (benötigt libusb) |
-| `FF802_WERROR` | `ON` | Warnungen als Fehler |
-| `FF802_REQUIRE_ALSA_TESTS` | aus Umgebung, sonst `OFF` | ALSA-/Pakettests schlagen fehl statt übersprungen zu werden (Dev-Container: `ON`) |
-| `FF802_SYSTEM_UCM2` | `/usr/share/alsa/ucm2` | UCM-Baum für `ucm_alsa_eval` und `deb_package` |
-| `FF802_PW_ROOT` | `/` | Wurzel der PipeWire-/WirePlumber-Installation für `pw_integration` (entpackter Paketbaum möglich) |
+In the default build, **no program can send data to the unit**. The
+write function is only compiled in with `-DFF802_ENABLE_USB_WRITE=ON`;
+the packages `ff802-cc` and `ff802-cc-auto` are built that way.
 
-Das Debian-Paket entsteht mit `cmake --build build --target deb` unter
-`build/deb/` (reproduzierbar). Installation und Entfernung: siehe
-[packaging/ff802-ucm/README.Debian](packaging/ff802-ucm/README.Debian).
-Das T4-Paket entsteht mit `cmake --build build --target deb-auto`
-(`build/deb/ff802-cc-auto_<Version>_amd64.deb`, siehe [docs/t4_usb_mode.md](docs/t4_usb_mode.md)),
-das Paket der manuellen Umschaltung mit `cmake --build build --target deb-cc`
-(`build/deb/ff802-cc_<Version>_amd64.deb`, Release-Build aus einem sauberen
-Commit). Projekt- und Paketversionen, Installation, Aktualisierung und
-Rückbau aller drei Pakete: [docs/packages.md](docs/packages.md).
-
-## Programme auf dem Kubuntu-Host
-
-Mit dem Paket `ff802-cc` liegen `ff802-cc` und `ff802-detect` unter
-`/usr/bin` (auf dem Entwicklungsrechner installiert: 0.4.0 aus Commit
-`e12a1d0`, siehe [docs/packages.md](docs/packages.md#installationsstand)):
+Debian packages (in `build/deb/`, reproducible):
 
 ```sh
-ff802-detect                 # Geräteerkennung (öffnet kein Gerät)
-ff802-cc --version           # ff802-cc <Version> (git <Revision>, Release, USB writes enabled)
-sudo ff802-cc enable         # proprietär -> CC, danach USB-Hub-Port-Reset
-sudo ff802-cc disable        # CC -> proprietär; verweigert bei ff802-cc-auto on
+cmake --build build --target deb        # ff802-ucm-profile
+cmake --build build --target deb-auto   # ff802-cc-auto
+cmake --build build --target deb-cc     # ff802-cc, only from a clean commit
 ```
 
-Ohne das Paket laufen die im Dev-Container gebauten Programme auch direkt
-auf dem Host aus dem eingebundenen Projektverzeichnis, ohne
-Entwicklungswerkzeuge. `<Projekt>` steht für den Pfad des Checkouts auf
-dem Host:
+Details on layout, build options, tests and packaging:
+[docs/development.md](docs/development.md), [docs/packages.md](docs/packages.md)
+(German).
 
-```sh
-cd <Projekt>
+---
 
-# Geräteerkennung (öffnet kein Gerät)
-build/ff802-detect
+## 13. License, trademarks and independence from the manufacturer
 
-# Diagnose vor der Umschaltung (öffnet das Gerät, beansprucht nichts, sendet nichts)
-build/ff802-cc check
-
-# Umschaltung (im Standard-Build gesperrt; schreibfähiger Build: build-write,
-# konfiguriert mit -DFF802_ENABLE_USB_WRITE=ON)
-# proprietär -> CC, danach automatischer USB-Hub-Port-Reset
-sudo build-write/ff802-cc enable
-# CC -> proprietär (USB-MIDI-Interface 3); verweigert bei ff802-cc-auto on
-sudo build-write/ff802-cc disable
-```
-
-Ist das Paket installiert, nur noch `/usr/bin/ff802-cc` verwenden, damit
-eindeutig ist, welche Fassung läuft (`--version`).
-
-Details: [docs/cc_disable_port_reset.md](docs/cc_disable_port_reset.md).
-
-| Exit | `ff802-detect` | `ff802-cc` |
-|:----:|----------------|------------|
-| 0 | Gerät gefunden | Prüfung bestanden bzw. umgeschaltet |
-| 1 | kein Gerät | kein passendes Gerät |
-| 2 | Fehler | Bedienfehler |
-| 3 | – | Vorbedingung nicht erfüllt, nichts gesendet |
-| 4 | – | Übertragung fehlgeschlagen, Gerätezustand unbekannt |
-| 5 | – | nicht gesendet (abgebrochen oder Schreiben gesperrt) |
-| 6 | – | übertragen, aber der neue Modus wurde nicht erkannt |
-
-`ff802-cc check` braucht Schreibrechte auf die Gerätedatei. Ohne udev-Regel
-meldet es `access to the USB device denied`. Eine udev-Regel wird nicht
-automatisch installiert (siehe [docs/usb_comm.md](docs/usb_comm.md)).
-
-**Voraussetzungen auf dem Host:** Laufzeitbibliothek `libusb-1.0-0`
-(normalerweise vorinstalliert) und glibc ab 2.34 (Kubuntu 22.04 oder
-neuer), x86-64.
-
-`build/ff802-chanmap` (Hardwaretest T2, nur nach Freigabe und nach
-[docs/audio_t2_plan.md](docs/audio_t2_plan.md)) braucht zusätzlich
-`libasound2t64` und für die Geräte-Reservierung `pw-reserve` (Paket
-`pipewire-bin`). `ff802-chanmap check` ist nur lesend.
-
-
-## Tests
-
-| Test | Inhalt |
-|------|--------|
-| `test_reg_codec`, `test_cc_mode` | Registerkodierung, Windows-Aufzeichnungen |
-| `test_device_id`, `test_detect` | Geräteerkennung mit simulierten Gerätelisten |
-| `test_usb_backend` | Layout-Prüfung, Bestätigungswort, `--device`-Syntax, Exit-Codes |
-| `test_cc_switch` | Kompletter Ablauf gegen ein simuliertes USB-Backend: Reihenfolge, genau ein Schreibversuch, Freigabe aller Ressourcen, alle Fehlerfälle |
-| `test_cc_disable`, `test_disable_check`, `test_usb_port` | `ff802-cc disable` (Ablauf, Vorprüfung) und USB-Hub-Port-Reset nach `enable`, gegen simuliertes Backend und nachgebautes sysfs |
-| `test_write_gate` | Backend meldet die konfigurierte Schreibfähigkeit |
-| `check_forbidden_usb_calls` | Quelltextprüfung: Schreib-APIs nur in `src/usb_comm.c`, verbotene APIs nirgends |
-| `detect_binary_symbols`, `cc_binary_symbols` | Prüfung der importierten Symbole der fertigen Programme mit `nm` |
-| `cli_*`, `cc_cli_*` | Kommandozeilen beider Programme ohne USB-Zugriff; `--version` mit Projektversion, Git-Revision und Build-Typ |
-| `ucm_profile_static` | Struktur und Inhalt des UCM-Profils gegen eine eigene Erwartungstabelle |
-| `ucm_alsa_syntax` | Syntax des UCM-Profils mit dem alsa-lib-Parser (braucht `libasound2-dev`) |
-| `ucm_alsa_eval` | Auswertung des Profils durch die echte alsa-lib mit nachgebildeter Fireface-Karte; führt das T1-Skript im Container aus (braucht `alsa-ucm-conf` und alsa-lib 1.2.15.x) |
-| `ucm_t1_script` | Host-Test-Skript T1 und Host-Wrapper gegen nachgebautes UCM-Verzeichnis, procfs und `alsaucm` |
-| `deb_package` | Paket: reproduzierbarer Bau, Inhalt, Installation, Gerätezuordnung, Upgrade, Entfernung und Purge in isolierter Wurzel; installierter Baum mit der echten alsa-lib ausgewertet |
-| `ucm_bind_udev` | T3 0.3.0: udev-Hook `ff802-ucm-bind udev <N>` an neuen Ports, Idempotenz, fremde Dateien, nur das originale 802, alsa-lib ≥ 1.2.16, udev-Regel statisch |
-| `pw_integration` | T3: private PipeWire-Sitzung (PipeWire 1.6.x, WirePlumber 0.5.x) mit unverändertem WirePlumber-ALSA-Monitor gegen nachgebildete Karte im Paketaufbau: sechs Sinks und eine Quelle, Signalwege bis zum Hardwarekanal, Startlautstärke, Anstecken während der Wiedergabe, Persistenz, Host-Skript `ff802-t3-host.sh` (braucht `pipewire`, `wireplumber`, `pipewire-pulse`, `pulseaudio-utils`, `libspa-0.2-dev`) |
-| `test_chanmap_*`, `chanmap_cli_*`, `check_chanmap_sources`, `chanmap_binary_symbols` | ff802-chanmap: Simulation korrekter und falscher Zuordnungen, aller Abbruch- und Fehlerfälle, Pegelwächter, Kartenerkennung, pw-reserve, Auswertung, ALSA-Backend am `null`-Plugin |
-| `test_auto_sysfs`, `test_auto_switch` | T4: Identität aus sysfs, Zustandsdateien, Sperre, automatischer Ablauf mit allen Fehler- und Änderungsfällen |
-| `auto_flow`, `auto_notify`, `auto_control`, `auto_units` | T4: Dienstaufruf wie systemd (auch gleichzeitig), Benachrichtigung mit Test-Doubles, `ff802-cc-auto on/off/status`, udev-Regel und Units (`systemd-analyze`) |
-| `autoswitch_binary_symbols`, `autoswitch_sim_no_libusb` | T4: Symbole des Dienstprogramms; Simulationsbuild ohne libusb |
-| `deb_auto_package` | T4-Paket: reproduzierbar, Inhalt, Installation/Upgrade/Entfernung/Purge in isolierter Wurzel mit Stolperdrähten |
-| `deb_cc_package` | Paket `ff802-cc`: Bau nur aus sauberem Commit, bitgleich aus zwei Checkouts und beim Neubau, Inhalt, Programme, Zusammenspiel mit `ff802-cc-auto` in isolierter Wurzel |
-| `reproducible_release_build` | Release-Build mit `-Werror` in zwei Verzeichnissen, Programme byte-gleich |
-
-Fehlen die Voraussetzungen von `ucm_alsa_syntax`, `ucm_alsa_eval` oder `pw_integration`, werden sie
-übersprungen. Im Dev-Container (`FF802_REQUIRE_ALSA_TESTS=ON`) schlagen sie dann
-stattdessen fehl.
-
-Keiner der automatisierten Tests greift auf USB-Hardware oder eine Soundkarte zu.
-
-## Dokumentation
-
-- [docs/protocol.md](docs/protocol.md): Registerprotokoll
-- [docs/detection.md](docs/detection.md): Geräteerkennung
-- [docs/usb_comm.md](docs/usb_comm.md): Kommunikation, Sicherheitsmechanismen, Risiken
-- [docs/audio_ucm.md](docs/audio_ucm.md): ALSA-UCM-Profil, Host-Test T1, Lautstärkesicherheit
-- [docs/audio_ucm_einbindung.md](docs/audio_ucm_einbindung.md): produktive UCM-Einbindung (Variante A1, Paket)
-- [docs/audio_t2_plan.md](docs/audio_t2_plan.md): Hardwaretest T2 (Kanalzuordnung) mit `ff802-chanmap`
-- [docs/audio_t3.md](docs/audio_t3.md): T3, Integration in PipeWire/WirePlumber/Plasma, Lautstärkesicherheit, Host-Test
-- [docs/audio_t3_usb_port.md](docs/audio_t3_usb_port.md): T3 0.3.0, automatische UCM-Bindung an jedem USB-Port (udev-Hook), Annahmen, Host-Testplan
-- [docs/t4_usb_mode.md](docs/t4_usb_mode.md): T4, automatischer CC-Moduswechsel: Architektur, Sicherheit, Installation, Aktivierung, Diagnose, Rollback, Tests
-- [docs/t4_disable.md](docs/t4_disable.md): T4, Untersuchung `ff802-cc disable` (Rückweg in den proprietären Modus)
-- [docs/cc_disable_port_reset.md](docs/cc_disable_port_reset.md): `ff802-cc disable` (USB-MIDI-SysEx) und USB-Hub-Port-Reset nach `enable`
-- [docs/packages.md](docs/packages.md): die drei Debian-Pakete, Projekt- und Paketversion, Bau, Installation, Aktualisierung, Rückbau
-
-## Lizenz
-
-| Dateien | Lizenz | Copyright |
+| Files | License | Copyright |
 |---|---|---|
-| alle Dateien, soweit unten nicht anders angegeben (Quellcode, Skripte, Tests, Paketierung, Dokumentation) | MIT, siehe [LICENSE](LICENSE) | 2026 Bernhard Steinheber |
-| [audio/ucm2/](audio/ucm2/) (UCM-Profil) | BSD-3-Clause, siehe [LICENSES/BSD-3-Clause.txt](LICENSES/BSD-3-Clause.txt) | 2026 Bernhard Steinheber |
-| [packaging/ff802-ucm/longname-master.conf](packaging/ff802-ucm/longname-master.conf) | BSD-3-Clause, wie oben | 2026 Bernhard Steinheber; 2019-2026 Advanced Linux Sound Architecture (ALSA) project |
+| all files unless stated otherwise below (source code, scripts, tests, packaging, documentation) | MIT, see [LICENSE](LICENSE) | 2026 Bernhard Steinheber |
+| [audio/ucm2/](audio/ucm2/) (UCM profile) | BSD-3-Clause, see [LICENSES/BSD-3-Clause.txt](LICENSES/BSD-3-Clause.txt) | 2026 Bernhard Steinheber |
+| [packaging/ff802-ucm/longname-master.conf](packaging/ff802-ucm/longname-master.conf) | BSD-3-Clause | 2026 Bernhard Steinheber; 2019-2026 Advanced Linux Sound Architecture (ALSA) project |
 
-- Das UCM-Profil steht unter derselben Lizenz wie `alsa-ucm-conf`.
-- `longname-master.conf` enthält Abschnitte aus `USB-Audio/USB-Audio.conf`
-  von `alsa-ucm-conf` (BSD-3-Clause). Deshalb steht dort zusätzlich der
-  Copyright-Hinweis des ALSA-Projekts.
-- Die Debian-Pakete enthalten dieselbe Zuordnung in
-  `/usr/share/doc/<paket>/copyright` (Format DEP-5).
-- Die Dokumentation zitiert kurze, mit Quelle belegte Stellen aus dem
-  Handbuch von RME und aus Forenbeiträgen. Diese Zitate bleiben Eigentum
-  ihrer Urheber und fallen nicht unter die MIT-Lizenz.
-- Die Dateien in [tests/audio/fixtures/t1/](tests/audio/fixtures/t1/) sind
-  Ausgaben von `alsaucm` für dieses Profil.
+- The UCM profile is under the same license as `alsa-ucm-conf`.
+  `longname-master.conf` contains parts of `USB-Audio.conf` from
+  `alsa-ucm-conf` and therefore also carries the copyright notice of the
+  ALSA project.
+- The Debian packages contain the same assignment in
+  `/usr/share/doc/<package>/copyright` (DEP-5 format).
+- The documentation quotes short, referenced passages from the RME manual
+  and from forum posts. These quotations remain the property of their
+  authors and are not covered by the MIT license.
+- The files in `tests/audio/fixtures/t1/` are output of `alsaucm` for
+  this profile.
 
-### Marken
+**Independence from the manufacturer:** this project is not affiliated
+with RME and is neither supported nor reviewed by RME. The switch
+commands come from our own observation, not from RME documents.
 
-RME, Fireface und TotalMix sind Marken ihrer jeweiligen Inhaber. Sie
-werden hier nur verwendet, um die unterstützte Hardware zu benennen.
-Dieses Projekt steht in keiner Verbindung zu RME und wird von RME weder
-unterstützt noch geprüft.
+**Trademarks:** RME, Fireface and TotalMix are trademarks of their
+respective owners. They are used here only to name the supported
+hardware.

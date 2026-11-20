@@ -10,6 +10,12 @@
 >
 > Ursprüngliches Ergebnis (2026-11-17): Für das originale Fireface 802 gab
 > es **kein belegtes Verfahren**, und `ff802-cc disable` sendete nichts.
+>
+> Ebenfalls überholt: Die Tabelle „Antworten auf die Fragen“ und der
+> Abschnitt „Sichere Alternativen (heute)“ geben den Stand vom 2026-11-17
+> wieder; heute kommt `ff802-cc disable` als Rückweg unter Linux hinzu.
+> oscmix unterstützt das Fireface 802 inzwischen in einem inoffiziellen
+> Fork, siehe [mixer_routing.md](mixer_routing.md).
 
 Stand: 2026-11-17. Untersucht im Dev-Container. Es gab keine USB-Zugriffe:
 Die Deskriptoren stammen aus dem schreibgeschützt eingebundenen sysfs des

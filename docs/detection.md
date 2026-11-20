@@ -8,7 +8,7 @@ RME Fireface 802 erkennt und welchen Betriebsmodus es meldet.
 | Modus | VID:PID | Status |
 |-------|---------|--------|
 | Proprietärer USB-Modus | `2a39:3fcd` | bestätigt, unter Linux erkannt |
-| Class-Compliant-Modus | `0424:3fdd` | **vermutet**, unter Linux noch nicht bestätigt |
+| Class-Compliant-Modus | `0424:3fdd` | bestätigt (seit T1, 2026-11-17), unter Linux als Soundkarte von `snd-usb-audio` eingebunden |
 
 `0x2A39` ist die Hersteller-ID von RME. `0x0424` gehört Microchip (SMSC) und
 wird von vielen fremden Geräten verwendet, etwa von USB-Hubs. Für den

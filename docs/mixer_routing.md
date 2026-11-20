@@ -1,0 +1,161 @@
+# Interner Mixer und Routing im Class-Compliant-Modus
+
+> **Stand 2026-11-20.** Dieses Dokument sammelt, was über den internen
+> Mixer des ursprünglichen Fireface 802 im CC-Modus bekannt ist. Es trennt
+> streng zwischen **bestätigten Beobachtungen** an unserem Gerät, den
+> **Angaben im RME-Handbuch**, **Schlussfolgerungen** und **offenen
+> Fragen**. Dieses Projekt liest und schreibt den Mixer **nicht**.
+
+## Worum es geht
+
+Unter Linux kommt der Ton über USB als einer von 22 Wiedergabekanälen im
+Fireface an. Welche Buchse ihn ausgibt, entscheidet der interne digitale
+Mixer (DSP) des Geräts, nicht Linux:
+
+```text
+PipeWire/ALSA ──► USB-Kanal ──► Software Playback n ──► Fader ──► Hardware Output m ──► Buchse
+                  (UCM-Profil)   (Eingang des Mixers)     (Routing im Gerät)
+```
+
+In TotalMix FX heißt ein Wiedergabekanal vom Computer **Software
+Playback**. Für jede Kombination aus Software Playback und Hardware
+Output gibt es einen eigenen Fader (Pegelregler). Steht dieser Fader auf
+null, kommt vom betreffenden Software Playback an diesem Ausgang nichts
+an. Steht der Fader eines anderen Ausgangs offen, kommt der Ton dort an.
+Zusätzlich hat jeder Hardware Output einen eigenen Ausgangsfader.
+
+Die Kanalzuordnung des UCM-Profils (z. B. „Headphones Output 9/10“ =
+USB-Kanäle 9 und 10, intern 8/9) legt also nur fest, auf welchem
+**Software Playback** der Ton ankommt. Ob er an Phones 9/10 hörbar ist,
+hängt vom Mixer ab.
+
+## Bestätigte Beobachtungen (unser Gerät, Kubuntu 26.04.1)
+
+Gemeldet vom Anwender, aus den Hardwaretests vom 2026-11-17 bis
+2026-11-19:
+
+1. Unter Windows wurde das Routing in TotalMix FX geprüft: Software
+   Playback 9/10 war auf Hardware Output Phones 9/10 geroutet, nicht auf
+   Analog 1/2.
+2. Unter Kubuntu wurde die Wiedergabe nachweislich auf Software Playback
+   9/10 übertragen (Senke „Headphones Output 9/10“).
+3. Trotzdem war die Musik zunächst über Analog 1/2 hörbar, nicht über
+   Phones 9/10.
+4. Mit dem Fremdwerkzeug **oscmix** ließen sich unter Kubuntu die
+   Routing- und Ausgangsfader so einstellen, dass Phones 9/10
+   funktionierte.
+5. Nach einem Neustart von oscmix blieb die Kopfhörerwiedergabe erhalten;
+   das Gerät hatte die Einstellungen also weiter aktiv. oscmix zeigte
+   danach teilweise nicht die tatsächlich wirksamen Faderstellungen an.
+6. Am Vortag hatte die Kopfhörerwiedergabe unter Kubuntu bereits
+   funktioniert, nachdem die **Software-Playback-Fader in TotalMix FX**
+   korrigiert worden waren. Dazwischen lief das Gerät wieder unter
+   Windows.
+7. Analog 3/4, Phones 9/10 und Phones 11/12 wurden unter Kubuntu mit
+   realer Wiedergabe erfolgreich getestet; die zuvor stummen
+   Kopfhörerausgänge nach der Korrektur der Software-Playback-Fader in
+   TotalMix FX.
+
+## Angaben im RME-Handbuch (Fireface 802 User's Guide)
+
+| Aussage (wörtlich) | Fundstelle |
+|---|---|
+| CC-Modus: „no hardware settings, no (Total) Mix and no settings for the effects“ | S. 90, Kap. 29 |
+| „Audio playback in iTunes will automatically be performed by the 802, using analog outputs 1/2.“ | S. 91, Kap. 31 |
+| „Playback will use the rear-side analog outputs 1 and 2, or even more channels if the app supports such operation.“ | S. 93, Kap. 32 |
+| „Configuring the 802 is ideally done via the app TotalMix FX for iPad, otherwise by loading Setups.“ | S. 93 |
+| „Store current state into device. The unit can store up to 6 setups (the current state) in its own memory.“ | S. 78 |
+| „This function has been developed especially for the stand-alone mode operation, where there are no playback channels.“ „…using it under Windows, Mac or iOS will result in incomplete setups.“ | S. 78 |
+| „Activate CC mode on disconnect … will boot into Class Compliant mode as soon as the connection to the computer is interrupted“ | S. 78 |
+| „TotalMix FX resets the unit to normal mode whenever it detects CC mode.“ | S. 93 |
+| Total Reset: „Playback routing 1:1 with mixdown to Main Out.“ | S. 77 |
+
+Quelle: RME Fireface 802 User's Guide, z. B.
+<https://www.manualslib.com/manual/745601/Rme-Audio-Fireface-802.html?page=78>.
+
+**Nicht im Handbuch beschrieben:**
+- ob das Gerät seinen Mixerzustand selbständig speichert,
+- welcher Mixerzustand beim Start in den CC-Modus aktiv wird,
+- ob TotalMix FX beim Verbinden seinen eigenen Zustand ins Gerät schreibt,
+- wie die 22 CC-Wiedergabekanäle auf die Software-Playback-Kanäle
+  abgebildet werden.
+
+## Technische Schlussfolgerungen
+
+**Belegt durch Beobachtung und Quellcode:**
+- Die Ursache der stummen Kopfhörer lag im Mixer des Geräts, nicht in
+  ALSA oder PipeWire: Der Ton kam auf Software Playback 9/10 an
+  (Beobachtung 2), und die Ausgabe änderte sich allein durch Fader im
+  Gerät (Beobachtungen 4 und 6).
+- Keine Komponente dieses Projekts schreibt Mixer-Werte: Das UCM-Profil
+  enthält keine Mixer-Befehle (kein `cset`, keine `BootSequence`/
+  `EnableSequence`), WirePlumber regelt nur Software-Lautstärken,
+  `ff802-cc-auto` und `ff802-cc enable` senden nur den Befehl für
+  Register `0x3D44`, `ff802-chanmap` liest den Mixer nur.
+- Der Host-Test `ff802-t3-host.sh verify` prüft nur die PipeWire/ALSA-
+  Ebene. Ein bestandener `verify` sagt nichts über das Routing im Gerät.
+
+**Plausibel, nicht belegt:**
+- Im CC-Modus ist nicht immer der Mixerzustand aktiv, den TotalMix FX
+  zuletzt angezeigt hat. Beobachtung 3 passt zu einem Zustand wie „Total
+  Reset“ (Wiedergabe 1:1 und zusätzlich Mixdown auf Main Out = Analog
+  1/2).
+- Welcher Zustand im CC-Modus aktiv ist, könnte davon abhängen, **wie**
+  das Gerät in den CC-Modus kam: aus einer laufenden TotalMix-Sitzung
+  („Activate CC mode on disconnect“) oder nach dem Einschalten ohne
+  TotalMix, umgeschaltet mit `ff802-cc enable` bzw. `ff802-cc-auto`.
+  Das würde erklären, warum es an einem Tag funktionierte und nach dem
+  Windows-Betrieb zunächst nicht (Beobachtung 6).
+- „Store current state into device“ ist für den Stand-alone-Betrieb ohne
+  Wiedergabekanäle gedacht; das Routing der Software-Playback-Kanäle für
+  den CC-Modus ist darin laut Handbuch nicht verlässlich enthalten.
+- oscmix zeigt nach einem Neustart vermutlich eigene Startwerte statt
+  des Gerätezustands (Beobachtung 5).
+
+**Ausgeschlossen:** eine falsche Kanalzuordnung in ALSA/PipeWire als
+Ursache (widerspricht Beobachtung 2).
+
+## Offene Fragen
+
+1. Welcher Mixerzustand ist nach dem Wechsel in den CC-Modus aktiv, und
+   hängt er vom Weg in den CC-Modus oder vom Aus- und Einschalten ab?
+   Vorgeschlagener Test (noch nicht ausgeführt bzw. nicht dokumentiert):
+   - **Lauf A:** `ff802-cc-auto off`; unter Windows in TotalMix FX
+     „Activate CC mode on disconnect“ setzen, USB trennen, Gerät **nicht**
+     ausschalten; unter Kubuntu anschließen und ein leises Testsignal
+     über „Headphones Output 9/10“ abspielen.
+   - **Lauf B:** gleicher TotalMix-Zustand, Gerät aus- und einschalten,
+     unter Kubuntu im proprietären Modus anschließen und mit
+     `ff802-cc enable` oder der Automatik umschalten; gleiches
+     Testsignal.
+   - Auswertung: A richtig und B falsch → der Weg entscheidet; beide
+     falsch → der CC-Modus startet mit eigenem Zustand.
+2. Übersteht ein im CC-Modus gesetzter Mixerzustand (z. B. mit oscmix)
+   das Aus- und Einschalten des Geräts?
+3. Wie werden die 22 CC-Kanäle auf die Software-Playback-Kanäle
+   abgebildet? Für 1/2, 3/4, 9/10 und 11/12 passt die Zuordnung des
+   Profils zu den Beobachtungen; für die übrigen Paare ist sie nicht
+   einzeln dokumentiert (siehe [audio_t2_plan.md](audio_t2_plan.md)).
+4. Lässt sich das Routing zuverlässig und dauerhaft von Linux aus
+   einrichten? Ein Werkzeug dafür enthält dieses Projekt nicht.
+
+## Werkzeuge zum Einstellen des Mixers
+
+- **TotalMix FX** (RME) unter Windows oder macOS, im proprietären Modus.
+  Laut Handbuch ist für den CC-Modus TotalMix FX für iPad vorgesehen.
+- **oscmix**: Fremdprojekt, nicht Teil dieses Projekts. Die Unterstützung
+  des Fireface 802 gibt es nur in einem inoffiziellen Fork
+  (<https://github.com/huddx01/oscmix>), der selbst auf weiteren
+  Testbedarf hinweist. Bei uns hat es für Phones 9/10 funktioniert
+  (Beobachtung 4); eine Zusage für andere Einstellungen gibt es nicht.
+
+Eine automatische Einrichtung des Mixer-Routings ist in diesem Projekt
+**nicht implementiert**.
+
+## Weitere Quellen
+
+- RME-Forum: Remote controlling Fireface 802 in class compliant mode?
+  <https://forum.rme-audio.de/viewtopic.php?id=31390>
+- [t4_disable.md](t4_disable.md): CC-Option in TotalMix FX und Register
+  `0x3D44`
+- [audio_t3.md](audio_t3.md): Lautstärken in PipeWire/WirePlumber
