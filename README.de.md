@@ -421,20 +421,20 @@ Abhängigkeiten der Pakete (installiert `apt` automatisch mit):
 
 ### Pakete beschaffen
 
-Die `.deb`-Dateien entstehen reproduzierbar aus diesem Repository (siehe
-[Entwicklung und Build](#12-entwicklung-und-build)):
+Die drei Pakete und die Datei `SHA256SUMS` sind als Anhänge des
+GitHub-Releases **v0.4.1** veröffentlicht:
+<https://github.com/bsteinheber/fireface802-cc/releases/tag/v0.4.1>
 
 ```
 ff802-cc_0.4.1_amd64.deb
 ff802-cc-auto_0.1.2_amd64.deb
 ff802-ucm-profile_0.3.1_all.deb
+SHA256SUMS
 ```
 
-> **Veröffentlichung ausstehend:** Die drei Pakete und eine Datei
-> `SHA256SUMS` sollen als Anhänge des GitHub-Releases `v0.4.1`
-> erscheinen (Releases des Repositorys:
-> <https://github.com/bsteinheber/fireface802-cc/releases>). Bis dahin
-> die Pakete selbst bauen.
+Sie sind reproduzierbar aus dem Tag `v0.4.1` gebaut und lassen sich auch
+selbst aus diesem Repository bauen (siehe
+[Entwicklung und Build](#12-entwicklung-und-build)).
 
 Prüfsummen prüfen (im Ordner mit den Paketen und der Datei `SHA256SUMS`):
 

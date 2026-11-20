@@ -421,19 +421,20 @@ Package dependencies (`apt` installs them automatically):
 
 ### Getting the packages
 
-The `.deb` files are built reproducibly from this repository (see
-[Development and build](#12-development-and-build)):
+The three packages and the `SHA256SUMS` file are published as assets of
+the GitHub release **v0.4.1**:
+<https://github.com/bsteinheber/fireface802-cc/releases/tag/v0.4.1>
 
 ```
 ff802-cc_0.4.1_amd64.deb
 ff802-cc-auto_0.1.2_amd64.deb
 ff802-ucm-profile_0.3.1_all.deb
+SHA256SUMS
 ```
 
-> **Publication pending:** the three packages and a `SHA256SUMS` file are
-> to be attached to the GitHub release `v0.4.1` (releases of the
-> repository: <https://github.com/bsteinheber/fireface802-cc/releases>).
-> Until then, build the packages yourself.
+They are built reproducibly from tag `v0.4.1`, and you can also build
+them yourself from this repository (see
+[Development and build](#12-development-and-build)).
 
 Verify the checksums (in the folder with the packages and the
 `SHA256SUMS` file):

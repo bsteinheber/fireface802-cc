@@ -38,6 +38,23 @@ Prüfsummen auf dem Host bestätigt.
   Paketversionen (Projektversion 0.4.1) unterscheiden sich von den
   installierten nur in Lizenzangaben und Dokumentation.
 
+## Veröffentlichte Pakete: GitHub-Release v0.4.1
+
+Seit 2026-11-20 sind die Pakete aus dem Tag `v0.4.1` (Commit `04fa6e2`)
+als Anhänge des GitHub-Releases veröffentlicht:
+<https://github.com/bsteinheber/fireface802-cc/releases/tag/v0.4.1>
+
+| Anhang | Paketversion | SHA-256 |
+|---|---|---|
+| `ff802-cc_0.4.1_amd64.deb` | `ff802-cc` 0.4.1 | `cf67323712f55e0f6b550ee340348faa0787f81c8a93a8f9c27dd4744b5b0f60` |
+| `ff802-cc-auto_0.1.2_amd64.deb` | `ff802-cc-auto` 0.1.2 | `806f030f4a5afd56782709403419897feb2ffa09a25eb878b003af927332918c` |
+| `ff802-ucm-profile_0.3.1_all.deb` | `ff802-ucm-profile` 0.3.1 | `842ea4fc230c875d97a8369933abf535634c686f3302ca97c4535eb68deeca1c` |
+| `SHA256SUMS` | Prüfsummen der drei Pakete | `6a6ec459691c73fc10901f7908a77213fb72bee6db02a1ff20874a842ab8ee88` |
+
+Die von GitHub angegebenen SHA-256-Digests der Anhänge stimmen mit diesen
+Werten überein. Ein Neubau aus `v0.4.1` mit dem Dev-Container ergibt
+bitgleiche Pakete (siehe [Bauen](#bauen-dev-container)).
+
 ## Die drei Pakete
 
 | Paket | Paketversion (Quellen) | Inhalt | hängt ab von |
@@ -114,6 +131,10 @@ Für ein Release die Pakete aus dem Commit bauen, der getaggt wird, damit
 0.4.0, siehe [Installationsstand](#installationsstand)).
 
 ## Installation und Aktualisierung (Host, Administrator, nach Freigabe)
+
+Die Pakete stammen aus dem
+[GitHub-Release v0.4.1](#veröffentlichte-pakete-github-release-v041)
+oder aus einem eigenen Bau; vorher `sha256sum -c SHA256SUMS`.
 
 ```sh
 sudo apt install ./ff802-cc_0.4.1_amd64.deb            # Upgrade von 0.4.0
