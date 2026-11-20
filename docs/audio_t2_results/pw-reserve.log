@@ -1,0 +1,45 @@
+device Audio1 is busy
+doing RequestRelease on Audio1
+reserve available org.freedesktop.ReserveDevice1.Audio1
+reserve acquired
+doing Release on Audio1
+device Audio1 is busy
+doing RequestRelease on Audio1
+reserve available org.freedesktop.ReserveDevice1.Audio1
+reserve acquired
+doing Release on Audio1
+device Audio1 is busy
+doing RequestRelease on Audio1
+reserve available org.freedesktop.ReserveDevice1.Audio1
+reserve acquired
+doing Release on Audio1
+device Audio1 is busy
+doing RequestRelease on Audio1
+reserve available org.freedesktop.ReserveDevice1.Audio1
+reserve acquired
+doing Release on Audio1
+device Audio1 is busy
+doing RequestRelease on Audio1
+reserve available org.freedesktop.ReserveDevice1.Audio1
+reserve acquired
+doing Release on Audio1
+device Audio1 is busy
+doing RequestRelease on Audio1
+reserve available org.freedesktop.ReserveDevice1.Audio1
+reserve acquired
+doing Release on Audio1
+device Audio1 is busy
+doing RequestRelease on Audio1
+reserve available org.freedesktop.ReserveDevice1.Audio1
+reserve acquired
+doing Release on Audio1
+device Audio1 is busy
+doing RequestRelease on Audio1
+reserve available org.freedesktop.ReserveDevice1.Audio1
+reserve acquired
+doing Release on Audio1
+device Audio1 is busy
+doing RequestRelease on Audio1
+reserve available org.freedesktop.ReserveDevice1.Audio1
+reserve acquired
+doing Release on Audio1

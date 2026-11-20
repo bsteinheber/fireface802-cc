@@ -305,15 +305,23 @@ Kubuntu 26.04.1 durchgeführt.
 | UCM-Profil wird von alsa-lib mit der echten Karte geladen (T1) | ja | ja, 29/29 Prüfungen |
 | sechs Ausgänge und ein Eingang in PipeWire/Plasma (T3) | ja | ja |
 | Profilzuordnung an einem anderen USB-Anschluss | ja | ja, 2026-11-18 |
-| Kanalzuordnung, mit realer Wiedergabe gehört | – | Analog 1/2, Analog 3/4, Kopfhörer 9/10 und 11/12 ² |
-| Kanalzuordnung Analog 5/6, 7/8 und Eingang 1/2 | ja (Simulation) | nicht einzeln dokumentiert ² |
+| Kanalzuordnung gemessen (T2, Kabelschleife auf Line In 1) | ja (Simulation) | nur Analog Out 1 und 2 ² |
+| Wiedergabe gehört (T3, über PipeWire) | – | Analog 3/4, Kopfhörer 9/10 und 11/12 ³ |
+| Analog 5/6, 7/8 und Line In 2 am Gerät | ja (Simulation) | nicht nachgewiesen ² |
 | Startlautstärke 40 % für neue Ausgänge | ja | nicht einzeln dokumentiert |
 
 ¹ Getestet mit dem selbst gebauten Programm (`build-write/ff802-cc`) mit
 derselben Umschaltlogik wie im Paket `ff802-cc` 0.4.0/0.4.1.
-² Der Messtest T2 (Kanalzuordnung) wurde laut Testbericht erfolgreich
-ausgeführt; die einzelnen Messergebnisse liegen nicht im Repository, und
-das Profil ist intern noch als „UNVERIFIED“ markiert.
+² Der Messtest T2 vom 2026-11-17 hat nur Analog Out 1 und 2 nachgewiesen
+(sowie Line In 1 als Aufnahmekanal 1). An Out 3, 5 und 7 wurde kein
+Signal erkannt, die Messung an Out 4 wurde abgebrochen, die übrigen
+Positionen wurden nicht gemessen. Das ist kein Nachweis eines Fehlers;
+eine mögliche Ursache ist das Routing im internen Mixer. Das Profil
+bleibt deshalb intern als „UNVERIFIED“ markiert. Protokolle und
+Auswertung: [docs/audio_t2_results/](docs/audio_t2_results/README.md).
+³ Hörtest über PipeWire, unabhängig von T2 und keine Messung des
+Kanalindex; die Kopfhörer erst, nachdem die Software-Playback-Fader im
+Gerät eingestellt waren.
 
 ---
 
@@ -344,8 +352,9 @@ das Profil ist intern noch als „UNVERIFIED“ markiert.
 
 - Verhältnis der Mixer-Zustände zwischen proprietärem und CC-Modus
   (Speichern im Gerät, Verhalten nach Windows-Betrieb).
-- Kanalzuordnung von Analog 5/6, 7/8 und Analog Input 1/2 mit realem
-  Signal (siehe Fußnote ² oben).
+- Messung der Kanalzuordnung für alle Ausgänge außer Analog 1/2 und für
+  Line In 2; T2 hat nur Analog Out 1 und 2 nachgewiesen (siehe
+  Fußnote ² oben).
 - Andere Linux-Distributionen und -Versionen, andere PipeWire- oder
   WirePlumber-Versionen.
 - Bedeutung einzelner Werte der Umschaltbefehle: Sie wurden durch
@@ -621,6 +630,7 @@ Die Dokumente unter `docs/` sind auf Deutsch.
 | UCM-Profil, Host-Test T1, Lautstärkesicherheit | [docs/audio_ucm.md](docs/audio_ucm.md) |
 | Einbindung des UCM-Profils (Varianten, alsa-lib-Fehler) | [docs/audio_ucm_einbindung.md](docs/audio_ucm_einbindung.md) |
 | Kanalzuordnung, Messwerkzeug `ff802-chanmap` (T2) | [docs/audio_t2_plan.md](docs/audio_t2_plan.md) |
+| Ergebnisse von T2 (Originalprotokolle, Auswertung) | [docs/audio_t2_results/](docs/audio_t2_results/README.md) |
 | PipeWire, WirePlumber, Plasma (T3) | [docs/audio_t3.md](docs/audio_t3.md) |
 | Profilzuordnung an jedem USB-Anschluss | [docs/audio_t3_usb_port.md](docs/audio_t3_usb_port.md) |
 | Pakete, Versionen, Installationsstand | [docs/packages.md](docs/packages.md) |

@@ -303,15 +303,23 @@ They never access USB hardware or a real sound card.
 | UCM profile is loaded by alsa-lib with the real card (T1) | yes | yes, 29/29 checks |
 | six outputs and one input in PipeWire/Plasma (T3) | yes | yes |
 | profile binding on another USB port | yes | yes, 2026-11-18 |
-| channel mapping, heard with real playback | – | Analog 1/2, Analog 3/4, Headphones 9/10 and 11/12 ² |
-| channel mapping Analog 5/6, 7/8 and input 1/2 | yes (simulation) | not individually documented ² |
+| channel mapping measured (T2, cable loop to Line In 1) | yes (simulation) | only Analog Out 1 and 2 ² |
+| playback heard (T3, through PipeWire) | – | Analog 3/4, Headphones 9/10 and 11/12 ³ |
+| Analog 5/6, 7/8 and Line In 2 on the unit | yes (simulation) | not demonstrated ² |
 | start volume 40 % for new outputs | yes | not individually documented |
 
 ¹ Tested with the self-built program (`build-write/ff802-cc`) with the
 same switching logic as in the package `ff802-cc` 0.4.0/0.4.1.
-² According to the test report, the measurement test T2 (channel mapping)
-was run successfully; the individual measurements are not in the
-repository, and the profile is still marked "UNVERIFIED" internally.
+² The measurement test T2 of 2026-11-17 demonstrated only Analog Out 1
+and 2 (and Line In 1 as capture channel 1). No signal was detected at
+Out 3, 5 and 7, the measurement at Out 4 was aborted, and the other
+positions were not measured. This does not prove a fault; one possible
+cause is the routing in the internal mixer. The profile therefore stays
+marked "UNVERIFIED" internally. Logs and evaluation:
+[docs/audio_t2_results/](docs/audio_t2_results/README.md) (German).
+³ Listening test through PipeWire, independent of T2 and not a
+measurement of the channel index; the headphones only after the Software
+Playback faders in the unit had been set.
 
 ---
 
@@ -343,8 +351,9 @@ repository, and the profile is still marked "UNVERIFIED" internally.
 
 - How the mixer states of proprietary and CC mode relate to each other
   (storage in the unit, behaviour after use on Windows).
-- Channel mapping of Analog 5/6, 7/8 and Analog Input 1/2 with a real
-  signal (see footnote ² above).
+- Measurement of the channel mapping for all outputs except Analog 1/2
+  and for Line In 2; T2 demonstrated only Analog Out 1 and 2 (see
+  footnote ² above).
 - Other Linux distributions and versions, other PipeWire or WirePlumber
   versions.
 - Meaning of individual values in the switch commands: they were found by
@@ -621,6 +630,7 @@ The documents under `docs/` are in German.
 | UCM profile, host test T1, volume safety | [docs/audio_ucm.md](docs/audio_ucm.md) |
 | Integration of the UCM profile (variants, alsa-lib bug) | [docs/audio_ucm_einbindung.md](docs/audio_ucm_einbindung.md) |
 | Channel mapping, measurement tool `ff802-chanmap` (T2) | [docs/audio_t2_plan.md](docs/audio_t2_plan.md) |
+| Results of T2 (original logs, evaluation) | [docs/audio_t2_results/](docs/audio_t2_results/README.md) |
 | PipeWire, WirePlumber, Plasma (T3) | [docs/audio_t3.md](docs/audio_t3.md) |
 | Profile binding on every USB port | [docs/audio_t3_usb_port.md](docs/audio_t3_usb_port.md) |
 | Packages, versions, installation status | [docs/packages.md](docs/packages.md) |

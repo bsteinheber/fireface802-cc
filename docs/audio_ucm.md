@@ -4,15 +4,18 @@
 > installiert (UCM-Dateien seit 0.1.0 unverändert).**
 > **T1 ist bestanden** ([Lauf 2 am 2026-11-17](#t1-lauf-2-am-2026-11-17):
 > 29/29 Prüfungen, Rückbau nachgewiesen). alsa-lib findet und wertet das
-> Profil mit der echten Karte aus, wenn es geladen wird. **T2 und die
-> Funktionstests von T3** sind laut Rückmeldung vom 2026-11-17
-> erfolgreich: sechs Stereo-Ausgänge und ein Stereo-Eingang unter Kubuntu,
-> Analog 3/4, Kopfhörer 9/10 und 11/12 mit realer Wiedergabe geprüft. Die
-> Messergebnisse von T2 liegen nicht im Repository; die Markierung
-> `FF802-CHANNEL-MAP: UNVERIFIED` in den Profildateien ist deshalb noch
-> nicht umgestellt (siehe [audio_t2_plan.md](audio_t2_plan.md)). Die
-> produktive Einbindung (Variante A1, Paket) beschreibt
-> [audio_ucm_einbindung.md](audio_ucm_einbindung.md).
+> Profil mit der echten Karte aus, wenn es geladen wird.
+> **T2** (Messung der Kanalzuordnung, 2026-11-17) hat **nur Analog Out 1
+> und 2** nachgewiesen; an Out 3, 5 und 7 wurde kein Signal erkannt, Out 4
+> wurde abgebrochen, der Rest nicht gemessen. Das ist kein Nachweis eines
+> Fehlers ([audio_t2_results/](audio_t2_results/README.md)). Die
+> Markierung `FF802-CHANNEL-MAP: UNVERIFIED` in den Profildateien bleibt
+> deshalb bestehen.
+> Unabhängig davon sind die **Funktionstests von T3** erfolgreich: sechs
+> Stereo-Ausgänge und ein Stereo-Eingang unter Kubuntu, Analog 3/4,
+> Kopfhörer 9/10 und 11/12 mit realer Wiedergabe gehört (ein Hörtest über
+> PipeWire, keine Kanalmessung). Die produktive Einbindung (Variante A1,
+> Paket) beschreibt [audio_ucm_einbindung.md](audio_ucm_einbindung.md).
 >
 > Die Abschnitte „Risiken vor T2 und T3“ und die Hinweise „unbestätigt“
 > in den Tabellen geben den Planungsstand vor diesen Tests wieder.
@@ -167,8 +170,8 @@ alsa-ucm-conf 1.2.15.3, alsa-lib 1.2.15.3, PipeWire 1.6.2, WirePlumber 0.5.13.
 | UCM-Auswertung mit echter Karte | Host, T1 | ✓ **bestanden** in Lauf 2 am 2026-11-17 (29/29). Lauf 1 war wegen des alsa-lib-Fehlers nicht bestanden. In beiden Läufen ist der Rückbau nachgewiesen. |
 | `deb_package` | Container | ✓ bestanden. 49 Prüfungen: reproduzierbarer Bau, genauer Paketinhalt, keine Überschneidung mit dem Ubuntu-Baum; Installation in isolierter Wurzel mit Platzhalter-Paketen; Zuordnung und alle Verweigerungen; der installierte Baum liefert mit der echten alsa-lib die Ausgabe von T1-Lauf 2; Upgrade, Entfernung, Purge, Aufräumen ohne Bind-Werkzeug. |
 | `ff802-chanmap` (12 Tests) | Container | ✓ bestanden. Simulation (20 Szenarien), Signal und Wächter, Kartenerkennung, Reservierung, Auswertung, ALSA-Backend am `null`-Plugin, Kommandozeile, Quelltext- und Symbolprüfung; siehe [audio_t2_plan.md](audio_t2_plan.md) |
-| physische Kanalzuordnung | Host, T2 | Werkzeug fertig ([audio_t2_plan.md](audio_t2_plan.md)), nicht freigegeben |
-| Geräte in PipeWire/KDE, Prioritäten, Lautstärken | Host, T3 | ausstehend |
+| physische Kanalzuordnung | Host, T2 | ausgeführt am 2026-11-17: nur Analog Out 1 und 2 nachgewiesen, übrige Ausgänge offen ([audio_t2_results/](audio_t2_results/README.md)) |
+| Geräte in PipeWire/KDE, Prioritäten, Lautstärken | Host, T3 | funktional erfolgreich, Portwechsel `verify-03` bestanden ([audio_t3.md](audio_t3.md), [audio_t3_usb_port.md](audio_t3_usb_port.md)) |
 
 **Verpflichtende ALSA-Tests im Dev-Container:** CTest zählt einen
 übersprungenen Test nicht als Fehler und meldet trotzdem „100% tests
@@ -413,6 +416,10 @@ angeschlossen, der Pegel ist im Code auf höchstens −40 dBFS begrenzt, und
 die Karte wird über die Geräte-Reservierung von PipeWire freigegeben, ohne
 Profilwechsel und ohne geänderte Konfiguration. Planung, Schutzmaßnahmen und
 offene Entscheidungen: [audio_t2_plan.md](audio_t2_plan.md).
+
+**Ergebnis (2026-11-17):** nachgewiesen sind nur Wiedergabe-Index 0 →
+Analog Out 1 und Index 1 → Analog Out 2 (an Line In 1). Originalprotokolle
+und Grenzen der Aussagekraft: [audio_t2_results/](audio_t2_results/README.md).
 
 Die Nummerierung wurde am 2026-11-17 getauscht. Der frühere „T3,
 Kanalzuordnung“ ist jetzt **T2**, der frühere „T2, Sitzungstest“ ist jetzt

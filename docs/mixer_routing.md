@@ -51,10 +51,17 @@ Gemeldet vom Anwender, aus den Hardwaretests vom 2026-11-17 bis
    funktioniert, nachdem die **Software-Playback-Fader in TotalMix FX**
    korrigiert worden waren. Dazwischen lief das Gerät wieder unter
    Windows.
-7. Analog 3/4, Phones 9/10 und Phones 11/12 wurden unter Kubuntu mit
-   realer Wiedergabe erfolgreich getestet; die zuvor stummen
-   Kopfhörerausgänge nach der Korrektur der Software-Playback-Fader in
-   TotalMix FX.
+7. In **T3** wurden Analog 3/4, Phones 9/10 und Phones 11/12 unter
+   Kubuntu mit realer Wiedergabe über PipeWire erfolgreich gehört; die
+   zuvor stummen Kopfhörerausgänge nach der Korrektur der
+   Software-Playback-Fader in TotalMix FX. Das ist ein Hörtest, keine
+   Messung des Kanalindex.
+8. In der Messung **T2** (2026-11-17, Kabelschleife auf Line In 1) kam
+   Wiedergabe-Index 0 an
+   Analog Out 1 und Index 1 an Analog Out 2 an. An Out 3, 5 und 7 wurde
+   kein Signal erkannt, Out 4 wurde abgebrochen
+   ([audio_t2_results/](audio_t2_results/README.md)). Der Zustand des
+   internen Mixers wurde dabei nicht erfasst.
 
 ## Angaben im RME-Handbuch (Fireface 802 User's Guide)
 
@@ -133,9 +140,11 @@ Ursache (widerspricht Beobachtung 2).
 2. Übersteht ein im CC-Modus gesetzter Mixerzustand (z. B. mit oscmix)
    das Aus- und Einschalten des Geräts?
 3. Wie werden die 22 CC-Kanäle auf die Software-Playback-Kanäle
-   abgebildet? Für 1/2, 3/4, 9/10 und 11/12 passt die Zuordnung des
-   Profils zu den Beobachtungen; für die übrigen Paare ist sie nicht
-   einzeln dokumentiert (siehe [audio_t2_plan.md](audio_t2_plan.md)).
+   abgebildet? Gemessen (T2) ist nur Analog 1/2. Für 3/4, 9/10 und 11/12
+   passt die Zuordnung des Profils zum Hörtest in T3; für die übrigen
+   Paare gibt es weder Messung noch Hörtest
+   ([audio_t2_results/](audio_t2_results/README.md)). Ob die fehlenden
+   Signale in T2 am Mixer-Routing lagen, ist offen.
 4. Lässt sich das Routing zuverlässig und dauerhaft von Linux aus
    einrichten? Ein Werkzeug dafür enthält dieses Projekt nicht.
 

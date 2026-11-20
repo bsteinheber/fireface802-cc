@@ -23,7 +23,7 @@ T3 Integration in PipeWire/WirePlumber/Plasma, T4 USB-Modusverwaltung.
 | 2a | Diagnoseprogramm `ff802-detect`: lesende Geräteerkennung | abgeschlossen, auf dem Host getestet |
 | 2b | Umschaltprogramm `ff802-cc` mit Diagnosemodus | abgeschlossen; `enable` mit Port-Reset und `disable` am 2026-11-19 am Gerät erfolgreich getestet; Paket `ff802-cc` **0.4.0 auf dem Host installiert** (gebaut aus Commit `e12a1d0`, siehe [packages.md](packages.md#installationsstand)) |
 | 3 | ALSA-UCM-Profil mit sechs Stereo-Ausgängen für den CC-Modus, Debian-Paket `ff802-ucm-profile` (T1, T3) | T1 bestanden, T3 funktional erfolgreich getestet (sechs Stereo-Ausgänge, ein Stereo-Eingang; Analog 3/4, Kopfhörer 9/10 und 11/12 mit realer Wiedergabe); Version **0.3.0 auf dem Host installiert**, automatischer USB-Portwechsel erfolgreich getestet (2026-11-18, [audio_t3_usb_port.md](audio_t3_usb_port.md)) |
-| 4 | Messwerkzeug `ff802-chanmap` für die Kanalzuordnung (Hardwaretest T2) | T2 laut Rückmeldung vom 2026-11-17 erfolgreich; die Messergebnisse liegen nicht im Repository, die Markierung `FF802-CHANNEL-MAP: UNVERIFIED` im Profil ist noch nicht umgestellt |
+| 4 | Messwerkzeug `ff802-chanmap` für die Kanalzuordnung (Hardwaretest T2) | Werkzeug fertig; T2 am 2026-11-17 ausgeführt, **nur Analog Out 1 und 2 nachgewiesen** (Out 3, 5, 7 ohne erkanntes Signal, Out 4 abgebrochen, Rest nicht gemessen; kein Nachweis eines Fehlers). Protokolle und Auswertung: [audio_t2_results/](audio_t2_results/README.md). Die Markierung `FF802-CHANNEL-MAP: UNVERIFIED` im Profil bleibt |
 | T4 | Automatischer Wechsel in den CC-Modus beim Anschließen/Systemstart, Debian-Paket `ff802-cc-auto`; Untersuchung `ff802-cc disable` | Version 0.1.0 auf dem Host installiert und aktiviert, automatische Umschaltung erfolgreich getestet; ob inzwischen 0.1.1 (nur Dokumentation, Neubau) installiert ist, ist nicht bestätigt; `disable` ist Teil von `ff802-cc` |
 
 Seit Version 0.4.1 (Tag `v0.4.1`) gibt es Pakete `ff802-cc` 0.4.1,
@@ -231,9 +231,11 @@ Vorgesehen:
 
 ```
 Status: the profile is evaluated correctly by alsa-lib with the real card
-(host test T1). Analog outputs 1 and 2 are physically confirmed (hardware
-test T2); Analog 3/4 and Headphones 9/10 and 11/12 were tested with real
-playback. Analog 5/6, 7/8 and the input are not individually documented.
+(host test T1). The channel measurement (hardware test T2) confirmed
+Analog outputs 1 and 2 and Line In 1; the other outputs were not
+confirmed by it. Independently, Analog 3/4 and Headphones 9/10 and 11/12
+were heard with real playback through PipeWire (T3). Analog 5/6, 7/8 and
+Line In 2 are not demonstrated.
 Whether a channel is audible at a socket also depends on the routing
 (faders) in the internal mixer of the unit, which this package does not
 set.

@@ -1,0 +1,12 @@
+ff802-chanmap-result 1
+position	out4
+input	1
+card	F80224047128
+status	6	aborted by signal
+detail	abort requested at step 11
+steps	11
+max_output_dbfs	-40.09
+max_input_dbfs	-60.19
+mixer_checked	0
+# hit play capture level_dbfs snr_db latency_ms polarity
+end

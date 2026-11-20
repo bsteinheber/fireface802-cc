@@ -1,11 +1,21 @@
 # Hardwaretest T2: Kanalzuordnung mit `ff802-chanmap`
 
-> **Stand:** Werkzeug implementiert und im Container geprüft. **T2 wurde
-> laut Rückmeldung vom 2026-11-17 erfolgreich ausgeführt.** Die
-> Messergebnisse sind nicht im Repository dokumentiert, und die
-> Markierung `FF802-CHANNEL-MAP: UNVERIFIED` im Profil ist noch nicht auf
-> `VERIFIED` umgestellt. Der folgende Plan beschreibt den Test, wie er vor
-> der Ausführung festgelegt wurde.
+> **Stand:** Werkzeug implementiert und im Container geprüft. T2 wurde am
+> 2026-11-17 teilweise ausgeführt und hat **nur Analog Out 1 und 2
+> nachgewiesen** (Index 0 → Out 1, Index 1 → Out 2, an Line In 1). An
+> Out 3, 5 und 7 wurde kein Signal erkannt, die Messung an Out 4 wurde
+> abgebrochen; Out 6, Out 8, `hp1`, `hp2` und Line In 2 wurden nicht
+> gemessen, `report` wurde nicht ausgeführt. Fehlende Signale sind kein
+> Nachweis eines Fehlers im Profil oder unter Linux; eine mögliche Ursache
+> ist das Routing im internen Mixer ([mixer_routing.md](mixer_routing.md)).
+> Originalprotokolle und Auswertung:
+> [audio_t2_results/](audio_t2_results/README.md). Die Markierung
+> `FF802-CHANNEL-MAP: UNVERIFIED` bleibt bestehen. Der folgende Plan
+> beschreibt den Test, wie er vor der Ausführung festgelegt wurde.
+>
+> Unabhängig von T2 wurden in T3 Analog 3/4, Kopfhörer 9/10 und 11/12
+> mit realer Wiedergabe über PipeWire gehört
+> ([audio_t3.md](audio_t3.md)); das ersetzt die Messung nicht.
 
 ## Ziel
 
