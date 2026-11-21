@@ -3,19 +3,23 @@
  * started only by ff802-cc-auto@.service (T4).
  *
  *   ff802-cc-autoswitch --service <kernel name>:<busnum>:<devnum>
- *   ff802-cc-autoswitch --status
+ *   ff802-cc-autoswitch --status | --mixer-status
  *   ff802-cc-autoswitch --help | --version
  *
  * --service refuses to run unless started by systemd (INVOCATION_ID) as
  * root; the automation must be on (ff802-cc-auto on). It is installed in
  * /usr/libexec, not in PATH. For manual use there is ff802-cc enable
- * with its interactive confirmation.
+ * with its interactive confirmation. In class-compliant mode it also runs
+ * the mixer initialisation if "ff802-cc-auto mixer-init on" (independent
+ * of the automation mode).
  *
- * --status is read only: sysfs, state and run files. No USB access.
+ * --status and --mixer-status are read only: sysfs, state and run
+ * files. No USB or ALSA access.
  *
- * Built twice from this file: the installed program (libusb backend) and,
- * with FF802_AUTO_SIM, a test program with a simulated backend that does
- * not link libusb and works only below $FF802_AUTO_ROOT.
+ * Built twice from this file: the installed program (libusb backend, ALSA
+ * sequencer backend) and, with FF802_AUTO_SIM, a test program with
+ * simulated backends that links neither libusb nor libasound and works
+ * only below $FF802_AUTO_ROOT.
  */
 #define _POSIX_C_SOURCE 200809L
 
@@ -29,13 +33,38 @@
 #include "ff802/auto_switch.h"
 #include "ff802/auto_sysfs.h"
 
+#ifndef FF802_HAVE_MIXER_SEQ
+#define FF802_HAVE_MIXER_SEQ 0
+#endif
+
 #ifdef FF802_AUTO_SIM
+#include "sim_midi.h"
 #include "sim_usb.h"
 #define WRITES_ENABLED() 1
+static int mixer_writes_enabled(void)
+{
+    const char *v = getenv("FF802_SIM_MIXER_WRITE");
+    return v == NULL || strcmp(v, "0") != 0;
+}
 #else
 #include "ff802/usb_comm.h"
 #define WRITES_ENABLED() ff802_usb_comm_write_enabled()
+#if FF802_HAVE_MIXER_SEQ
+#include "ff802/midi_seq_alsa.h"
+static int mixer_writes_enabled(void) { return ff802_midi_seq_write_enabled(); }
+#else
+static int mixer_writes_enabled(void) { return 0; }
 #endif
+#endif
+
+static const char *mixer_backend_str(void)
+{
+#if !defined(FF802_AUTO_SIM) && !FF802_HAVE_MIXER_SEQ
+    return "not available (built without alsa-lib)";
+#else
+    return mixer_writes_enabled() ? "enabled" : "disabled";
+#endif
+}
 
 #ifndef FF802_VERSION
 #define FF802_VERSION "unknown"
@@ -45,22 +74,27 @@ static void usage(FILE *out)
 {
     fprintf(out,
         "Usage: ff802-cc-autoswitch --service <kernel name>:<busnum>:<devnum>\n"
-        "       ff802-cc-autoswitch --status\n"
+        "       ff802-cc-autoswitch --status | --mixer-status\n"
         "       ff802-cc-autoswitch --help | --version\n"
         "\n"
         "Internal program of ff802-cc-auto (T4), started by\n"
         "ff802-cc-auto@.service for one USB connection of an original\n"
         "RME Fireface 802. Use 'ff802-cc-auto status' instead.\n"
         "\n"
-        "  --service  handle one connection: if the automation is on and the\n"
-        "             device is a Fireface 802 in proprietary mode, send the\n"
-        "             class-compliant enable command once. Only when started\n"
-        "             by systemd as root.\n"
-        "  --status   read-only report (sysfs, state); no USB access.\n"
+        "  --service       handle one connection: if the automation is on and\n"
+        "                  the device is a Fireface 802 in proprietary mode,\n"
+        "                  send the class-compliant enable command once; in\n"
+        "                  class-compliant mode, initialise the mixer if\n"
+        "                  'ff802-cc-auto mixer-init on'. Only when started by\n"
+        "                  systemd as root.\n"
+        "  --status        read-only report (sysfs, state); no USB access.\n"
+        "  --mixer-status  read-only report of the mixer initialisation.\n"
         "\n"
-        "Exit status (--service): 0 off/handled/CC mode/sent, 2 usage or not\n"
-        "started by systemd, 3 nothing sent (refused or failed before the\n"
-        "write), 4 write failed (device state unknown).\n");
+        "Exit status (--service): 0 off/handled/CC mode/sent/mixer done,\n"
+        "2 usage or not started by systemd, 3 nothing sent (refused or failed\n"
+        "before the write; also a mixer initialisation that sent nothing),\n"
+        "4 write failed (device state unknown; also a mixer initialisation\n"
+        "that stopped while sending).\n");
 }
 
 static int get_paths(ff802_auto_paths *p)
@@ -164,7 +198,11 @@ static int run_status(const ff802_auto_paths *p)
                                            "(reconnect for a new attempt)" :
                    "would send the CC enable command on the next connection event");
         else if (id == FF802_ID_CLASS_COMPLIANT)
-            printf("  automation: nothing to do (class-compliant mode)\n");
+            printf("  automation: nothing to do (class-compliant mode)\n"
+                   "  mixer init: %s\n",
+                   ff802_auto_read_mixer_mode(p) == FF802_AUTO_MODE_ON
+                       ? "on, sets the 24 registers on the next connection event"
+                       : "off, the mixer is not changed");
         else
             printf("  automation: refused (not identified as an original "
                    "Fireface 802)\n");
@@ -175,6 +213,26 @@ static int run_status(const ff802_auto_paths *p)
     print_file(p->run_dir, "pending", "pending switch (reconnect needed)");
     print_file(p->run_dir, "last-result", "last result");
     print_file(p->run_dir, "event", "last notification event");
+    printf("mixer init: %s (%s/mixer-init)\n",
+           ff802_auto_mode_str(ff802_auto_read_mixer_mode(p)), p->state_dir);
+    printf("mixer writes in this build: %s\n", mixer_backend_str());
+    print_file(p->run_dir, "mixer-result", "last mixer initialisation");
+    return 0;
+}
+
+static int run_mixer_status(const ff802_auto_paths *p)
+{
+    ff802_auto_mode m = ff802_auto_read_mixer_mode(p);
+    printf("mixer init: %s (%s/mixer-init)\n", ff802_auto_mode_str(m), p->state_dir);
+    printf("mixer writes in this build: %s\n", mixer_backend_str());
+    if (m == FF802_AUTO_MODE_ON)
+        printf("on every connection in class-compliant mode: Playback 1..12 -> "
+               "Output 1..12 and the volumes of Output 1..12 (Analog 1-8, Phones "
+               "9-12) are set to 0 dB\n");
+    else
+        printf("the mixer of the Fireface 802 is not changed\n");
+    print_file(p->run_dir, "mixer-result", "last mixer initialisation");
+    print_file(p->run_dir, "mixer-event", "last mixer notification event");
     return 0;
 }
 
@@ -187,8 +245,8 @@ int main(int argc, char **argv)
         return 0;
     }
     if (argc == 2 && (strcmp(argv[1], "--version") == 0 || strcmp(argv[1], "-V") == 0)) {
-        printf("ff802-cc-autoswitch %s (USB writes %s%s)\n", FF802_VERSION,
-               WRITES_ENABLED() ? "enabled" : "disabled",
+        printf("ff802-cc-autoswitch %s (USB writes %s, mixer writes %s%s)\n", FF802_VERSION,
+               WRITES_ENABLED() ? "enabled" : "disabled", mixer_backend_str(),
 #ifdef FF802_AUTO_SIM
                ", SIMULATED backend"
 #else
@@ -201,6 +259,11 @@ int main(int argc, char **argv)
         if (get_paths(&paths) != 0)
             return FF802_AUTO_EXIT_USAGE;
         return run_status(&paths);
+    }
+    if (argc == 2 && strcmp(argv[1], "--mixer-status") == 0) {
+        if (get_paths(&paths) != 0)
+            return FF802_AUTO_EXIT_USAGE;
+        return run_mixer_status(&paths);
     }
     if (argc != 3 || strcmp(argv[1], "--service") != 0) {
         usage(stderr);
@@ -235,7 +298,17 @@ int main(int argc, char **argv)
 
     ff802_auto_backend_factory fac = { .ctx = &paths, .open = fac_open,
                                        .close = fac_close };
+#if defined(FF802_AUTO_SIM)
+    ff802_midi_factory midi;
+    ff802_mixer_options mopt;
+    sim_midi_setup(&paths, &midi, &mopt);
+    fac.midi = &midi;
+    fac.mixer_opt = &mopt;
+#elif FF802_HAVE_MIXER_SEQ
+    ff802_midi_factory midi = ff802_midi_seq_factory();
+    fac.midi = &midi;
+#endif
     ff802_auto_result res;
-    ff802_auto_outcome o = ff802_auto_handle(&paths, &ev, &fac, stderr, &res);
-    return ff802_auto_exit_code(o);
+    (void)ff802_auto_handle(&paths, &ev, &fac, stderr, &res);
+    return ff802_auto_result_exit_code(&res);
 }

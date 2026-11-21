@@ -45,7 +45,9 @@ STATE=$R/var/lib/ff802-cc-auto
 unset FF802_SIM_INIT_ERR FF802_SIM_LAYOUT FF802_SIM_OPEN_ERR FF802_SIM_KDRV \
       FF802_SIM_CLAIM_ERR FF802_SIM_WRITE_ERR FF802_SIM_WRITE_SHORT \
       FF802_SIM_REPLUG_ON_OPEN FF802_SIM_UNPLUG_ON_OPEN FF802_SIM_UNPLUG_ON_WRITE \
-      FF802_SIM_WRITE_DELAY_MS INVOCATION_ID
+      FF802_SIM_WRITE_DELAY_MS INVOCATION_ID \
+      FF802_SIM_SEQ_OPEN_ERR FF802_SIM_SEQ_LIST_ERR FF802_SIM_SEQ_CONNECT_ERR \
+      FF802_SIM_SEQ_SEND_ERR_AT FF802_SIM_MIXER_WRITE FF802_SIM_MIXER_TIMEOUT_MS
 
 # --- simulated host -------------------------------------------------------------
 reset_root() {
@@ -212,6 +214,141 @@ ok "18: stale and current event at the same time: only the current connection is
     '[ "$(writes)" = 1 ] && grep -q "bus=3 addr=19" "$R/usb.log" && [ "$(cat "$T/rc.old")" = 3 ] &&
      [ "$(cat "$T/rc.new")" = 0 ]'
 
+# --- mixer initialisation in CC mode ------------------------------------------------
+MIDI=$R/midi.log
+mixer() { echo "$1" > "$STATE/mixer-init"; }
+sndcard() { mkdir -p "$DEVS/$PORT/$PORT:1.0/sound/card1/midiC1D0"; }
+seqports() { # the listing of the unit in phase 2a; client number as argument
+    cat > "$R/seq-ports" <<EOF
+0 0 kernel -1 - Timer
+14 0 kernel -1 w Midi Through Port-0
+${1:-20} 0 kernel 1 w Fireface 802 (24047128) Port 1
+${1:-20} 1 kernel 1 w Fireface 802 (24047128) Port 2
+144 0 user -1 w input
+EOF
+}
+ccdev() { cc "$1"; sndcard; seqports "${2:-20}"; }
+sysex() { n=$(grep -c '^sysex F0' "$MIDI" 2>/dev/null); echo "${n:-0}"; }
+midi_calls() { [ -f "$MIDI" ] && wc -l < "$MIDI" || echo 0; }
+mres() { sed -n "s/^$1=//p" "$RUN/mixer-result" 2>/dev/null; }
+mkind() { sed -n 's/^kind=//p' "$RUN/mixer-event" 2>/dev/null; }
+nth_sysex() { grep '^sysex F0' "$MIDI" | sed -n "$1p"; }
+
+reset_root; ccdev 19
+rc=$(event)
+ok "M1: mixer init off by default: CC event opens no MIDI, writes no mixer result" \
+    '[ "$rc" = 0 ] && [ "$(midi_calls)" = 0 ] && [ ! -e "$RUN/mixer-result" ] &&
+     [ ! -e "$RUN/mixer-event" ] && [ "$(outcome)" = cc-active ]'
+
+reset_root; mode off; mixer on; ccdev 19
+rc=$(event)
+ok "M2: mixer init on, automation off: 24 SysEx messages to port 20:1, exit 0, no USB access" \
+    '[ "$rc" = 0 ] && [ "$(sysex)" = 24 ] && [ "$(usb_calls)" = 0 ] &&
+     grep -qx "seq connect 20:1" "$MIDI" && [ "$(mres outcome)" = done ] &&
+     [ "$(mres written)" = 24/24 ] && [ "$(mres card)" = 1 ] &&
+     [ "$(mres midi_port)" = "20:1 Fireface 802 (24047128) Port 2" ] && [ ! -e "$RUN/mixer-event" ]'
+ok "M2: order: routings 1..12 first (Playback 1 -> Analog 1 first), output volumes last" \
+    '[ "$(nth_sysex 1)" = "sysex F0 00 20 0D 10 00 00 20 02 01 0C F7" ] &&
+     [ "$(nth_sysex 2)" = "sysex F0 00 20 0D 10 00 00 20 06 03 0C F7" ] &&
+     [ "$(nth_sysex 9)" = "sysex F0 00 20 0D 10 00 00 20 22 11 0C F7" ] &&
+     [ "$(nth_sysex 21)" = "sysex F0 00 20 0D 10 00 00 00 00 30 02 F7" ] &&
+     [ "$(tr "\n" ";" < "$MIDI" | sed "s/sysex F0[^;]*;//g")" = "seq open;seq list;seq connect 20:1;seq close;" ]'
+ok "M2: one journal line per register, last-result stays cc-active" \
+    '[ "$(grep -c "^mixer: set 0x" "$T/journal.txt")" = 24 ] &&
+     grep -q "^mixer: set 0x4228 = 0x9000 (Playback 9 -> Phones 9, 0 dB) \[9/24\]$" "$T/journal.txt" &&
+     grep -q "^mixer: set 0x2900 = 0x0000 (Output Phones 12 volume, 0 dB) \[24/24\]$" "$T/journal.txt" &&
+     [ "$(outcome)" = cc-active ] && grep -q "mixer initialisation: done" "$RUN/last-result"'
+
+rc=$(event)
+ok "M3: a repeated add event of the same connection initialises again (same values), exit 0" \
+    '[ "$rc" = 0 ] && [ "$(sysex)" = 48 ] && [ "$(nth_sysex 25)" = "$(nth_sysex 1)" ]'
+unplug; ccdev 20 24
+rc=$(event)
+ok "M3: new connection, client number changed (24): found by card, initialised" \
+    '[ "$rc" = 0 ] && [ "$(sysex)" = 72 ] && grep -qx "seq connect 24:1" "$MIDI"'
+unplug; ccdev 19
+rc=$(event)
+ok "M4: reused device number (19 again): the initialisation is never suppressed" \
+    '[ "$rc" = 0 ] && [ "$(sysex)" = 96 ] && [ "$(mres devnum)" = 19 ] && [ "$(mres outcome)" = done ]'
+
+reset_root; mode on; mixer on; prop 18
+rc=$(event)
+ok "M5: proprietary mode: only the switch, no MIDI access" \
+    '[ "$rc" = 0 ] && [ "$(writes)" = 1 ] && [ "$(midi_calls)" = 0 ] && [ ! -e "$RUN/mixer-result" ]'
+unplug; ccdev 19
+rc=$(event)
+ok "M5: after the switch, reconnected in CC mode: cc-active event and mixer done, kept apart" \
+    '[ "$rc" = 0 ] && [ "$(kind)" = cc-active ] && [ "$(sysex)" = 24 ] && [ ! -e "$RUN/mixer-event" ] &&
+     [ "$(mres outcome)" = done ]'
+
+reset_root; mixer on; cc 19
+rc=$(event)
+ok "M6: no sound card within the timeout: exit 3, no-port, sequencer never opened, mixer-failed event" \
+    '[ "$rc" = 3 ] && [ "$(midi_calls)" = 0 ] && [ "$(mres outcome)" = no-port ] &&
+     [ "$(mkind)" = mixer-failed ] && grep -q "^detail=.*no sound card with MIDI device.*(0 of 24 registers)" "$RUN/mixer-event" &&
+     [ ! -e "$RUN/event" ] && [ "$(outcome)" = cc-active ]'
+sndcard
+rc=$(event)
+ok "M7: sound card but no sequencer port: exit 3, no-port, nothing sent" \
+    '[ "$rc" = 3 ] && [ "$(sysex)" = 0 ] && ! grep -q "^seq connect" "$MIDI" &&
+     [ "$(mres outcome)" = no-port ] && grep -q "seq close" "$MIDI"'
+
+for f in FF802_SIM_SEQ_OPEN_ERR=1 FF802_SIM_SEQ_LIST_ERR=1 FF802_SIM_SEQ_CONNECT_ERR=busy; do
+    reset_root; mixer on; ccdev 19
+    rc=$(event $f)
+    ok "M8: $f: exit 3, not-sent, no SysEx, mixer-failed event" \
+        '[ "$rc" = 3 ] && [ "$(sysex)" = 0 ] && [ "$(mres outcome)" = not-sent ] && [ "$(mkind)" = mixer-failed ]'
+done
+
+reset_root; mixer on; ccdev 19
+rc=$(event FF802_SIM_SEQ_SEND_ERR_AT=7)
+ok "M9: sending fails at register 7: exit 4, incomplete, 6 sent, nothing retried" \
+    '[ "$rc" = 4 ] && [ "$(sysex)" = 6 ] && [ "$(mres outcome)" = incomplete ] && [ "$(mres written)" = 6/24 ] &&
+     [ "$(grep -c "^sysex FAILED" "$MIDI")" = 1 ] && grep -q "(6 of 24 registers)" "$RUN/mixer-event" &&
+     grep -q "seq close" "$MIDI"'
+
+reset_root; mixer on; ccdev 19
+rc=$(event FF802_SIM_MIXER_WRITE=0)
+ok "M10: build without mixer writes: port found and reported, no connect, no SysEx, exit 3" \
+    '[ "$rc" = 3 ] && [ "$(sysex)" = 0 ] && ! grep -q "^seq connect" "$MIDI" &&
+     [ "$(mres outcome)" = disabled-build ] && [ "$(mres midi_port)" = "20:1 Fireface 802 (24047128) Port 2" ] &&
+     [ "$(mkind)" = mixer-failed ]'
+
+reset_root; ccdev 19
+sed -i "s/24047128) Port 2/24047128) Port 1/" "$R/seq-ports"; mixer on
+rc=$(event)
+ok "M11: port 1 does not carry the name 'Port 2': refused, nothing sent" \
+    '[ "$rc" = 3 ] && [ "$(sysex)" = 0 ] && [ "$(mres outcome)" = refused ]'
+
+for c in yes ON "on extra" ""; do
+    reset_root; ccdev 19; printf '%s\n' "$c" > "$STATE/mixer-init"
+    rc=$(event)
+    ok "M12: mixer-init '$c' counts as off" '[ "$rc" = 0 ] && [ "$(midi_calls)" = 0 ]'
+done
+
+reset_root; mixer on; ccdev 19
+inst=$(instance $PORT)
+pids=""
+for i in 1 2 3 4 5; do
+    (service "$inst" > "$T/mrc.$i") &
+    pids="$pids $!"
+done
+for p in $pids; do wait "$p"; done
+ok "M13: five simultaneous events: serialised, each a complete block of 24, all exit 0" \
+    '[ "$(sysex)" = 120 ] && [ "$(cat "$T"/mrc.* | sort -u)" = 0 ] &&
+     [ "$(tr "\n" ";" < "$MIDI" | sed -e "s/sysex F0[^;]*;/S/g" | sed "s/seq open;seq list;seq connect 20:1;SSSSSSSSSSSSSSSSSSSSSSSSseq close;//g")" = "" ]'
+
+reset_root; mixer on; ccdev 19
+before=$(cd "$R" && find . | sort)
+FF802_AUTO_ROOT=$R "$SIM" --status > "$T/mstatus.txt" 2>&1; rc1=$?
+FF802_AUTO_ROOT=$R "$SIM" --mixer-status > "$T/mstatus2.txt" 2>&1; rc2=$?
+ok "status and mixer-status are read only and report the mixer initialisation" \
+    '[ "$rc1" = 0 ] && [ "$rc2" = 0 ] && [ "$(cd "$R" && find . | sort)" = "$before" ] &&
+     [ "$(midi_calls)" = 0 ] && grep -q "^mixer init: on" "$T/mstatus.txt" &&
+     grep -q "sets the 24 registers on the next connection event" "$T/mstatus.txt" &&
+     grep -q "^mixer writes in this build: enabled" "$T/mstatus2.txt" &&
+     grep -q "are set to 0 dB" "$T/mstatus2.txt"'
+
 # --- guards against unintended use ------------------------------------------------
 reset_root; mode on; prop 18
 FF802_AUTO_ROOT=$R "$SIM" --service "$(instance $PORT)" > "$T/manual.txt" 2>&1
@@ -248,8 +385,8 @@ else
     echo "skip installed-program guard test (running as root)"
 fi
 "$REAL" --version > "$T/realv.txt" 2>&1
-ok "installed program of this build: --version reports the write gate, no simulation" \
-    'grep -Eq "^ff802-cc-autoswitch [0-9.]+ \(USB writes (enabled|disabled)\)$" "$T/realv.txt"'
+ok "installed program of this build: --version reports both write gates, no simulation" \
+    'grep -Eq "^ff802-cc-autoswitch [0-9.]+ \(USB writes (enabled|disabled), mixer writes (enabled|disabled|not available \(built without alsa-lib\))\)$" "$T/realv.txt"'
 
 echo "$checks checks, $fails failures"
 [ "$fails" -eq 0 ]

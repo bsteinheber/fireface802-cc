@@ -15,6 +15,12 @@
  * or switches back to proprietary mode. The USB backend is created only
  * when a write is actually going to be attempted, so the "automation
  * off", "already handled" and "CC mode" cases never initialise libusb.
+ *
+ * CC mode, in addition and independent of the automation mode: if
+ * "ff802-cc-auto mixer-init on", the mixer initialisation of
+ * mixer_run.h for this connection, on every "add" event (no USB access,
+ * only the ALSA sequencer). A failure is recorded in mixer-result and
+ * mixer-event; it never changes the outcome "cc-active" of the switch.
  */
 #ifndef FF802_AUTO_SWITCH_H
 #define FF802_AUTO_SWITCH_H
@@ -24,6 +30,8 @@
 #include "ff802/auto_state.h"
 #include "ff802/auto_sysfs.h"
 #include "ff802/cc_switch.h"
+#include "ff802/midi_backend.h"
+#include "ff802/mixer_run.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -42,11 +50,17 @@ typedef struct ff802_auto_event {
  */
 int ff802_auto_parse_instance(const char *s, ff802_auto_event *ev);
 
-/* Creates the USB backend only when it is needed. */
+/*
+ * Creates the USB backend only when it is needed. midi is the backend of
+ * the mixer initialisation (NULL: not available in this program);
+ * mixer_opt NULL: the defaults of mixer_run.h.
+ */
 typedef struct ff802_auto_backend_factory {
     void *ctx;
     ff802_usb_err (*open)(void *ctx, ff802_usb_backend *be);
     void (*close)(void *ctx, ff802_usb_backend *be);
+    const ff802_midi_factory  *midi;
+    const ff802_mixer_options *mixer_opt;
 } ff802_auto_backend_factory;
 
 typedef enum ff802_auto_outcome {
@@ -69,6 +83,9 @@ typedef struct ff802_auto_result {
     ff802_sw_result sw;
     long            event_seq;      /* 0 if no event was written */
     char            detail[192];
+    int             mixer_ran;      /* mixer-init on, initialisation attempted */
+    ff802_mixer_result mixer;       /* outcome FF802_MIXER_OFF if not run */
+    long            mixer_event_seq;
 } ff802_auto_result;
 
 ff802_auto_outcome ff802_auto_handle(const ff802_auto_paths *p,
@@ -88,6 +105,13 @@ enum {
 };
 
 int ff802_auto_exit_code(ff802_auto_outcome o);
+
+/*
+ * Exit code of a complete run: that of the outcome, except in CC mode
+ * with a failed mixer initialisation: 4 if it stopped while sending
+ * (incomplete), 3 if nothing was sent.
+ */
+int ff802_auto_result_exit_code(const ff802_auto_result *r);
 
 #ifdef __cplusplus
 }

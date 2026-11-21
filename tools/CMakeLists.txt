@@ -57,3 +57,15 @@ target_compile_definitions(ff802-cc-autoswitch PRIVATE
 set_target_properties(ff802-cc-autoswitch PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 ff802_set_warnings(ff802-cc-autoswitch)
+# Mixer initialisation in class-compliant mode: ALSA sequencer backend
+# (ff802_midi_alsa, subscribe/send only with FF802_ENABLE_MIXER_WRITE).
+# Without alsa-lib the program is built without it and reports the mixer
+# initialisation as not available; the Debian package requires it.
+if(TARGET ff802_midi_alsa)
+    target_link_libraries(ff802-cc-autoswitch PRIVATE ff802_midi_alsa)
+    target_compile_definitions(ff802-cc-autoswitch PRIVATE FF802_HAVE_MIXER_SEQ=1)
+    set_target_properties(ff802-cc-autoswitch PROPERTIES C_EXTENSIONS ON)
+else()
+    message(WARNING "alsa-lib not found: ff802-cc-autoswitch is built without "
+                    "the mixer initialisation")
+endif()

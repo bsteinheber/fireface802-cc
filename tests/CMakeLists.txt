@@ -172,7 +172,37 @@ if(FF802_HAVE_TOOLS)
                 "-DREQUIRED=libusb_open|libusb_kernel_driver_active"
                 -P ${CMAKE_CURRENT_SOURCE_DIR}/check_binary_symbols.cmake)
     endif()
+
+    # T4 program, mixer initialisation: only the ALSA sequencer, never
+    # rawmidi, control writes or PCM; subscribe and send only with
+    # FF802_ENABLE_MIXER_WRITE.
+    if(TARGET ff802_midi_alsa)
+        set(alsa_forbidden
+            "snd_rawmidi_open|snd_rawmidi_write|snd_ctl_open|snd_ctl_elem_write|snd_hctl_elem_write|snd_pcm_open|snd_seq_event_output|snd_seq_event_output_buffer|snd_mixer_open")
+        set(alsa_write
+            "snd_seq_create_simple_port|snd_seq_connect_to|snd_seq_event_output_direct")
+        if(FF802_ENABLE_MIXER_WRITE)
+            add_test(NAME autoswitch_mixer_symbols
+                COMMAND ${CMAKE_COMMAND} -DNM=${CMAKE_NM} -DBINARY=$<TARGET_FILE:ff802-cc-autoswitch>
+                    "-DFORBIDDEN=${alsa_forbidden}|snd_seq_subscribe_port|snd_seq_create_port"
+                    "-DREQUIRED=snd_seq_open|snd_seq_query_next_client|snd_seq_query_next_port|${alsa_write}"
+                    -P ${CMAKE_CURRENT_SOURCE_DIR}/check_binary_symbols.cmake)
+        else()
+            add_test(NAME autoswitch_mixer_symbols
+                COMMAND ${CMAKE_COMMAND} -DNM=${CMAKE_NM} -DBINARY=$<TARGET_FILE:ff802-cc-autoswitch>
+                    "-DFORBIDDEN=${alsa_forbidden}|${alsa_write}|snd_seq_subscribe_port|snd_seq_create_port|snd_seq_disconnect_to"
+                    "-DREQUIRED=snd_seq_open|snd_seq_query_next_client|snd_seq_query_next_port"
+                    -P ${CMAKE_CURRENT_SOURCE_DIR}/check_binary_symbols.cmake)
+        endif()
+    endif()
 endif()
+
+# Mixer initialisation, over all sources: ALSA sequencer calls only in
+# src/midi_seq_alsa.c, RME SysEx frames built only by the two protocol
+# modules, the register list only in src/mixer_init.c.
+add_test(NAME check_mixer_sources
+    COMMAND ${CMAKE_COMMAND} -DSOURCE_DIR=${PROJECT_SOURCE_DIR}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/check_mixer_sources.cmake)
 
 # Static checks of the ALSA UCM profile (no sound card needed).
 add_subdirectory(audio)

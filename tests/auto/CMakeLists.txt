@@ -42,7 +42,7 @@ add_test(NAME test_auto_switch COMMAND test_auto_switch)
 # Test build of ff802-cc-autoswitch: same main program, simulated backend,
 # no libusb; works only below $FF802_AUTO_ROOT. Never installed.
 add_executable(ff802-cc-autoswitch-sim
-    ${PROJECT_SOURCE_DIR}/tools/ff802_cc_autoswitch.c sim_usb.c)
+    ${PROJECT_SOURCE_DIR}/tools/ff802_cc_autoswitch.c sim_usb.c sim_midi.c)
 target_include_directories(ff802-cc-autoswitch-sim PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(ff802-cc-autoswitch-sim PRIVATE ff802_auto)
 target_compile_definitions(ff802-cc-autoswitch-sim PRIVATE
@@ -59,11 +59,11 @@ if(FF802_HAVE_TOOLS)
                 $<TARGET_FILE:ff802-cc-autoswitch>
                 ${CMAKE_CURRENT_BINARY_DIR}/flow-scratch)
 
-    # The simulation build must not contain any libusb call.
+    # The simulation build must not contain any libusb or ALSA call.
     add_test(NAME autoswitch_sim_no_libusb
         COMMAND ${CMAKE_COMMAND} -DNM=${CMAKE_NM}
             -DBINARY=$<TARGET_FILE:ff802-cc-autoswitch-sim>
-            "-DFORBIDDEN=libusb_init|libusb_exit|libusb_get_device_list|libusb_open|libusb_close|libusb_claim_interface|libusb_release_interface|libusb_bulk_transfer|libusb_kernel_driver_active|libusb_get_active_config_descriptor"
+            "-DFORBIDDEN=libusb_init|libusb_exit|libusb_get_device_list|libusb_open|libusb_close|libusb_claim_interface|libusb_release_interface|libusb_bulk_transfer|libusb_kernel_driver_active|libusb_get_active_config_descriptor|snd_seq_open|snd_seq_connect_to|snd_seq_event_output_direct|snd_rawmidi_open"
             "-DREQUIRED=flock"
             -P ${PROJECT_SOURCE_DIR}/tests/check_binary_symbols.cmake)
 endif()

@@ -44,12 +44,12 @@ static int join(char *dst, size_t size, const char *dir, const char *name)
     return (n < 0 || (size_t)n >= size) ? -1 : 0;
 }
 
-ff802_auto_mode ff802_auto_read_mode(const ff802_auto_paths *p)
+static ff802_auto_mode read_onoff(const ff802_auto_paths *p, const char *name)
 {
     char path[FF802_AUTO_PATH_MAX + 16u];
     char buf[16];
 
-    if (join(path, sizeof path, p->state_dir, "mode") != 0)
+    if (join(path, sizeof path, p->state_dir, name) != 0)
         return FF802_AUTO_MODE_INVALID;
     int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
     if (fd < 0)
@@ -64,6 +64,16 @@ ff802_auto_mode ff802_auto_read_mode(const ff802_auto_paths *p)
     if (strcmp(buf, "off") == 0 || strcmp(buf, "off\n") == 0)
         return FF802_AUTO_MODE_OFF;
     return FF802_AUTO_MODE_INVALID;
+}
+
+ff802_auto_mode ff802_auto_read_mode(const ff802_auto_paths *p)
+{
+    return read_onoff(p, "mode");
+}
+
+ff802_auto_mode ff802_auto_read_mixer_mode(const ff802_auto_paths *p)
+{
+    return read_onoff(p, "mixer-init");
 }
 
 const char *ff802_auto_mode_str(ff802_auto_mode m)
@@ -186,6 +196,7 @@ const char *ff802_auto_event_kind_str(ff802_auto_event_kind k)
     case FF802_EVENT_PREPARED:  return "prepared";
     case FF802_EVENT_CC_ACTIVE: return "cc-active";
     case FF802_EVENT_FAILED:    return "failed";
+    case FF802_EVENT_MIXER_FAILED: return "mixer-failed";
     }
     return "failed";
 }
@@ -212,9 +223,9 @@ static long read_seq(const char *run_dir)
     return v;
 }
 
-long ff802_auto_write_event(const ff802_auto_paths *p,
-                            ff802_auto_event_kind kind,
-                            const ff802_sysfs_dev *d, const char *detail)
+static long write_event_file(const ff802_auto_paths *p, const char *file,
+                             ff802_auto_event_kind kind,
+                             const ff802_sysfs_dev *d, const char *detail)
 {
     char clean[160];
     char buf[512];
@@ -231,9 +242,47 @@ long ff802_auto_write_event(const ff802_auto_paths *p,
                  "seq=%ld\nkind=%s\ntime=%lld\nport=%s\nbusnum=%u\ndevnum=%u\ndetail=%s\n",
                  seq, ff802_auto_event_kind_str(kind), (long long)time(NULL),
                  d->kernel_name, (unsigned)d->bus, (unsigned)d->devnum, clean);
-    if (n < 0 || (size_t)n >= sizeof buf || write_atomic(p->run_dir, "event", buf) != 0)
+    if (n < 0 || (size_t)n >= sizeof buf || write_atomic(p->run_dir, file, buf) != 0)
         return -1;
     return seq;
+}
+
+long ff802_auto_write_event(const ff802_auto_paths *p,
+                            ff802_auto_event_kind kind,
+                            const ff802_sysfs_dev *d, const char *detail)
+{
+    return write_event_file(p, "event", kind, d, detail);
+}
+
+long ff802_auto_write_mixer_event(const ff802_auto_paths *p,
+                                  const ff802_sysfs_dev *d, const char *detail)
+{
+    return write_event_file(p, "mixer-event", FF802_EVENT_MIXER_FAILED, d, detail);
+}
+
+int ff802_auto_write_mixer_result(const ff802_auto_paths *p,
+                                  const ff802_sysfs_dev *d, const char *outcome,
+                                  unsigned written, unsigned total, int card,
+                                  int client, int port, const char *port_name,
+                                  const char *detail)
+{
+    char clean[200];
+    char pname[80];
+    char oc[32];
+    char buf[640];
+
+    sanitize(clean, sizeof clean, detail);
+    sanitize(pname, sizeof pname, port_name);
+    sanitize(oc, sizeof oc, outcome);
+    int n = snprintf(buf, sizeof buf,
+                     "time=%lld\noutcome=%s\nport=%s\nbusnum=%u\ndevnum=%u\n"
+                     "written=%u/%u\ncard=%d\nmidi_port=%d:%d %s\ndetail=%s\n",
+                     (long long)time(NULL), oc, d->kernel_name, (unsigned)d->bus,
+                     (unsigned)d->devnum, written, total, card, client, port,
+                     pname, clean);
+    if (n < 0 || (size_t)n >= sizeof buf)
+        return -1;
+    return write_atomic(p->run_dir, "mixer-result", buf);
 }
 
 int ff802_auto_set_pending(const ff802_auto_paths *p, const ff802_sysfs_dev *d)

@@ -14,6 +14,22 @@
  *   <run_dir>/seq           sequence number of the last event
  *   <run_dir>/last-result   outcome of the last handled event
  *
+ * Mixer initialisation in class-compliant mode (independent of "mode"):
+ *
+ *   <state_dir>/mixer-init  "on" enables it. Missing, "off" or anything
+ *                           else: off. Written only by
+ *                           ff802-cc-auto mixer-init on|off.
+ *   <run_dir>/mixer-result  outcome of the last initialisation (time,
+ *                           connection, registers written, MIDI port)
+ *   <run_dir>/mixer-event   last failed initialisation, for the desktop
+ *                           notification (same format as "event", kind
+ *                           "mixer-failed", sequence number from "seq")
+ *
+ * There is no per-connection record for the mixer initialisation: it
+ * runs for every udev "add" event of the device in class-compliant mode
+ * (the values are absolute, a repetition writes the same values), so a
+ * reused USB device number can never suppress it.
+ *
  * All files are written atomically (temporary file + rename). The
  * notification side only reads them; nothing here talks to a desktop
  * session.
@@ -53,6 +69,9 @@ typedef enum ff802_auto_mode {
 ff802_auto_mode ff802_auto_read_mode(const ff802_auto_paths *p);
 const char *ff802_auto_mode_str(ff802_auto_mode m);
 
+/* <state_dir>/mixer-init, same rules as the mode file. */
+ff802_auto_mode ff802_auto_read_mixer_mode(const ff802_auto_paths *p);
+
 /*
  * Create run_dir (0755) and take the exclusive lock. Blocks until the
  * lock is free. Returns the lock fd, or -1.
@@ -72,7 +91,8 @@ int ff802_auto_claim_connection(const ff802_auto_paths *p,
 typedef enum ff802_auto_event_kind {
     FF802_EVENT_PREPARED = 0,   /* enable sent: reconnect needed */
     FF802_EVENT_CC_ACTIVE,      /* device came back in CC mode */
-    FF802_EVENT_FAILED          /* switch not possible / state unknown */
+    FF802_EVENT_FAILED,         /* switch not possible / state unknown */
+    FF802_EVENT_MIXER_FAILED    /* CC mode, mixer initialisation failed */
 } ff802_auto_event_kind;
 
 const char *ff802_auto_event_kind_str(ff802_auto_event_kind k);
@@ -85,6 +105,25 @@ const char *ff802_auto_event_kind_str(ff802_auto_event_kind k);
 long ff802_auto_write_event(const ff802_auto_paths *p,
                             ff802_auto_event_kind kind,
                             const ff802_sysfs_dev *d, const char *detail);
+
+/*
+ * <run_dir>/mixer-event with the next sequence number (shared with the
+ * event file): kind "mixer-failed", one line of detail. A separate file,
+ * so a failed initialisation never replaces the cc-active event of the
+ * same connection. Returns the sequence number (>= 1) or -1.
+ */
+long ff802_auto_write_mixer_event(const ff802_auto_paths *p,
+                                  const ff802_sysfs_dev *d, const char *detail);
+
+/*
+ * <run_dir>/mixer-result: time, outcome, port, busnum, devnum,
+ * written=<n>/24, card, midi_port, detail. Strings are sanitised.
+ */
+int ff802_auto_write_mixer_result(const ff802_auto_paths *p,
+                                  const ff802_sysfs_dev *d, const char *outcome,
+                                  unsigned written, unsigned total, int card,
+                                  int client, int port, const char *port_name,
+                                  const char *detail);
 
 /* <run_dir>/pending: written after a successful enable transfer. */
 int ff802_auto_set_pending(const ff802_auto_paths *p, const ff802_sysfs_dev *d);

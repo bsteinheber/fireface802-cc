@@ -5,6 +5,7 @@
 #include "auto_fixture.h"
 
 #include "ff802/auto_switch.h"
+#include "fake_midi.h"
 #include "fake_usb.h"
 #include "test_common.h"
 
@@ -343,10 +344,94 @@ static void test_reboot_on(void)
     fx_done(&fx);
 }
 
+/* Mixer initialisation in the CC branch (fake MIDI backend). */
+static void cc_card(fixture *fx)
+{
+    char cmd[512];
+    snprintf(cmd, sizeof cmd, "mkdir -p -- '%s/bus/usb/devices/" PORT "/" PORT
+             ":1.0/sound/card1/midiC1D0'", fx->paths.sysfs_root);
+    if (system(cmd) != 0)
+        exit(2);
+}
+
+static ff802_auto_outcome run_mixer(fixture *fx, factory_ctx *c, fake_midi *m,
+                                    unsigned devnum, ff802_auto_result *res)
+{
+    ff802_auto_event ev;
+    char inst[64];
+    snprintf(inst, sizeof inst, PORT ":003:%03u", devnum);
+    if (ff802_auto_parse_instance(inst, &ev) != 0)
+        return FF802_AUTO_ERROR;
+    ff802_midi_factory mf;
+    memset(&mf, 0, sizeof mf);
+    if (m != NULL)
+        mf = fake_midi_factory(m);
+    ff802_mixer_options o = { .timeout_ms = 200, .poll_ms = 100, .gap_ms = 0 };
+    ff802_auto_backend_factory f = { .ctx = c, .open = f_create, .close = f_destroy,
+                                     .midi = m != NULL ? &mf : NULL, .mixer_opt = &o };
+    return ff802_auto_handle(&fx->paths, &ev, &f, NULL, res);
+}
+
+static void mixer_file(fixture *fx, const char *content)
+{
+    char path[256];
+    snprintf(path, sizeof path, "%s/mixer-init", fx->paths.state_dir);
+    fx_write(path, content);
+}
+
+static void test_mixer_in_cc_branch(void)
+{
+    fixture fx; factory_ctx c; ff802_auto_result r; fake_midi m;
+    char buf[640];
+
+    /* off (default): nothing, not even the MIDI backend */
+    fx_init(&fx); fx_ff802_cc(&fx, 19); cc_card(&fx);
+    ctx_init(&c, &fx, 19); fake_midi_init(&m, 1, 20);
+    CHECK(run_mixer(&fx, &c, &m, 19, &r) == FF802_AUTO_CC_ACTIVE);
+    CHECK(!r.mixer_ran && r.mixer.outcome == FF802_MIXER_OFF && m.n_open == 0);
+    CHECK(ff802_auto_result_exit_code(&r) == 0);
+    CHECK(!fx_exists(&fx, "run/ff802-cc-auto/mixer-result"));
+
+    /* on, automation off: done, independent of the mode file */
+    mixer_file(&fx, "on\n");
+    CHECK(run_mixer(&fx, &c, &m, 19, &r) == FF802_AUTO_CC_ACTIVE);
+    CHECK(r.mixer_ran && r.mixer.outcome == FF802_MIXER_DONE && r.mixer.written == 24);
+    CHECK(m.n_sent == 24 && c.n_create == 0 && ff802_auto_result_exit_code(&r) == 0);
+    CHECK(r.mixer_event_seq == 0 && !fx_exists(&fx, "run/ff802-cc-auto/mixer-event"));
+    fx_read(&fx, "run/ff802-cc-auto/mixer-result", buf, sizeof buf);
+    CHECK(strstr(buf, "outcome=done\n") != NULL && strstr(buf, "written=24/24\n") != NULL);
+    CHECK(strstr(buf, "port=" PORT "\nbusnum=3\ndevnum=19\n") != NULL);
+    CHECK(strstr(buf, "midi_port=20:1 Fireface 802 (24047128) Port 2\n") != NULL);
+    fx_read(&fx, "run/ff802-cc-auto/last-result", buf, sizeof buf);
+    CHECK(strstr(buf, "outcome=cc-active\n") != NULL);
+
+    /* failure while sending: exit 4, mixer-failed event, cc-active kept */
+    fake_midi_init(&m, 1, 20);
+    m.send_err_at = 3;
+    CHECK(run_mixer(&fx, &c, &m, 19, &r) == FF802_AUTO_CC_ACTIVE);
+    CHECK(r.mixer.outcome == FF802_MIXER_INCOMPLETE && ff802_auto_result_exit_code(&r) == 4);
+    CHECK(r.mixer_event_seq >= 1);
+    fx_read(&fx, "run/ff802-cc-auto/mixer-event", buf, sizeof buf);
+    CHECK(strstr(buf, "kind=mixer-failed\n") != NULL && strstr(buf, "(2 of 24 registers)") != NULL);
+
+    /* no MIDI backend in the program: exit 3 */
+    CHECK(run_mixer(&fx, &c, NULL, 19, &r) == FF802_AUTO_CC_ACTIVE);
+    CHECK(r.mixer.outcome == FF802_MIXER_UNAVAILABLE && ff802_auto_result_exit_code(&r) == 3);
+    fx_done(&fx);
+
+    /* proprietary mode with mixer-init on: only the switch, MIDI untouched */
+    fx_init(&fx); fx_mode(&fx, "on\n"); mixer_file(&fx, "on\n"); fx_ff802_prop(&fx, 18);
+    ctx_init(&c, &fx, 18); fake_midi_init(&m, 1, 20);
+    CHECK(run_mixer(&fx, &c, &m, 18, &r) == FF802_AUTO_SENT);
+    CHECK(!r.mixer_ran && m.n_open == 0 && c.fake.n_write == 1);
+    fx_done(&fx);
+}
+
 int main(void)
 {
     test_parse_instance();
     test_cc_mode();
+    test_mixer_in_cc_branch();
     test_enable_and_reconnect();
     test_write_failures();
     test_not_sent();

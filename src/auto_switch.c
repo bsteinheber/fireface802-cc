@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "ff802/cc_mode.h"
+#include "ff802/mixer_init.h"
 
 static void logf_(FILE *log, const char *fmt, ...)
 {
@@ -110,6 +111,18 @@ int ff802_auto_exit_code(ff802_auto_outcome o)
     return FF802_AUTO_EXIT_NOT_SENT;
 }
 
+int ff802_auto_result_exit_code(const ff802_auto_result *r)
+{
+    if (r == NULL)
+        return FF802_AUTO_EXIT_NOT_SENT;
+    int rc = ff802_auto_exit_code(r->outcome);
+    if (rc != FF802_AUTO_EXIT_OK || !r->mixer_ran ||
+        !ff802_mixer_outcome_failed(r->mixer.outcome))
+        return rc;
+    return r->mixer.outcome == FF802_MIXER_INCOMPLETE ? FF802_AUTO_EXIT_WRITE_FAILED
+                                                      : FF802_AUTO_EXIT_NOT_SENT;
+}
+
 /* Context of the last check right before the claim. */
 typedef struct revalidate_ctx {
     const ff802_auto_paths *paths;
@@ -176,6 +189,45 @@ static void write_event(const ff802_auto_paths *p, ff802_auto_result *res,
         res->event_seq = seq;
 }
 
+/*
+ * CC mode: the mixer initialisation, if turned on. Runs on every "add"
+ * event of the connection; nothing here touches USB.
+ */
+static void mixer_init(const ff802_auto_paths *p, const ff802_sysfs_dev *d,
+                       const ff802_auto_backend_factory *f, FILE *log,
+                       ff802_auto_result *res)
+{
+    ff802_auto_mode mm = ff802_auto_read_mixer_mode(p);
+    res->mixer.outcome = FF802_MIXER_OFF;
+    if (mm != FF802_AUTO_MODE_ON) {
+        if (mm == FF802_AUTO_MODE_INVALID)
+            logf_(log, "mixer: %s/mixer-init is invalid: treated as off.", p->state_dir);
+        return;
+    }
+    res->mixer_ran = 1;
+    logf_(log, "mixer: initialisation is on (ff802-cc-auto mixer-init): %s bus %u "
+               "devnum %u.", d->kernel_name, (unsigned)d->bus, (unsigned)d->devnum);
+    ff802_mixer_run(p->sysfs_root, d, f->midi, f->mixer_opt, log, &res->mixer);
+    const ff802_mixer_result *m = &res->mixer;
+    logf_(log, "mixer: result %s (%u of %u registers): %s",
+          ff802_mixer_outcome_str(m->outcome), m->written, FF802_MIXER_INIT_COUNT,
+          m->detail);
+    if (ff802_auto_write_mixer_result(p, d, ff802_mixer_outcome_str(m->outcome),
+                                      m->written, FF802_MIXER_INIT_COUNT, m->card,
+                                      m->client, m->port, m->port_name, m->detail) != 0)
+        logf_(log, "Warning: could not write %s/mixer-result.", p->run_dir);
+    if (ff802_mixer_outcome_failed(m->outcome)) {
+        char detail[220];
+        snprintf(detail, sizeof detail, "%s (%u of %u registers)", m->detail,
+                 m->written, FF802_MIXER_INIT_COUNT);
+        long seq = ff802_auto_write_mixer_event(p, d, detail);
+        if (seq < 0)
+            logf_(log, "Warning: could not write the mixer notification event.");
+        else
+            res->mixer_event_seq = seq;
+    }
+}
+
 /* Everything below the lock. */
 static ff802_auto_outcome handle_locked(const ff802_auto_paths *p,
                                         const ff802_auto_event *ev,
@@ -215,6 +267,11 @@ static ff802_auto_outcome handle_locked(const ff802_auto_paths *p,
             (void)ff802_auto_clear_pending(p);
             write_event(p, res, FF802_EVENT_CC_ACTIVE, &d, log);
         }
+        mixer_init(p, &d, f, log, res);
+        if (res->mixer_ran)
+            set_detail(res, "Fireface 802 in class-compliant mode at %s; no mode "
+                       "switch needed; mixer initialisation: %s", d.kernel_name,
+                       ff802_mixer_outcome_str(res->mixer.outcome));
         return FF802_AUTO_CC_ACTIVE;
     }
     if (d.vid != 0x2A39u || d.pid != 0x3FCDu) {
