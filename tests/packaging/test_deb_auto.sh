@@ -53,13 +53,13 @@ calls() { cat "$TW/calls.log" 2>/dev/null; }
 # --- build -----------------------------------------------------------------------
 DEB=$(sh "$SRC/packaging/build-deb-auto.sh" "$T/deb" 2> "$T/build.err")
 DEB2=$(sh "$SRC/packaging/build-deb-auto.sh" "$T/deb2" 2>> "$T/build.err")
-ok "package builds" '[ -f "$DEB" ] && [ "${DEB##*/}" = "ff802-cc-auto_0.1.2_${ARCH}.deb" ]'
+ok "package builds" '[ -f "$DEB" ] && [ "${DEB##*/}" = "ff802-cc-auto_0.2.0~dev1_${ARCH}.deb" ]'
 [ -f "$DEB" ] || { cat "$T/build.err"; exit 1; }
 ok "build is reproducible (identical bytes in another directory)" 'cmp -s "$DEB" "$DEB2"'
 ok "19: building the package called no tripwire (nothing executed, no system access)" '[ -z "$(calls)" ]'
 ok "19: the build script never executes the program (only compiles, strips, copies it)" \
     '[ "$(grep -n "ff802-cc-autoswitch" "$SRC/packaging/build-deb-auto.sh" | grep -v "^[0-9]*:#" |
-          grep -vE "^[0-9]+:cmake --build .* --target ff802-cc-autoswitch |^[0-9]+:put 0755 |^[0-9]+:strip --strip-unneeded " | wc -l)" = 0 ]'
+          grep -vE "^[0-9]+:cmake --build .* --target ff802-cc-autoswitch |^[0-9]+:put 0755 |^[0-9]+:strip --strip-unneeded |^[0-9]+:nm -D --undefined-only |^[0-9]+: +. echo .build-deb-auto: ff802-cc-autoswitch was built without" | wc -l)" = 0 ]'
 
 dpkg-deb -c "$DEB" | awk '{ print $1, $2, $6, $7, $8 }' | sed 's/ *$//' | sort > "$T/contents.txt"
 cat > "$T/contents.expected.in" <<'EOF'
@@ -82,6 +82,8 @@ drwxr-xr-x root/root ./usr/lib/udev/rules.d/
 -rw-r--r-- root/root ./usr/lib/udev/rules.d/70-ff802-cc-auto.rules
 drwxr-xr-x root/root ./usr/libexec/
 drwxr-xr-x root/root ./usr/libexec/ff802-cc/
+-rwxr-xr-x root/root ./usr/libexec/ff802-cc/ff802-cc-auto-mixer-off
+-rwxr-xr-x root/root ./usr/libexec/ff802-cc/ff802-cc-auto-mixer-on
 -rwxr-xr-x root/root ./usr/libexec/ff802-cc/ff802-cc-auto-off
 -rwxr-xr-x root/root ./usr/libexec/ff802-cc/ff802-cc-auto-on
 -rwxr-xr-x root/root ./usr/libexec/ff802-cc/ff802-cc-autoswitch
@@ -108,6 +110,8 @@ dpkg-deb -e "$DEB" "$X/DEBIAN"
 same=1
 for pair in "ff802-cc-auto:usr/bin/ff802-cc-auto" "ff802-cc-auto-on:usr/libexec/ff802-cc/ff802-cc-auto-on" \
             "ff802-cc-auto-off:usr/libexec/ff802-cc/ff802-cc-auto-off" "ff802-cc-notify:usr/libexec/ff802-cc/ff802-cc-notify" \
+            "ff802-cc-auto-mixer-on:usr/libexec/ff802-cc/ff802-cc-auto-mixer-on" \
+            "ff802-cc-auto-mixer-off:usr/libexec/ff802-cc/ff802-cc-auto-mixer-off" \
             "70-ff802-cc-auto.rules:usr/lib/udev/rules.d/70-ff802-cc-auto.rules" \
             "ff802-cc-auto@.service:usr/lib/systemd/system/ff802-cc-auto@.service" \
             "ff802-cc-notify.path:usr/lib/systemd/user/ff802-cc-notify.path" \
@@ -131,13 +135,19 @@ ok "packaged program has no forbidden USB call (reset, detach, config, control t
               libusb_set_configuration libusb_set_interface_alt_setting libusb_control_transfer \
               libusb_interrupt_transfer libusb_submit_transfer libusb_open_device_with_vid_pid \
               libusb_clear_halt'
+ok "packaged program has the ALSA sequencer backend, but no mixer writes (FF802_ENABLE_MIXER_WRITE=OFF)" \
+    'has snd_seq_open && has snd_seq_query_next_port &&
+     none_of snd_seq_connect_to snd_seq_create_simple_port snd_seq_event_output_direct \
+             snd_seq_event_output snd_rawmidi_open snd_ctl_elem_write'
+ok "packaged program reports the mixer write gate as disabled" \
+    'grep -aq "mixer writes are not compiled into" "$BIN"'
 ok "packaged program is the installed build, not the simulation" \
     '! grep -aq "SIMULATED backend" "$BIN" && ! grep -aq "FF802_AUTO_ROOT must be" "$BIN" &&
      grep -aq "only started by ff802-cc-auto@.service" "$BIN"'
 ok "control: name, version, architecture, dependencies, off after installation" \
-    'grep -qx "Package: ff802-cc-auto" "$X/DEBIAN/control" && grep -qx "Version: 0.1.2" "$X/DEBIAN/control" &&
+    'grep -qx "Package: ff802-cc-auto" "$X/DEBIAN/control" && grep -qx "Version: 0.2.0~dev1" "$X/DEBIAN/control" &&
      grep -qx "Architecture: $ARCH" "$X/DEBIAN/control" &&
-     grep -qx "Depends: libc6 (>= 2.34), libusb-1.0-0 (>= 2:1.0.22), systemd, udev" "$X/DEBIAN/control" &&
+     grep -qx "Depends: libc6 (>= 2.34), libusb-1.0-0 (>= 2:1.0.22), libasound2t64 (>= 1.2.10), systemd, udev" "$X/DEBIAN/control" &&
      grep -q "The automation is off after installation" "$X/DEBIAN/control"'
 ok "md5sums cover every file" \
     '[ "$(cut -d" " -f3 "$X/DEBIAN/md5sums" | sort)" = "$(cd "$X" && find usr -type f | sort)" ] &&
@@ -167,9 +177,10 @@ standin() { # standin <package> <version>
 }
 standin libc6 2.42-0test
 standin libusb-1.0-0 2:1.0.29-0test
+standin libasound2t64 1.2.14-0test
 standin systemd 259-0test
 standin udev 259-0test
-rc=$(run standins.txt dpkg_r -i "$T/libc6.deb" "$T/libusb-1.0-0.deb" "$T/systemd.deb" "$T/udev.deb")
+rc=$(run standins.txt dpkg_r -i "$T/libc6.deb" "$T/libusb-1.0-0.deb" "$T/libasound2t64.deb" "$T/systemd.deb" "$T/udev.deb")
 ok "stand-in dependency packages installed in the isolated root" '[ "$rc" = 0 ]'
 before=$(tree_sum)
 : > "$TW/calls.log"
@@ -186,11 +197,15 @@ ok "installed files are in place" \
 
 # turn it on with the installed helper (test root), then upgrade: state kept
 FF802_AUTO_ROOT=$R sh "$R/usr/libexec/ff802-cc/ff802-cc-auto-on" > "$T/on.txt" 2>&1
-DEBUP=$(sh "$SRC/packaging/build-deb-auto.sh" "$T/deb-up" 0.1.3 2>> "$T/build.err")
+FF802_AUTO_ROOT=$R sh "$R/usr/libexec/ff802-cc/ff802-cc-auto-mixer-on" > "$T/mon.txt" 2>&1
+ok "installed mixer helper writes only the mixer-init state" \
+    '[ "$(cat "$R/var/lib/ff802-cc-auto/mixer-init")" = on ] && [ "$(cat "$R/var/lib/ff802-cc-auto/mode")" = on ] &&
+     [ "$(ls "$R/var/lib/ff802-cc-auto" | tr "\n" " ")" = "mixer-init mode " ]'
+DEBUP=$(sh "$SRC/packaging/build-deb-auto.sh" "$T/deb-up" 0.2.0~dev2 2>> "$T/build.err")
 rc=$(run upgrade.txt dpkg_r -i "$DEBUP")
-ok "upgrade keeps the automation state (on) and reports it" \
-    '[ "$rc" = 0 ] && [ "$(cat "$R/var/lib/ff802-cc-auto/mode")" = on ] &&
-     grep -q "automation is on" "$T/upgrade.txt"'
+ok "upgrade keeps the automation state (on) and the mixer-init state (on) and reports them" \
+    '[ "$rc" = 0 ] && [ "$(cat "$R/var/lib/ff802-cc-auto/mode")" = on ] && [ "$(cat "$R/var/lib/ff802-cc-auto/mixer-init")" = on ] &&
+     grep -q "automation is on" "$T/upgrade.txt" && grep -q "mixer initialisation is on" "$T/upgrade.txt"'
 
 # --- 20: full deactivation and rollback -----------------------------------------
 FF802_AUTO_ROOT=$R sh "$R/usr/libexec/ff802-cc/ff802-cc-auto-off" > "$T/off.txt" 2>&1

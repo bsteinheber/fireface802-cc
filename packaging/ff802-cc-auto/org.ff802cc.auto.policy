@@ -8,6 +8,11 @@
   on:  administrator authentication (the automation sends a USB command).
   off: the active local user, without a password (it only stops the
        automation; nothing is sent to any device).
+
+  mixer-on:  administrator authentication (the mixer initialisation sets
+             output levels of the unit on every connection).
+  mixer-off: the active local user, without a password (it only stops
+             the initialisation; nothing is sent to any device).
 -->
 <policyconfig>
   <vendor>fireface802-cc</vendor>
@@ -36,5 +41,31 @@
       <allow_active>yes</allow_active>
     </defaults>
     <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/ff802-cc/ff802-cc-auto-off</annotate>
+  </action>
+
+  <action id="org.ff802cc.auto.mixer-on">
+    <description>Turn on the mixer initialisation of the Fireface 802</description>
+    <description xml:lang="de">Mixer-Initialisierung des Fireface 802 einschalten</description>
+    <message>Authentication is required to let Linux set the playback routings and output volumes of the Fireface 802 to 0 dB on every connection</message>
+    <message xml:lang="de">Zum Einschalten der Mixer-Initialisierung (Playback-Routings und Ausgangspegel des Fireface 802 bei jedem Anschließen auf 0 dB) ist eine Administrator-Anmeldung nötig</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/ff802-cc/ff802-cc-auto-mixer-on</annotate>
+  </action>
+
+  <action id="org.ff802cc.auto.mixer-off">
+    <description>Turn off the mixer initialisation of the Fireface 802</description>
+    <description xml:lang="de">Mixer-Initialisierung des Fireface 802 ausschalten</description>
+    <message>Authentication is required to turn off the mixer initialisation of the Fireface 802</message>
+    <message xml:lang="de">Zum Ausschalten der Mixer-Initialisierung des Fireface 802 ist eine Anmeldung nötig</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>yes</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/ff802-cc/ff802-cc-auto-mixer-off</annotate>
   </action>
 </policyconfig>

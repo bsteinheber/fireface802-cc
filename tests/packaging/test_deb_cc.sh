@@ -199,9 +199,10 @@ standin() {
 }
 standin libc6 2.42-0test
 standin libusb-1.0-0 2:1.0.29-0test
+standin libasound2t64 1.2.14-0test
 standin systemd 259-0test
 standin udev 259-0test
-dpkg_r -i "$T/libc6.deb" "$T/libusb-1.0-0.deb" "$T/systemd.deb" "$T/udev.deb" > "$T/standins.txt" 2>&1
+dpkg_r -i "$T/libc6.deb" "$T/libusb-1.0-0.deb" "$T/libasound2t64.deb" "$T/systemd.deb" "$T/udev.deb" > "$T/standins.txt" 2>&1
 before=$(tree_sum)
 : > "$TW/calls.log"
 

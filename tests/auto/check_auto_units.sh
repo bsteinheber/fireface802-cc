@@ -55,10 +55,10 @@ ok "service: oneshot, one ExecStart with the instance, no other Exec*, no Restar
     '[ "$(key Type)" = oneshot ] &&
      [ "$(key ExecStart)" = "/usr/libexec/ff802-cc/ff802-cc-autoswitch --service %i" ] &&
      [ "$(grep -cE "^Exec" "$SVC")" = 1 ] && ! grep -qE "^Restart" "$SVC"'
-ok "service: no capabilities, no new privileges, only usb_device nodes, no network" \
+ok "service: no capabilities, no new privileges, only usb_device and ALSA nodes, no network" \
     '[ "$(key CapabilityBoundingSet)" = "" ] && grep -qx "CapabilityBoundingSet=" "$SVC" &&
      [ "$(key NoNewPrivileges)" = yes ] && [ "$(key DevicePolicy)" = closed ] &&
-     [ "$(key DeviceAllow)" = "char-usb_device rw" ] && [ "$(key PrivateNetwork)" = yes ] &&
+     [ "$(key DeviceAllow | tr "\n" ";")" = "char-usb_device rw;char-alsa rw;" ] && [ "$(key PrivateNetwork)" = yes ] &&
      [ "$(key ProtectSystem)" = strict ] && [ "$(key ProtectHome)" = yes ]'
 ok "service: bounded run time, runtime directory /run/ff802-cc-auto kept across instances" \
     '[ "$(key TimeoutStartSec)" = 30 ] && [ "$(key RuntimeDirectory)" = ff802-cc-auto ] &&

@@ -43,11 +43,51 @@ TotalMix option "Activate CC mode on disconnect" in the unit.
 Notifications
 -------------
 
-The system service only writes /run/ff802-cc-auto/event. The systemd user
-units ff802-cc-notify.path/.service (started with every graphical session)
-show each event once. If nobody was logged in (switch at boot), the
+The system service only writes /run/ff802-cc-auto/event (and mixer-event,
+see below). The systemd user units ff802-cc-notify.path/.service (started
+with every graphical session) show each event once. If nobody was logged in (switch at boot), the
 notification is shown at login while it is still relevant. A missing
 notification never affects the USB side.
+
+Mixer initialisation (optional, OFF by default)
+-----------------------------------------------
+
+Independent of the automation, also for a unit that was switched with
+"ff802-cc enable" or is already in CC mode when it is switched on:
+
+  ff802-cc-auto mixer-init status   state and last result (anyone)
+  ff802-cc-auto mixer-init on       turn on  (administrator)
+  ff802-cc-auto mixer-init off      turn off (the active local user)
+
+The state is kept in /var/lib/ff802-cc-auto/mixer-init. When it is on,
+the service sets on EVERY connection of the unit in class-compliant mode
+(reconnect, power cycle, boot) exactly these 24 registers of the internal
+mixer, in this order, through the ALSA sequencer (MIDI "Port 2" of that
+USB connection, found by its sound card; no fixed ALSA numbers):
+
+  Playback 1..12 -> Hardware Output 1..12     0 dB (0x9000)
+  Volume of Hardware Output 1..12             0 dB (0x0000)
+  (Output 1-8 = Analog 1-8, 9-12 = Phones 9-12)
+
+Nothing else is changed: no crossed routings, inputs, mute, pan, other
+outputs or stored setups. Nothing is read from the unit, so there is no
+undo: changes made to these 24 values with TotalMix FX or OSCMix are
+overwritten at the next connection.
+
+WARNING: 0 dB on the headphone outputs Phones 9-12 can be very loud. Take
+headphones off and turn amplifiers down before connecting the unit, and
+set the volume in the applications.
+
+Each register is logged (journalctl -t ff802-cc-auto). The result is in
+/run/ff802-cc-auto/mixer-result. If the initialisation fails (MIDI port
+not there within 10 s, port not unambiguous, ALSA error, stopped while
+sending), nothing is retried and a separate notification "Fireface 802 –
+Mixer-Initialisierung fehlgeschlagen" is shown; the class-compliant mode
+itself is not affected.
+
+This development build does not contain the mixer writes
+(FF802_ENABLE_MIXER_WRITE=OFF): with mixer-init on, the MIDI port is found
+and reported, nothing is sent, and the result is "disabled-build".
 
 Automatic and manual switching
 ------------------------------
@@ -80,9 +120,11 @@ Diagnosis
   journalctl --user -t ff802-cc-notify -b    notifications
   systemctl list-units 'ff802-cc-auto@*'
 
-Exit codes of the service: 0 off / handled / CC mode / sent, 3 nothing
-sent (refused or failed before the write), 4 the write failed (device
-state unknown: power-cycle the unit and check with "ff802-cc-auto status").
+Exit codes of the service: 0 off / handled / CC mode / sent / mixer done,
+3 nothing sent (refused or failed before the write; also a mixer
+initialisation that sent nothing), 4 the write failed (device state
+unknown: power-cycle the unit and check with "ff802-cc-auto status"; also
+a mixer initialisation that stopped while sending).
 
 Removal
 -------

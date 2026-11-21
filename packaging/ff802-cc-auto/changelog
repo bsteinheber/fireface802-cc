@@ -1,3 +1,24 @@
+ff802-cc-auto (0.2.0~dev1) UNRELEASED; urgency=medium
+
+  * Development build, not released, not for installation on the
+    production host. Built from the project tree after version 0.4.1.
+  * Mixer initialisation in class-compliant mode (off by default,
+    independent of the automation): 'ff802-cc-auto mixer-init on|off|status'
+    with the root helpers ff802-cc-auto-mixer-on/-off and the polkit
+    actions org.ff802cc.auto.mixer-on (administrator) and .mixer-off
+    (active local user). When on, the service sets on every connection in
+    CC mode the 24 fixed registers Playback 1..12 -> Output 1..12 and the
+    volumes of Output 1..12 to 0 dB through the ALSA sequencer (MIDI port
+    "Port 2" of the connection, found by card number), with one journal
+    line per register, /run/ff802-cc-auto/mixer-result and, on failure,
+    a separate desktop notification (mixer-event).
+  * The mixer writes are NOT compiled in (FF802_ENABLE_MIXER_WRITE=OFF):
+    the MIDI port is found and reported, nothing is sent ("disabled-build").
+  * The service may now open ALSA device nodes (DeviceAllow=char-alsa rw);
+    new dependency libasound2t64. The mode switch itself is unchanged.
+
+ -- Bernhard Steinheber <bernhard@steinheber.info>  Sat, 21 Nov 2026 12:00:00 +0100
+
 ff802-cc-auto (0.1.2) unstable; urgency=medium
 
   * Rebuilt from project version 0.4.1 (ff802-cc-autoswitch reports

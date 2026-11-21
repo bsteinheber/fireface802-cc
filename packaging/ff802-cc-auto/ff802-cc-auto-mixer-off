@@ -1,0 +1,28 @@
+#!/bin/sh
+# ff802-cc-auto-mixer-off: turn the mixer initialisation of the Fireface 802
+# in class-compliant mode off.
+# Runs as root: via pkexec (polkit action org.ff802cc.auto.mixer-off) or sudo.
+# Writes /var/lib/ff802-cc-auto/mixer-init atomically; nothing else.
+# Test override: FF802_AUTO_ROOT (prefix; pkexec and sudo clear it).
+set -eu
+umask 022
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+ROOT=${FF802_AUTO_ROOT:-}
+[ $# = 0 ] || { echo "ff802-cc-auto-mixer-off: no arguments expected" >&2; exit 2; }
+if [ -z "$ROOT" ] && [ "$(id -u)" != 0 ]; then
+    echo "ff802-cc-auto-mixer-off: needs root (use: ff802-cc-auto mixer-init off)" >&2
+    exit 2
+fi
+DIR=$ROOT/var/lib/ff802-cc-auto
+mkdir -p "$DIR"
+chmod 0755 "$DIR"
+printf 'off\n' > "$DIR/mixer-init.tmp"
+chmod 0644 "$DIR/mixer-init.tmp"
+mv -f "$DIR/mixer-init.tmp" "$DIR/mixer-init"
+who=${PKEXEC_UID:+uid $PKEXEC_UID via pkexec}
+who=${who:-${SUDO_USER:+$SUDO_USER via sudo}}
+msg="mixer initialisation turned off${who:+ ($who)}"
+[ -n "$ROOT" ] || logger -t ff802-cc-auto "$msg" 2>/dev/null || true
+echo "ff802-cc-auto: $msg."
+echo "The mixer of the Fireface 802 is no longer changed on connection. The"
+echo "current mixer settings of the unit are not changed by this."

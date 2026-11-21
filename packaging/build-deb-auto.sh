@@ -8,7 +8,12 @@
 # to write). The program is compiled, stripped and copied, but never
 # executed: building or checking the package sends nothing to any device.
 # Version and SOURCE_DATE_EPOCH come from packaging/ff802-cc-auto/changelog.
-# Needs: cmake, a C compiler, libusb-1.0-0-dev, dpkg-deb, gzip, md5sum.
+# The mixer initialisation is built with the ALSA sequencer backend, but
+# without FF802_ENABLE_MIXER_WRITE (default OFF): the packaged program can
+# find the MIDI port but cannot send mixer registers until a hardware test
+# of the mixer writes has been approved.
+# Needs: cmake, a C compiler, libusb-1.0-0-dev, libasound2-dev, dpkg-deb,
+# gzip, md5sum, nm.
 
 set -eu
 
@@ -35,10 +40,14 @@ OUT=$(CDPATH= cd -- "$OUT" && pwd)
 # --- program (compiled only) ------------------------------------------------------
 B=$OUT/.build-auto
 cmake -S "$SRC" -B "$B" -DCMAKE_BUILD_TYPE=Release -DFF802_WERROR=ON \
-      -DBUILD_TESTING=OFF -DFF802_ENABLE_USB_WRITE=ON > "$B.configure.log" 2>&1 ||
+      -DBUILD_TESTING=OFF -DFF802_ENABLE_USB_WRITE=ON -DFF802_ENABLE_MIXER_WRITE=OFF \
+      > "$B.configure.log" 2>&1 ||
     { cat "$B.configure.log" >&2; exit 1; }
 cmake --build "$B" --target ff802-cc-autoswitch -j > "$B.build.log" 2>&1 ||
     { cat "$B.build.log" >&2; exit 1; }
+# the package needs the mixer backend (alsa-lib found at configure time)
+nm -D --undefined-only "$B/ff802-cc-autoswitch" | grep -q ' snd_seq_open' ||
+    { echo "build-deb-auto: ff802-cc-autoswitch was built without the ALSA sequencer backend (libasound2-dev missing?)" >&2; exit 1; }
 
 # --- stage --------------------------------------------------------------------------
 STAGE=$OUT/.stage-$NAME
@@ -56,6 +65,8 @@ put 0755 "$B/ff802-cc-autoswitch"           $LX/ff802-cc-autoswitch
 strip --strip-unneeded "$STAGE/$LX/ff802-cc-autoswitch"
 put 0755 "$PKGSRC/ff802-cc-auto-on"         $LX/ff802-cc-auto-on
 put 0755 "$PKGSRC/ff802-cc-auto-off"        $LX/ff802-cc-auto-off
+put 0755 "$PKGSRC/ff802-cc-auto-mixer-on"   $LX/ff802-cc-auto-mixer-on
+put 0755 "$PKGSRC/ff802-cc-auto-mixer-off"  $LX/ff802-cc-auto-mixer-off
 put 0755 "$PKGSRC/ff802-cc-notify"          $LX/ff802-cc-notify
 put 0755 "$PKGSRC/ff802-cc-auto"            usr/bin/ff802-cc-auto
 put 0644 "$PKGSRC/70-ff802-cc-auto.rules"   usr/lib/udev/rules.d/70-ff802-cc-auto.rules

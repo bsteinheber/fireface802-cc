@@ -2,7 +2,8 @@
 # postinst of ff802-cc-auto. Reloads udev rules and systemd units; does
 # NOT trigger udev events and does NOT start the service: installing the
 # package never sends anything to a device. The automation stays off
-# until 'ff802-cc-auto on'.
+# until 'ff802-cc-auto on', the mixer initialisation until
+# 'ff802-cc-auto mixer-init on'.
 set -e
 
 case "$1" in
@@ -14,6 +15,9 @@ case "$1" in
         mode=$(cat "${DPKG_ROOT:-}/var/lib/ff802-cc-auto/mode" 2>/dev/null || echo off)
         echo "ff802-cc-auto: automation is ${mode}." \
              "Turn it on with 'ff802-cc-auto on'; see /usr/share/doc/ff802-cc-auto/README.Debian"
+        mixer=$(cat "${DPKG_ROOT:-}/var/lib/ff802-cc-auto/mixer-init" 2>/dev/null || echo off)
+        [ "$mixer" = on ] || mixer=off
+        echo "ff802-cc-auto: mixer initialisation is ${mixer} ('ff802-cc-auto mixer-init status')."
         ;;
     abort-upgrade|abort-remove|abort-deconfigure)
         ;;

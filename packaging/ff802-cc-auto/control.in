@@ -3,7 +3,7 @@ Version: @VERSION@
 Architecture: @ARCH@
 Maintainer: Bernhard Steinheber <bernhard@steinheber.info>
 Installed-Size: @SIZE@
-Depends: libc6 (>= 2.34), libusb-1.0-0 (>= 2:1.0.22), systemd, udev
+Depends: libc6 (>= 2.34), libusb-1.0-0 (>= 2:1.0.22), libasound2t64 (>= 1.2.10), systemd, udev
 Recommends: pkexec, libnotify-bin
 Section: sound
 Priority: optional
@@ -19,3 +19,11 @@ Description: automatic class-compliant mode for the RME Fireface 802
  ff802-cc-auto status shows the state. The package never switches the unit
  back to proprietary mode; for that use "ff802-cc disable" of the separate
  package ff802-cc, TotalMix FX on Windows/macOS or the ARC.
+ .
+ Optional, also off after installation and independent of the automation:
+ ff802-cc-auto mixer-init on sets, on every connection in class-compliant
+ mode, the routings Playback 1..12 -> Output 1..12 and the volumes of the
+ twelve hardware outputs to 0 dB through the ALSA sequencer (MIDI port 2
+ of the unit). In this development build the mixer writes are not
+ compiled in (FF802_ENABLE_MIXER_WRITE=OFF): the MIDI port is found and
+ reported, nothing is sent.

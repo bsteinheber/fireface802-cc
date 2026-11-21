@@ -7,16 +7,23 @@
 #   ff802-cc-auto on       turn the automation on (administrator)
 #   ff802-cc-auto off      turn the automation off (the active local user
 #                          may do this without a password)
+#   ff802-cc-auto mixer-init status|on|off
+#                          mixer initialisation in class-compliant mode:
+#                          on every connection, Playback 1..12 -> Output
+#                          1..12 and the volumes of Output 1..12 at 0 dB
+#                          (on: administrator; off: the active local user)
 #
 # "off" only stops Linux from switching the device automatically; it does
 # not change the USB mode of the Fireface (that would be "ff802-cc disable",
 # which is not available, see /usr/share/doc/ff802-cc-auto/README.Debian).
 # The state is kept in /var/lib/ff802-cc-auto/mode and survives reboots.
-# Default after installation: off.
+# Default after installation: off. The mixer initialisation is independent
+# of it (/var/lib/ff802-cc-auto/mixer-init), also off by default.
 #
 # on/off run /usr/libexec/ff802-cc/ff802-cc-auto-on|-off as root, via
 # pkexec (polkit actions org.ff802cc.auto.on/.off) or when already root
-# (sudo by an administrator).
+# (sudo by an administrator); mixer-init on/off likewise run
+# ff802-cc-auto-mixer-on|-mixer-off (org.ff802cc.auto.mixer-on/-off).
 #
 # Test overrides: FF802_AUTO_ROOT (prefix of all paths, no root needed),
 # FF802_AUTO_LIBEXEC (directory of the helper programs).
@@ -27,8 +34,22 @@ ROOT=${FF802_AUTO_ROOT:-}
 LIBEXEC=${FF802_AUTO_LIBEXEC:-/usr/libexec/ff802-cc}
 
 usage() {
-    sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'
     exit 2
+}
+
+mixer_warning() {
+    cat <<'EOF'
+WARNING: with the mixer initialisation on, every connection of the
+Fireface 802 in class-compliant mode (reconnect, power cycle, boot) sets
+  - Playback 1..12 -> Hardware Output 1..12 to 0 dB and
+  - the volumes of all twelve Hardware Outputs (Analog 1-8 and the
+    headphone outputs Phones 9-12) to 0 dB,
+overwriting changes made to these 24 values with TotalMix FX or OSCMix.
+0 dB on the headphone outputs can be very loud: take headphones off and
+turn amplifiers down before connecting the unit, and set the volume in
+the applications. Other routings, mute, pan and inputs are not changed.
+EOF
 }
 
 status() {
@@ -51,24 +72,47 @@ status() {
     return $rc
 }
 
-set_mode() { # set_mode on|off
+set_mode() { # set_mode on|off|mixer-on|mixer-off
     helper=$LIBEXEC/ff802-cc-auto-$1
+    case $1 in mixer-*) what="mixer-init ${1#mixer-}" ;; *) what=$1 ;; esac
     if [ -n "$ROOT" ] || [ "$(id -u)" = 0 ]; then
         exec "$helper"
     fi
     if command -v pkexec > /dev/null 2>&1; then
         exec pkexec "$helper"
     fi
-    echo "ff802-cc-auto: '$1' needs administrator rights and pkexec is not installed." >&2
-    echo "An administrator can run: sudo ff802-cc-auto $1" >&2
+    echo "ff802-cc-auto: '$what' needs administrator rights and pkexec is not installed." >&2
+    echo "An administrator can run: sudo ff802-cc-auto $what" >&2
     exit 2
 }
 
-[ $# = 1 ] || usage
-case $1 in
-    status) status ;;
-    on) set_mode on ;;
-    off) set_mode off ;;
-    -h|--help) usage ;;
+mixer_status() {
+    if [ -n "$ROOT" ]; then
+        FF802_AUTO_ROOT=$ROOT "$LIBEXEC/ff802-cc-autoswitch" --mixer-status
+    else
+        "$LIBEXEC/ff802-cc-autoswitch" --mixer-status
+    fi
+    rc=$?
+    echo "log: journalctl -t ff802-cc-auto -b | grep mixer"
+    return $rc
+}
+
+case $# in
+    1)
+        case $1 in
+            status) status ;;
+            on) set_mode on ;;
+            off) set_mode off ;;
+            -h|--help) usage ;;
+            *) usage ;;
+        esac ;;
+    2)
+        [ "$1" = mixer-init ] || usage
+        case $2 in
+            status) mixer_status ;;
+            on) mixer_warning; set_mode mixer-on ;;
+            off) set_mode mixer-off ;;
+            *) usage ;;
+        esac ;;
     *) usage ;;
 esac
