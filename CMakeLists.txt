@@ -111,6 +111,7 @@ add_library(ff802_auto STATIC
     src/auto_switch.c
     src/usb_port.c
     src/mixer_port.c
+    src/mixer_run.c
     src/disable_check.c)
 target_include_directories(ff802_auto PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include)

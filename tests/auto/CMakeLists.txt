@@ -19,6 +19,13 @@ set_target_properties(test_mixer_port PROPERTIES C_EXTENSIONS ON)
 ff802_set_warnings(test_mixer_port)
 add_test(NAME test_mixer_port COMMAND test_mixer_port)
 
+add_executable(test_mixer_run test_mixer_run.c)
+target_include_directories(test_mixer_run PRIVATE ${PROJECT_SOURCE_DIR}/tests)
+target_link_libraries(test_mixer_run PRIVATE ff802_auto)
+set_target_properties(test_mixer_run PROPERTIES C_EXTENSIONS ON)
+ff802_set_warnings(test_mixer_run)
+add_test(NAME test_mixer_run COMMAND test_mixer_run)
+
 # udev rule and systemd units: static checks and systemd-analyze verify.
 add_test(NAME auto_units
     COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/check_auto_units.sh
