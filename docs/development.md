@@ -86,6 +86,7 @@ ctest --test-dir build --output-on-failure
 |--------------|----------|-----------|
 | `FF802_ENABLE_USB_WRITE` | `OFF` | Claim und Bulk-Write einkompilieren |
 | `FF802_ENABLE_MIXER_WRITE` | `OFF` | Mixer-Initialisierung: Verbinden mit dem MIDI-Port und Senden der SysEx-Nachrichten einkompilieren (bis zur Freigabe eines Hardwaretests `OFF`, auch im Paket) |
+| `FF802_BUILD_MIXER_B2` | `OFF` | Hardwaretest B.2 `ff802-mixer-b2` bauen: das einzige Programm mit Mixer-Schreibfunktion, genau zwei Nachrichten für Register `0x2600`; nie installiert, kein Paket |
 | `FF802_BUILD_TOOLS` | `ON` | Programme bauen (benötigt libusb) |
 | `FF802_WERROR` | `ON` | Warnungen als Fehler |
 | `FF802_REQUIRE_ALSA_TESTS` | aus Umgebung, sonst `OFF` | ALSA-/Pakettests schlagen fehl statt übersprungen zu werden (Dev-Container: `ON`) |
@@ -194,6 +195,7 @@ Registerliste und Stand der Mixer-Initialisierung: [mixer_routing.md](mixer_rout
 | `test_chanmap_*`, `chanmap_cli_*`, `check_chanmap_sources`, `chanmap_binary_symbols` | ff802-chanmap: Simulation korrekter und falscher Zuordnungen, aller Abbruch- und Fehlerfälle, Pegelwächter, Kartenerkennung, pw-reserve, Auswertung, ALSA-Backend am `null`-Plugin |
 | `test_auto_sysfs`, `test_auto_switch` | T4: Identität aus sysfs, Zustandsdateien, Sperre, automatischer Ablauf mit allen Fehler- und Änderungsfällen; Mixer-Initialisierung im CC-Zweig |
 | `test_mixer_init`, `test_mixer_port`, `test_mixer_run` | Mixer-Initialisierung: Registerliste gegen Messwerte und Formeln, SysEx-Bytes, Soundkarte aus sysfs, Auswahl des Sequencer-Ports, Ablauf gegen simuliertes MIDI-Backend mit allen Fehlerfällen |
+| `mixer_b2` | Hardwaretest B.2 mit simuliertem MIDI-Backend: Erkennung bei wechselnden Client-Nummern, genau eine Nachricht, Bestätigung, alle Ablehnungen; das echte Programm (falls gebaut) nur `--help`/`--version` und `nm` |
 | `check_mixer_sources`, `autoswitch_mixer_symbols` | Quelltextprüfung (ALSA-Aufrufe, SysEx, Registerliterale nur in den vorgesehenen Dateien) und Symbole des Dienstprogramms (nur Sequencer, ohne Freigabe keine Ausgabefunktionen) |
 | `auto_flow`, `auto_notify`, `auto_control`, `auto_units` | T4: Dienstaufruf wie systemd (auch gleichzeitig), Benachrichtigung mit Test-Doubles, `ff802-cc-auto on/off/status` und `mixer-init on/off/status`, udev-Regel und Units (`systemd-analyze`) |
 | `autoswitch_binary_symbols`, `autoswitch_sim_no_libusb` | T4: Symbole des Dienstprogramms; Simulationsbuild ohne libusb und ohne libasound |

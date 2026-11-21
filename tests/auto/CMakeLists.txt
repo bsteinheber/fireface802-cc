@@ -68,6 +68,26 @@ if(FF802_HAVE_TOOLS)
             -P ${PROJECT_SOURCE_DIR}/tests/check_binary_symbols.cmake)
 endif()
 
+# Hardware test program B.2 with the simulated MIDI backend (no
+# libasound): detection, the two messages, confirmation, all refusals.
+add_executable(ff802-mixer-b2-sim
+    ${PROJECT_SOURCE_DIR}/tools/hw-test/ff802_mixer_b2.c sim_midi.c)
+target_include_directories(ff802-mixer-b2-sim PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(ff802-mixer-b2-sim PRIVATE ff802_auto)
+target_compile_definitions(ff802-mixer-b2-sim PRIVATE
+    FF802_B2_SIM=1 FF802_VERSION="${PROJECT_VERSION}")
+set_target_properties(ff802-mixer-b2-sim PROPERTIES C_EXTENSIONS ON)
+ff802_set_warnings(ff802-mixer-b2-sim)
+if(FF802_HAVE_MIXER_B2)
+    set(b2_real $<TARGET_FILE:ff802-mixer-b2>)
+else()
+    set(b2_real "-")
+endif()
+add_test(NAME mixer_b2
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/test_mixer_b2.sh
+            ${PROJECT_SOURCE_DIR} $<TARGET_FILE:ff802-mixer-b2-sim> ${b2_real}
+            ${CMAKE_NM} ${CMAKE_CURRENT_BINARY_DIR}/b2-scratch)
+
 # Desktop notification (test doubles for notify-send and busctl) and its
 # decoupling from the system service.
 add_test(NAME auto_notify
