@@ -265,6 +265,27 @@ Knopfs, alle mit gültiger Parität). Das Drehen des Knopfs erzeugte
 **keine** weitere Registermeldung. Eine Prüfung von Schreibzugriffen über
 den MIDI-Eingang ist ohne Refresh-Anforderung daher nicht möglich.
 
+### Hardwaretest B.2 (vorbereitet, Schreibschritte nicht freigegeben)
+
+Erster MIDI-Schreibzugriff über den ALSA-Sequencer: genau ein Register,
+`0x2600` (Ausgangspegel Hardware Output 9 = Phones 9, linker Kanal von
+Phones 9/10), mit dem Testprogramm
+[ff802_mixer_b2.c](../tools/hw-test/ff802_mixer_b2.c) (CMake-Option
+`FF802_BUILD_MIXER_B2`, nie installiert). Es enthält nur zwei Nachrichten:
+
+| Schritt | Register = Wert | SysEx |
+|---|---|---|
+| Test | `0x2600 = 0xFF38` (−20,0 dB) | `F0 00 20 0D 10 00 38 7E 03 30 0A F7` |
+| Wiederherstellung | `0x2600 = 0x0000` (0 dB) | `F0 00 20 0D 10 00 00 00 00 30 02 F7` |
+
+Ablauf: B.2.0 Kodierung von −20,0 dB mit OSCMix (Debug) bestätigen, danach
+Output 9 mit OSCMix auf 0 dB und OSCMix schließen; B.2.1 Dry-Run; B.2.2
+Dauerton auf „Headphones Output 9/10“ und MIDI-Eingang mitschneiden;
+B.2.3 `--send test` (erwartet: links etwa 20 dB leiser, rechts
+unverändert); B.2.4 Kopfhörer absetzen, `--send restore`; B.2.5 bei
+Unklarheit Output 9 mit OSCMix auf 0 dB (unabhängig vom neuen Sendeweg).
+Freigegeben ist bisher nur der Dry-Run B.2.1.
+
 **Offen bis zum Hardwaretest:** ob der Kernel-Client `snd-seq-midi`
 direkt adressierte SysEx-Ereignisse nach dem Verbinden vollständig an das
 Gerät weitergibt (bei OSCMix mit `alsaseqio` belegt, für dieses Programm
