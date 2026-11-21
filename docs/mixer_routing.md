@@ -235,6 +235,36 @@ Build findet und meldet den MIDI-Port, sendet aber nichts
   Änderungen an diesen 24 Werten werden bei jeder Verbindung
   überschrieben.
 
+### Hardware-Trockenlauf B.1 (2026-11-21): erfolgreich
+
+Nur lesend, ohne MIDI- oder USB-Schreibzugriff, ohne Änderung am Host.
+Ausgeführt wurde der implementierte Erkennungscode
+(`ff802_sysfs_identify`, `ff802_mixer_find_card`, ALSA-Portliste,
+`ff802_mixer_select_port`) in einem Prüfprogramm ohne
+`FF802_ENABLE_MIXER_WRITE` (laut `nm` ohne `snd_seq_connect_to`,
+`snd_seq_create_simple_port`, `snd_seq_event_output_direct`), als
+normaler Benutzer am Host.
+
+| Merkmal | Ergebnis |
+|---|---|
+| USB-Verbindung | `3-2.4.1.1.3` (Bus 3, Gerätenummer 53), `0424:3fdd`, RME, „Fireface 802 (24047128)“, 480 Mbit/s |
+| Identität | Fireface 802, class-compliant mode |
+| Soundkarte (sysfs) | `card1` unter Schnittstelle `:1.0` (Audio Control), mit `midiC1D0` und `seq-midi-1-0`; **nicht** unter der MIDI-Schnittstelle `:1.3` |
+| Sequencer | Kernel-Client 20, Karte 1 |
+| Gewählter Port | `20:1` „Fireface 802 (24047128) Port 2“ |
+| Mixer-Schreibzugriffe | im Prüfprogramm nicht einkompiliert |
+
+Die implementierte Erkennung stimmt damit mit dem Gerät überein. Nicht
+abgedeckt: der Lauf in der gehärteten systemd-Unit (`DeviceAllow`,
+`ProtectKernelModules`) und das Zeitverhalten beim Anstecken.
+
+**Registermeldungen des Geräts (Auswertung der Phase-2a-Mitschnitte):** Auf
+„Port 2“ sendet das Gerät ohne Anforderung nur RME-SysEx mit dem Register
+`0x3F00 = 0x0908` (3300 Wörter im Ruhezustand, 5207 beim Drehen eines
+Knopfs, alle mit gültiger Parität). Das Drehen des Knopfs erzeugte
+**keine** weitere Registermeldung. Eine Prüfung von Schreibzugriffen über
+den MIDI-Eingang ist ohne Refresh-Anforderung daher nicht möglich.
+
 **Offen bis zum Hardwaretest:** ob der Kernel-Client `snd-seq-midi`
 direkt adressierte SysEx-Ereignisse nach dem Verbinden vollständig an das
 Gerät weitergibt (bei OSCMix mit `alsaseqio` belegt, für dieses Programm
