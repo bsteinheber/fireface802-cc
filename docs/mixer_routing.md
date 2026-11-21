@@ -184,7 +184,7 @@ empfangenen Register) im CC-Modus. Formeln für Kanal k = 1…12 (1–8 Analog,
 | Playback 11 → Output 11 | `0x42AA` | `0x9000` | geschrieben und beobachtet |
 | Playback 12 → Output 12 | `0x42EB` | `0x9000` | geschrieben und beobachtet |
 | Hardware Output 1 | `0x1E00` | `0x0000` | geschrieben und beobachtet |
-| Hardware Output 9 | `0x2600` | `0x0000` | geschrieben und beobachtet |
+| Hardware Output 9 | `0x2600` | `0x0000` | geschrieben und beobachtet; außerdem `0xFF38` = −20,0 dB, und über den ALSA-Sendeweg des Projekts geschrieben (B.2) |
 | Hardware Output 10 | `0x2700` | `0x0000` | geschrieben und beobachtet |
 | Hardware Output 11 | `0x2800` | `0x0000` | geschrieben und beobachtet |
 | Hardware Output 12 | `0x2900` | `0x0000` | nur in Registermeldungen beobachtet |
@@ -205,7 +205,7 @@ Port 2“.
 Schreibzugriffe**: Die Build-Option `FF802_ENABLE_MIXER_WRITE` ist `OFF`,
 auch im Paket `ff802-cc-auto 0.2.0~dev1` (unveröffentlicht). Ein solcher
 Build findet und meldet den MIDI-Port, sendet aber nichts
-(Ergebnis `disabled-build`). Ein Hardwaretest ist noch nicht freigegeben.
+(Ergebnis `disabled-build`). Am Gerät getestet ist bisher nur der Sendeweg mit einer einzelnen Nachricht (B.2, eigenes Testprogramm); die 24 Register der Initialisierung sind gesperrt.
 
 - **Einschalten:** `ff802-cc-auto mixer-init on|off|status`, Standard aus,
   unabhängig von der automatischen Umschaltung
@@ -265,11 +265,10 @@ Knopfs, alle mit gültiger Parität). Das Drehen des Knopfs erzeugte
 **keine** weitere Registermeldung. Eine Prüfung von Schreibzugriffen über
 den MIDI-Eingang ist ohne Refresh-Anforderung daher nicht möglich.
 
-### Hardwaretest B.2 (vorbereitet, Schreibschritte nicht freigegeben)
+### Hardwaretest B.2 (2026-11-21): erfolgreich
 
 Erster MIDI-Schreibzugriff über den ALSA-Sequencer: genau ein Register,
-`0x2600` (Ausgangspegel Hardware Output 9 = Phones 9, linker Kanal von
-Phones 9/10), mit dem Testprogramm
+`0x2600` (Ausgangspegel Hardware Output 9 = Phones 9), mit dem Testprogramm
 [ff802_mixer_b2.c](../tools/hw-test/ff802_mixer_b2.c) (CMake-Option
 `FF802_BUILD_MIXER_B2`, nie installiert). Es enthält nur zwei Nachrichten:
 
@@ -278,19 +277,36 @@ Phones 9/10), mit dem Testprogramm
 | Test | `0x2600 = 0xFF38` (−20,0 dB) | `F0 00 20 0D 10 00 38 7E 03 30 0A F7` |
 | Wiederherstellung | `0x2600 = 0x0000` (0 dB) | `F0 00 20 0D 10 00 00 00 00 30 02 F7` |
 
-Ablauf: B.2.0 Kodierung von −20,0 dB mit OSCMix (Debug) bestätigen, danach
-Output 9 mit OSCMix auf 0 dB und OSCMix schließen; B.2.1 Dry-Run; B.2.2
-Dauerton auf „Headphones Output 9/10“ und MIDI-Eingang mitschneiden;
-B.2.3 `--send test` (erwartet: links etwa 20 dB leiser, rechts
-unverändert); B.2.4 Kopfhörer absetzen, `--send restore`; B.2.5 bei
-Unklarheit Output 9 mit OSCMix auf 0 dB (unabhängig vom neuen Sendeweg).
-Freigegeben ist bisher nur der Dry-Run B.2.1.
+Ergebnisse (vom Anwender gemeldet):
 
-**Offen bis zum Hardwaretest:** ob der Kernel-Client `snd-seq-midi`
-direkt adressierte SysEx-Ereignisse nach dem Verbinden vollständig an das
-Gerät weitergibt (bei OSCMix mit `alsaseqio` belegt, für dieses Programm
-nicht); ob der Lautstärkeknopf am Gerät auf die Ausgangsfader 9–12 wirkt;
-Wirkung auf Ausgang 3–8 (abgeleitet).
+| Schritt | Ergebnis |
+|---|---|
+| B.2.0 Kodierung (OSCMix) | `0x2600` wirkt auf Hardware Output 9 (Phones 9); Pegel als vorzeichenbehaftete 16-Bit-Werte in 0,1 dB; `0xFF38` = −20,0 dB, `0x0000` = 0,0 dB |
+| B.2.1 Dry-Run | `0424:3fdd`, CC-Modus, Karte 1, Port `20:1` automatisch gewählt, nichts gesendet |
+| B.2.3 Test | Nachricht `0x2600 = 0xFF38` über `20:1` gesendet; Pegeländerung hörbar. **Nach subjektiver Wahrnehmung wurden beide Kanäle von Phones 9/10 leiser**, nicht nur der linke |
+| B.2.4 Wiederherstellung | `0x2600 = 0x0000` gesendet; beide Kanäle wieder in ursprünglicher Lautstärke |
+
+**Damit belegt:** Der Sendeweg des Projekts (ALSA-Sequencer, Verbindung
+mit dem Kernel-Port „Port 2“, direkt adressiertes SysEx-Ereignis,
+`snd-seq-midi`) erreicht das Gerät, und das Gerät übernimmt einen
+Registerwert daraus. Die automatische Port- und Kartenerkennung arbeitet
+am Gerät. Belegt ist das für **eine** Nachricht, nicht für eine Folge von
+24.
+
+**Nicht geklärt:** warum beide Kanäle leiser wurden. Phones 9/10 sind in
+TotalMix sehr wahrscheinlich als Stereopaar gekoppelt. Möglich sind: (a)
+das Gerät überträgt den Pegel von Output 9 bei gekoppeltem Paar auch auf
+Output 10, (b) der Pegel von `0x2600` wirkt auf das ganze
+Kopfhörerpaar, (c) eine Täuschung der Wahrnehmung (−20 dB auf einem Ohr
+wirkt insgesamt leiser). Eine objektive Messung oder ein Auslesen der
+Register fehlt. Ob die Kopplung auch die Routing-Register betrifft, ist
+offen.
+
+**Offen bis zum nächsten Hardwaretest:** Verhalten gekoppelter Paare bei
+direkten Registerzugriffen (Ausgangspegel und Routings); eine Folge
+mehrerer Nachrichten über denselben Weg; ob der Lautstärkeknopf am Gerät
+auf die Ausgangsfader 9–12 wirkt; Wirkung auf Ausgang 3–8 (abgeleitet);
+der Lauf in der gehärteten systemd-Unit.
 
 ## Weitere Quellen
 
