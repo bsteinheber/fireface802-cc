@@ -1,5 +1,6 @@
-# ff802-cc-auto (T4), systemd user unit: watch the event file of the
-# Fireface 802 automation and show new events in this session.
+# ff802-cc-auto (T4), systemd user unit: watch the event files of the
+# Fireface 802 automation (mode switch and mixer initialisation) and show
+# new events in this session.
 [Unit]
 Description=Fireface 802: watch for mode switch notifications
 Documentation=file:/usr/share/doc/ff802-cc-auto/README.Debian
@@ -7,6 +8,7 @@ PartOf=graphical-session.target
 
 [Path]
 PathChanged=/run/ff802-cc-auto/event
+PathChanged=/run/ff802-cc-auto/mixer-event
 Unit=ff802-cc-notify.service
 
 [Install]

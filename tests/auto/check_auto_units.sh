@@ -80,16 +80,19 @@ ok "systemd-analyze security: exposure <= 2.0" \
 # --- user units of the notification --------------------------------------------
 UPATH=$P/ff802-cc-notify.path
 USVC=$P/ff802-cc-notify.service
-ok "user path unit watches only the event file and starts only the notification" \
-    '[ "$(grep -E "^Path" "$UPATH")" = "PathChanged=/run/ff802-cc-auto/event" ] &&
+ok "user path unit watches only the two event files and starts only the notification" \
+    '[ "$(grep -E "^Path" "$UPATH" | tr "\n" ";")" = "PathChanged=/run/ff802-cc-auto/event;PathChanged=/run/ff802-cc-auto/mixer-event;" ] &&
      grep -qx "Unit=ff802-cc-notify.service" "$UPATH" && grep -qx "WantedBy=graphical-session.target" "$UPATH"'
 ok "user service: oneshot notifier, bounded, part of the graphical session" \
     '[ "$(grep -E "^Exec" "$USVC")" = "ExecStart=/usr/libexec/ff802-cc/ff802-cc-notify" ] &&
      grep -qx "Type=oneshot" "$USVC" && grep -qx "TimeoutStartSec=60" "$USVC" &&
      grep -qx "PartOf=graphical-session.target" "$USVC" && ! grep -qE "^Restart" "$USVC"'
 ok "notifier has no USB, privilege or system-unit access and writes only below XDG_RUNTIME_DIR" \
-    '! grep -Eq "ff802-cc-autoswitch|/dev/bus|sudo|pkexec|systemctl|udevadm" "$P/ff802-cc-notify" &&
-     [ "$(grep -oE "> *\"[^\"]*\"" "$P/ff802-cc-notify" | sort -u | tr "\n" ";")" = "> \"\$SEEN.tmp\";" ]'
+    '! grep -Eq "ff802-cc-autoswitch|/dev/bus|/dev/snd|amidi|aconnect|sudo|pkexec|systemctl|udevadm" "$P/ff802-cc-notify" &&
+     [ "$(grep -oE "> *\"[^\"]*\"" "$P/ff802-cc-notify" | sort -u | tr "\n" ";")" = "> \"\$1.tmp\";" ] &&
+     [ "$(grep -oE "mark_seen \"[^\"]*\"" "$P/ff802-cc-notify" | sort -u)" = "mark_seen \"\$SEEN\"" ] &&
+     [ "$(grep -E "^handle " "$P/ff802-cc-notify" | grep -c "\"\$XDG_RUNTIME_DIR/ff802-cc-notify\.")" = 2 ] &&
+     [ "$(grep -cE "^handle " "$P/ff802-cc-notify")" = 2 ]'
 sed 's|/usr/libexec/ff802-cc/ff802-cc-notify|/bin/true|' "$USVC" > "$T/ff802-cc-notify.service"
 cp "$UPATH" "$T/ff802-cc-notify.path"
 xdg=$(mktemp -d /tmp/ff802-xdg.XXXXXX)   # short: socket paths of other units

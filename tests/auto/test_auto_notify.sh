@@ -157,7 +157,64 @@ reset
 rc=$(notify bin-full)
 ok "no event file (nothing happened yet): exit 0" '[ "$rc" = 0 ] && [ "$(shown notify-send)" = 0 ]'
 
+# --- mixer initialisation ----------------------------------------------------------
+mevent() { # mevent <seq> <devnum> [<detail>] [<kind>]
+    now=$(date +%s)
+    printf 'seq=%s\nkind=%s\ntime=%s\nport=%s\nbusnum=3\ndevnum=%s\ndetail=%s\n' \
+        "$1" "${4:-mixer-failed}" "$now" "$PORT" "$2" "${3:-x}" > "$R/run/ff802-cc-auto/mixer-event"
+}
+MTEXT="[Fireface 802 – Mixer-Initialisierung fehlgeschlagen] [Der Class-Compliant-Modus ist aktiv, aber der interne Mixer wurde nicht vollständig eingestellt: MIDI port of card 1 not available after 10000 ms; nothing sent (0 of 24 registers). Details: ff802-cc-auto mixer-init status, journalctl -t ff802-cc-auto]"
+
+reset; dev 0424 19; mevent 1 19 "MIDI port of card 1 not available after 10000 ms; nothing sent (0 of 24 registers)"
+rc=$(notify bin-full)
+ok "mixer-failed: critical notification of its own, clearly not the CC confirmation" \
+    '[ "$rc" = 0 ] && [ "$(shown notify-send)" = 1 ] && grep -qF "[--urgency=critical] $MTEXT" "$CALLS" &&
+     ! grep -q "Class-Compliant-Modus aktiv\]" "$CALLS"'
+notify bin-full > /dev/null
+ok "mixer-failed: shown once per session" '[ "$(shown notify-send)" = 1 ]'
+
+reset; dev 0424 19; event 4 cc-active 19; mevent 5 19 "x (3 of 24 registers)"
+rc=$(notify bin-full)
+ok "cc-active and mixer-failed of the same connection: both shown, two different texts" \
+    '[ "$rc" = 0 ] && [ "$(shown notify-send)" = 2 ] &&
+     grep -qF "[Fireface 802 – Class-Compliant-Modus aktiv]" "$CALLS" &&
+     grep -qF "[Fireface 802 – Mixer-Initialisierung fehlgeschlagen]" "$CALLS"'
+mevent 6 19 "again"
+rc=$(notify bin-full)
+ok "a later mixer failure is shown, the cc-active confirmation not again" \
+    '[ "$(shown notify-send)" = 3 ] && [ "$(grep -c "Class-Compliant-Modus aktiv\]" "$CALLS")" = 1 ]'
+
+reset; dev 0424 20; mevent 1 19
+rc=$(notify bin-full)
+ok "mixer-failed, but the device was reconnected meanwhile: not shown" '[ "$rc" = 0 ] && [ "$(shown notify-send)" = 0 ]'
+reset; dev 2a39 19; mevent 1 19
+rc=$(notify bin-full)
+ok "mixer-failed, but the device is in proprietary mode now: not shown" '[ "$(shown notify-send)" = 0 ]'
+
+for k in cc-active prepared failed reboot; do
+    reset; dev 0424 19; mevent 1 19 x "$k"
+    rc=$(notify bin-full)
+    ok "mixer-event with kind '$k': ignored" '[ "$rc" = 0 ] && [ "$(shown notify-send)" = 0 ]'
+done
+reset; dev 0424 19; event 1 mixer-failed 19
+rc=$(notify bin-full)
+ok "event file with kind 'mixer-failed': ignored (only the mixer-event file carries it)" \
+    '[ "$rc" = 0 ] && [ "$(shown notify-send)" = 0 ]'
+
 # --- decoupling from the system service ---------------------------------------------
+reset; mkdir -p "$R/var/lib/ff802-cc-auto"; echo on > "$R/var/lib/ff802-cc-auto/mixer-init"
+d=$DEVS/$PORT; mkdir -p "$d"
+echo 0424 > "$d/idVendor"; echo 3fdd > "$d/idProduct"; echo 3 > "$d/busnum"; echo 19 > "$d/devnum"
+echo 480 > "$d/speed"; echo RME > "$d/manufacturer"; echo "Fireface 802 (24047128)" > "$d/product"
+env INVOCATION_ID=t FF802_AUTO_ROOT="$R" FF802_SIM_MIXER_TIMEOUT_MS=0 "$SIM" --service 3-2.4.1.1.3:003:019 >> "$T/svc.log" 2>&1
+src=$?
+rc=$(notify bin-full)
+ok "service with mixer init and no MIDI port: mixer-event written, shown as mixer failure" \
+    '[ "$src" = 3 ] && [ "$rc" = 0 ] && [ ! -e "$R/run/ff802-cc-auto/event" ] &&
+     [ "$(stat -c %a "$R/run/ff802-cc-auto/mixer-event")" = 644 ] &&
+     grep -qF "[Fireface 802 – Mixer-Initialisierung fehlgeschlagen]" "$CALLS" &&
+     grep -qF "no sound card with MIDI device for the connection after 0 ms; nothing sent (0 of 24 registers)" "$CALLS"'
+
 reset; mkdir -p "$R/var/lib/ff802-cc-auto"; echo on > "$R/var/lib/ff802-cc-auto/mode"
 d=$DEVS/$PORT; mkdir -p "$d"
 echo 2a39 > "$d/idVendor"; echo 3fcd > "$d/idProduct"; echo 3 > "$d/busnum"; echo 18 > "$d/devnum"
