@@ -1,6 +1,12 @@
 # Konzept: Steuerung des internen Mixers des Fireface 802 unter Linux
 
-> **Stand 2026-11-20, Konzept – keine Implementierung.** Es gab keine
+> **Stand 2026-11-20, Konzept.** Nachtrag 2026-11-21: Die Register der
+> geplanten Mixer-Initialisierung (Playback k → Output k, Ausgangsfader
+> 1–12) sind inzwischen mit OSCMix am Gerät bestätigt, und die
+> Initialisierung ist ohne Schreibzugriffe implementiert
+> (`FF802_ENABLE_MIXER_WRITE=OFF`); Stand und Messwerte in
+> [mixer_routing.md](mixer_routing.md#mixer-initialisierung-im-cc-modus).
+> Der folgende Text ist der unveränderte Stand vom 2026-11-20. Es gab keine
 > USB- oder MIDI-Zugriffe auf das Gerät und keine Änderung an
 > Programmdateien. Externe Projekte wurden nur lesend über ihre
 > öffentlichen Quelltexte geprüft (kein Klon, keine Installation).

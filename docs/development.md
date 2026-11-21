@@ -64,14 +64,15 @@ docs/                        Protokoll, Erkennung, Kommunikation, UCM-Profil
 
 | Bibliothek | Inhalt | libusb | darf schreiben |
 |------------|--------|:------:|:--------------:|
-| `ff802_protocol` | `reg_codec`, `cc_mode` | nein | – |
+| `ff802_protocol` | `reg_codec`, `cc_mode`, `mixer_init` (feste Liste der 24 Mixer-Register, SysEx) | nein | – |
 | `ff802_detect` | `device_id`, `detect` | nein | – |
 | `ff802_switch` | `usb_backend`, `cc_switch` | nein | nur über Backend |
 | `ff802_usb` | `usb_enum` | ja | nein |
 | `ff802_comm` | `usb_comm` | ja | nur mit `FF802_ENABLE_USB_WRITE=ON` |
 | `ff802_chanmap` | `chanmap_*` ohne ALSA | nein | – |
 | `ff802_chanmap_alsa` | `chanmap_alsa` (alsa-lib) | nein | Audio nur mit −40 dBFS, Mixer nie |
-| `ff802_auto` | `auto_sysfs`, `auto_state`, `auto_switch` | nein | nur über Backend |
+| `ff802_auto` | `auto_sysfs`, `auto_state`, `auto_switch`, `mixer_port`, `mixer_run` | nein | nur über Backend |
+| `ff802_midi_alsa` | `midi_seq_alsa` (alsa-lib, ALSA-Sequencer) | nein | MIDI-SysEx nur mit `FF802_ENABLE_MIXER_WRITE=ON` |
 
 ## Bauen und Testen (im Dev-Container)
 
@@ -84,6 +85,7 @@ ctest --test-dir build --output-on-failure
 | CMake-Option | Standard | Bedeutung |
 |--------------|----------|-----------|
 | `FF802_ENABLE_USB_WRITE` | `OFF` | Claim und Bulk-Write einkompilieren |
+| `FF802_ENABLE_MIXER_WRITE` | `OFF` | Mixer-Initialisierung: Verbinden mit dem MIDI-Port und Senden der SysEx-Nachrichten einkompilieren (bis zur Freigabe eines Hardwaretests `OFF`, auch im Paket) |
 | `FF802_BUILD_TOOLS` | `ON` | Programme bauen (benötigt libusb) |
 | `FF802_WERROR` | `ON` | Warnungen als Fehler |
 | `FF802_REQUIRE_ALSA_TESTS` | aus Umgebung, sonst `OFF` | ALSA-/Pakettests schlagen fehl statt übersprungen zu werden (Dev-Container: `ON`) |
@@ -163,6 +165,12 @@ neuer), x86-64.
 `libasound2t64` und für die Geräte-Reservierung `pw-reserve` (Paket
 `pipewire-bin`). `ff802-chanmap check` ist nur lesend.
 
+`ff802-cc-autoswitch` wird mit dem ALSA-Sequencer-Backend der
+Mixer-Initialisierung gebaut, wenn `libasound2-dev` vorhanden ist (sonst
+ohne, mit Warnung; `build-deb-auto.sh` bricht dann ab). Das Paket
+`ff802-cc-auto` hängt deshalb ab 0.2.0~dev1 von `libasound2t64` ab. Ablauf,
+Registerliste und Stand der Mixer-Initialisierung: [mixer_routing.md](mixer_routing.md#mixer-initialisierung-im-cc-modus).
+
 ## Tests
 
 | Test | Inhalt |
@@ -184,9 +192,11 @@ neuer), x86-64.
 | `ucm_bind_udev` | T3 0.3.0: udev-Hook `ff802-ucm-bind udev <N>` an neuen Ports, Idempotenz, fremde Dateien, nur das originale 802, alsa-lib ≥ 1.2.16, udev-Regel statisch |
 | `pw_integration` | T3: private PipeWire-Sitzung (PipeWire 1.6.x, WirePlumber 0.5.x) mit unverändertem WirePlumber-ALSA-Monitor gegen nachgebildete Karte im Paketaufbau: sechs Sinks und eine Quelle, Signalwege bis zum Hardwarekanal, Startlautstärke, Anstecken während der Wiedergabe, Persistenz, Host-Skript `ff802-t3-host.sh` (braucht `pipewire`, `wireplumber`, `pipewire-pulse`, `pulseaudio-utils`, `libspa-0.2-dev`) |
 | `test_chanmap_*`, `chanmap_cli_*`, `check_chanmap_sources`, `chanmap_binary_symbols` | ff802-chanmap: Simulation korrekter und falscher Zuordnungen, aller Abbruch- und Fehlerfälle, Pegelwächter, Kartenerkennung, pw-reserve, Auswertung, ALSA-Backend am `null`-Plugin |
-| `test_auto_sysfs`, `test_auto_switch` | T4: Identität aus sysfs, Zustandsdateien, Sperre, automatischer Ablauf mit allen Fehler- und Änderungsfällen |
-| `auto_flow`, `auto_notify`, `auto_control`, `auto_units` | T4: Dienstaufruf wie systemd (auch gleichzeitig), Benachrichtigung mit Test-Doubles, `ff802-cc-auto on/off/status`, udev-Regel und Units (`systemd-analyze`) |
-| `autoswitch_binary_symbols`, `autoswitch_sim_no_libusb` | T4: Symbole des Dienstprogramms; Simulationsbuild ohne libusb |
+| `test_auto_sysfs`, `test_auto_switch` | T4: Identität aus sysfs, Zustandsdateien, Sperre, automatischer Ablauf mit allen Fehler- und Änderungsfällen; Mixer-Initialisierung im CC-Zweig |
+| `test_mixer_init`, `test_mixer_port`, `test_mixer_run` | Mixer-Initialisierung: Registerliste gegen Messwerte und Formeln, SysEx-Bytes, Soundkarte aus sysfs, Auswahl des Sequencer-Ports, Ablauf gegen simuliertes MIDI-Backend mit allen Fehlerfällen |
+| `check_mixer_sources`, `autoswitch_mixer_symbols` | Quelltextprüfung (ALSA-Aufrufe, SysEx, Registerliterale nur in den vorgesehenen Dateien) und Symbole des Dienstprogramms (nur Sequencer, ohne Freigabe keine Ausgabefunktionen) |
+| `auto_flow`, `auto_notify`, `auto_control`, `auto_units` | T4: Dienstaufruf wie systemd (auch gleichzeitig), Benachrichtigung mit Test-Doubles, `ff802-cc-auto on/off/status` und `mixer-init on/off/status`, udev-Regel und Units (`systemd-analyze`) |
+| `autoswitch_binary_symbols`, `autoswitch_sim_no_libusb` | T4: Symbole des Dienstprogramms; Simulationsbuild ohne libusb und ohne libasound |
 | `deb_auto_package` | T4-Paket: reproduzierbar, Inhalt, Installation/Upgrade/Entfernung/Purge in isolierter Wurzel mit Stolperdrähten |
 | `deb_cc_package` | Paket `ff802-cc`: Bau nur aus sauberem Commit, bitgleich aus zwei Checkouts und beim Neubau, Inhalt, Programme, Zusammenspiel mit `ff802-cc-auto` in isolierter Wurzel |
 | `reproducible_release_build` | Release-Build mit `-Werror` in zwei Verzeichnissen, Programme byte-gleich |

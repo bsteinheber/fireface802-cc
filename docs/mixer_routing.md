@@ -1,10 +1,13 @@
 # Interner Mixer und Routing im Class-Compliant-Modus
 
-> **Stand 2026-11-20.** Dieses Dokument sammelt, was über den internen
+> **Stand 2026-11-21.** Dieses Dokument sammelt, was über den internen
 > Mixer des ursprünglichen Fireface 802 im CC-Modus bekannt ist. Es trennt
 > streng zwischen **bestätigten Beobachtungen** an unserem Gerät, den
 > **Angaben im RME-Handbuch**, **Schlussfolgerungen** und **offenen
-> Fragen**. Dieses Projekt liest und schreibt den Mixer **nicht**.
+> Fragen**. Die veröffentlichten Versionen (bis 0.4.1) lesen und schreiben
+> den Mixer **nicht**. Eine optionale Mixer-Initialisierung ist in
+> Entwicklung; sie ist im Code enthalten, sendet aber noch nichts (siehe
+> [Mixer-Initialisierung im CC-Modus](#mixer-initialisierung-im-cc-modus)).
 
 ## Worum es geht
 
@@ -94,11 +97,13 @@ Quelle: RME Fireface 802 User's Guide, z. B.
   ALSA oder PipeWire: Der Ton kam auf Software Playback 9/10 an
   (Beobachtung 2), und die Ausgabe änderte sich allein durch Fader im
   Gerät (Beobachtungen 4 und 6).
-- Keine Komponente dieses Projekts schreibt Mixer-Werte: Das UCM-Profil
-  enthält keine Mixer-Befehle (kein `cset`, keine `BootSequence`/
-  `EnableSequence`), WirePlumber regelt nur Software-Lautstärken,
+- Keine veröffentlichte Komponente dieses Projekts (bis 0.4.1) schreibt
+  Mixer-Werte: Das UCM-Profil enthält keine Mixer-Befehle (kein `cset`,
+  keine `BootSequence`/`EnableSequence`), WirePlumber regelt nur Software-Lautstärken,
   `ff802-cc-auto` und `ff802-cc enable` senden nur den Befehl für
-  Register `0x3D44`, `ff802-chanmap` liest den Mixer nur.
+  Register `0x3D44`, `ff802-chanmap` liest den Mixer nur. Die neue
+  Mixer-Initialisierung ist ohne `FF802_ENABLE_MIXER_WRITE` gebaut und
+  sendet ebenfalls nichts.
 - Der Host-Test `ff802-t3-host.sh verify` prüft nur die PipeWire/ALSA-
   Ebene. Ein bestandener `verify` sagt nichts über das Routing im Gerät.
 
@@ -146,7 +151,9 @@ Ursache (widerspricht Beobachtung 2).
    ([audio_t2_results/](audio_t2_results/README.md)). Ob die fehlenden
    Signale in T2 am Mixer-Routing lagen, ist offen.
 4. Lässt sich das Routing zuverlässig und dauerhaft von Linux aus
-   einrichten? Ein Werkzeug dafür enthält dieses Projekt nicht.
+   einrichten? Mit OSCMix ja (Beobachtungen 4 und 5). Eine eigene,
+   optionale Mixer-Initialisierung ist in Entwicklung und sendet noch
+   nichts (siehe unten).
 
 ## Werkzeuge zum Einstellen des Mixers
 
@@ -158,8 +165,81 @@ Ursache (widerspricht Beobachtung 2).
   Testbedarf hinweist. Bei uns hat es für Phones 9/10 funktioniert
   (Beobachtung 4); eine Zusage für andere Einstellungen gibt es nicht.
 
-Eine automatische Einrichtung des Mixer-Routings ist in diesem Projekt
-**nicht implementiert**.
+## Register, mit OSCMix am Gerät bestätigt (2026-11-21)
+
+Gemessen vom Anwender mit OSCMix (Debug-Ausgabe der geschriebenen und
+empfangenen Register) im CC-Modus. Formeln für Kanal k = 1…12 (1–8 Analog,
+9–12 Phones):
+
+- Playback k → Hardware Output k: `0x4000 | ((k−1) << 6) | (0x20 + k − 1)`,
+  0 dB = `0x9000`
+- Ausgangsfader Hardware Output k: `0x1E00 + ((k−1) << 8)`, 0 dB = `0x0000`
+
+| Funktion | Register | 0 dB | Nachweis |
+|---|---|---|---|
+| Playback 1 → Output 1 | `0x4020` | `0x9000` | geschrieben und beobachtet |
+| Playback 2 → Output 2 | `0x4061` | `0x9000` | geschrieben und beobachtet |
+| Playback 9 → Output 9 | `0x4228` | `0x9000` | geschrieben und beobachtet |
+| Playback 10 → Output 10 | `0x4269` | `0x9000` | geschrieben und beobachtet |
+| Playback 11 → Output 11 | `0x42AA` | `0x9000` | geschrieben und beobachtet |
+| Playback 12 → Output 12 | `0x42EB` | `0x9000` | geschrieben und beobachtet |
+| Hardware Output 1 | `0x1E00` | `0x0000` | geschrieben und beobachtet |
+| Hardware Output 9 | `0x2600` | `0x0000` | geschrieben und beobachtet |
+| Hardware Output 10 | `0x2700` | `0x0000` | geschrieben und beobachtet |
+| Hardware Output 11 | `0x2800` | `0x0000` | geschrieben und beobachtet |
+| Hardware Output 12 | `0x2900` | `0x0000` | nur in Registermeldungen beobachtet |
+
+Playback 3–8 → Output 3–8 und die Ausgangsfader 2–8 sind aus den Formeln
+abgeleitet. OSCMix schreibt beim Verändern eines Stereo-Playback-Faders
+teilweise zusätzlich die gekreuzten Routings (z. B. Playback 9 → Output 10)
+mit dem Wert null; die Mixer-Initialisierung übernimmt das **nicht**.
+
+Die Kommunikation über den ALSA-Sequencer-Port „Port 2“ wurde mit OSCMix
+(`alsaseqio`) erfolgreich getestet. Phase 2a (passives Mitlesen) zeigte
+den Port als Kernel-Client 20 mit `card=1`, Port 1 „Fireface 802 (24047128)
+Port 2“.
+
+## Mixer-Initialisierung im CC-Modus
+
+**Stand:** implementiert und automatisiert getestet (Simulation), **ohne
+Schreibzugriffe**: Die Build-Option `FF802_ENABLE_MIXER_WRITE` ist `OFF`,
+auch im Paket `ff802-cc-auto 0.2.0~dev1` (unveröffentlicht). Ein solcher
+Build findet und meldet den MIDI-Port, sendet aber nichts
+(Ergebnis `disabled-build`). Ein Hardwaretest ist noch nicht freigegeben.
+
+- **Einschalten:** `ff802-cc-auto mixer-init on|off|status`, Standard aus,
+  unabhängig von der automatischen Umschaltung
+  (`/var/lib/ff802-cc-auto/mixer-init`).
+- **Wann:** im bestehenden Dienst `ff802-cc-auto@.service`, im Zweig für
+  ein Gerät im CC-Modus, bei **jedem** udev-„add“ des Geräts (Umstecken,
+  Aus/Ein, Boot, nach `ff802-cc enable`). Es gibt dafür bewusst keinen
+  Eintrag „schon erledigt“ je Verbindung: Die Werte sind absolut, eine
+  Wiederholung schreibt dieselben Werte, und eine wiederverwendete
+  USB-Gerätenummer kann eine nötige Initialisierung nie unterdrücken.
+- **Was:** genau 24 Register in fester Reihenfolge, erst Playback 1…12 →
+  Output 1…12, dann die Ausgangsfader 1…12, jeweils 0 dB
+  ([mixer_init.h](../include/ff802/mixer_init.h)). Nichts anderes:
+  keine gekreuzten Routings, Eingänge, Mute, Pan, weitere Ausgänge oder
+  gespeicherten Setups. Die Liste ist eine Konstante mit Prüfsumme.
+- **Wie:** RME-SysEx `F0 00 20 0D 10 00 <5 Septette> F7` über den
+  ALSA-Sequencer. Der Port wird ohne feste Nummern gefunden: Soundkarte
+  der USB-Verbindung aus sysfs, Kernel-Client mit dieser Kartennummer,
+  dessen Port 1 mit einem Namen auf „Port 2“; Index und Name müssen
+  übereinstimmen. Warten auf Karte und Port höchstens 10 s.
+- **Fehler:** keine Wiederholung, kein Zurücksetzen (es wird nichts
+  gelesen). Ergebnis in `/run/ff802-cc-auto/mixer-result`, eine
+  Journalzeile je Register, bei Fehlern eine eigene Desktop-Benachrichtigung
+  „Mixer-Initialisierung fehlgeschlagen“, getrennt von „Class-Compliant-Modus
+  aktiv“.
+- **Gefahr:** 0 dB an Phones 9–12 kann sehr laut sein; manuelle
+  Änderungen an diesen 24 Werten werden bei jeder Verbindung
+  überschrieben.
+
+**Offen bis zum Hardwaretest:** ob der Kernel-Client `snd-seq-midi`
+direkt adressierte SysEx-Ereignisse nach dem Verbinden vollständig an das
+Gerät weitergibt (bei OSCMix mit `alsaseqio` belegt, für dieses Programm
+nicht); ob der Lautstärkeknopf am Gerät auf die Ausgangsfader 9–12 wirkt;
+Wirkung auf Ausgang 3–8 (abgeleitet).
 
 ## Weitere Quellen
 
