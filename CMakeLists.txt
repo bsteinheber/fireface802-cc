@@ -160,6 +160,29 @@ else()
     message(WARNING "alsa-lib not found: ff802-chanmap is not built")
 endif()
 
+# Safety gate of the mixer initialisation: without this option the ALSA
+# sequencer backend can list ports but cannot subscribe to the Fireface
+# MIDI port or send a SysEx message. Keep OFF until a hardware test of
+# the mixer writes has been explicitly approved.
+option(FF802_ENABLE_MIXER_WRITE "Compile in MIDI subscribe and SysEx send of the mixer initialisation" OFF)
+if(FF802_ENABLE_MIXER_WRITE)
+    message(WARNING "FF802_ENABLE_MIXER_WRITE=ON: ff802-cc-autoswitch can write mixer registers")
+endif()
+
+# ALSA sequencer backend of the mixer initialisation (ff802-cc-autoswitch).
+if(ALSA_FOUND)
+    add_library(ff802_midi_alsa STATIC src/midi_seq_alsa.c)
+    target_include_directories(ff802_midi_alsa PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    target_link_libraries(ff802_midi_alsa PUBLIC PkgConfig::ALSA)
+    if(FF802_ENABLE_MIXER_WRITE)
+        target_compile_definitions(ff802_midi_alsa PRIVATE FF802_ENABLE_MIXER_WRITE=1)
+    else()
+        target_compile_definitions(ff802_midi_alsa PRIVATE FF802_ENABLE_MIXER_WRITE=0)
+    endif()
+    set_target_properties(ff802_midi_alsa PROPERTIES C_EXTENSIONS ON)
+    ff802_set_warnings(ff802_midi_alsa)
+endif()
+
 # Command-line tools need libusb. Without it, only the pure libraries and
 # their tests are built.
 option(FF802_BUILD_TOOLS "Build the libusb based command-line tools" ON)
