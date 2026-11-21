@@ -10,6 +10,7 @@ endfunction()
 
 ff802_add_test(test_reg_codec ff802_protocol)
 ff802_add_test(test_cc_mode ff802_protocol)
+ff802_add_test(test_mixer_init ff802_protocol)
 ff802_add_test(test_device_id ff802_detect)
 ff802_add_test(test_detect ff802_detect)
 
