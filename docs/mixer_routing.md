@@ -371,6 +371,15 @@ mehrerer Nachrichten über denselben Weg; ob der Lautstärkeknopf am Gerät
 auf die Ausgangsfader 9–12 wirkt; Wirkung auf Ausgang 3–8 (abgeleitet);
 der Lauf in der gehärteten systemd-Unit.
 
+### Hardwaretest B.4 (vorbereitet, nicht ausgeführt)
+
+Beobachtung: Wiedergabe über „Analog Output 1/2“ ist auf Phones 9/10
+hörbar, und zwar nur Playback 2 (rechts) auf Phones 10. Vermutet wird eine
+Matrixverbindung Playback 2 → Hardware Output 10, Register `0x4261`. B.4
+schaltet sie mit genau einer Nachricht `0x4261 = 0x0000` ab
+(`F0 00 20 0D 10 00 00 00 04 13 04 F7`). Der vorherige Wert ist nicht
+wiederherstellbar. Einzelheiten: [mixer_b4.md](mixer_b4.md).
+
 ## Weitere Quellen
 
 - RME-Forum: Remote controlling Fireface 802 in class compliant mode?
