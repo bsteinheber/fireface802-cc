@@ -12,6 +12,10 @@
 #                          on every connection, Playback 1..12 -> Output
 #                          1..12 and the volumes of Output 1..12 at 0 dB
 #                          (on: administrator; off: the active local user)
+#   ff802-cc-auto mixer-init dry-run|apply
+#                          run the mixer initialisation once by hand
+#                          (ff802-mixer-init; dry-run sends nothing, apply
+#                          asks for SEND); independent of on/off
 #
 # "off" only stops Linux from switching the device automatically; it does
 # not change the USB mode of the Fireface (that would be "ff802-cc disable",
@@ -26,15 +30,17 @@
 # ff802-cc-auto-mixer-on|-mixer-off (org.ff802cc.auto.mixer-on/-off).
 #
 # Test overrides: FF802_AUTO_ROOT (prefix of all paths, no root needed),
-# FF802_AUTO_LIBEXEC (directory of the helper programs).
+# FF802_AUTO_LIBEXEC (directory of the helper programs), FF802_MIXER_INIT
+# (path of ff802-mixer-init).
 
 set -u
 
 ROOT=${FF802_AUTO_ROOT:-}
 LIBEXEC=${FF802_AUTO_LIBEXEC:-/usr/libexec/ff802-cc}
+MIXER_INIT=${FF802_MIXER_INIT:-/usr/bin/ff802-mixer-init}
 
 usage() {
-    sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'
     exit 2
 }
 
@@ -110,6 +116,8 @@ case $# in
         [ "$1" = mixer-init ] || usage
         case $2 in
             status) mixer_status ;;
+            dry-run) exec "$MIXER_INIT" --dry-run ;;
+            apply) mixer_warning; exec "$MIXER_INIT" --apply ;;
             on) mixer_warning; set_mode mixer-on ;;
             off) set_mode mixer-off ;;
             *) usage ;;

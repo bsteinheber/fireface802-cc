@@ -157,6 +157,15 @@ for a in "mixer-init" "mixer-init yes" "mixer-init on extra" "mixer on" "status 
     ctl $a > /dev/null 2>&1; rc=$?
     ok "ff802-cc-auto '$a': usage error, mixer-init unchanged" '[ "$rc" = 2 ] && [ "$(cat "$STATE/mixer-init")" = off ]'
 done
+printf '#!/bin/sh\necho "mixer-init-stub $*" >> "%s"\nexit 0\n' "$T/mi.log" > "$T/mi-stub"
+chmod +x "$T/mi-stub"
+FF802_MIXER_INIT=$T/mi-stub ctl mixer-init dry-run > "$T/mdry.txt" 2>&1; rc=$?
+FF802_MIXER_INIT=$T/mi-stub ctl mixer-init apply > "$T/mapply.txt" 2>&1; rc2=$?
+ok "mixer-init dry-run/apply: run ff802-mixer-init by hand (apply after the warning), state unchanged" \
+    '[ "$rc" = 0 ] && [ "$rc2" = 0 ] &&
+     [ "$(tr "\n" ";" < "$T/mi.log")" = "mixer-init-stub --dry-run;mixer-init-stub --apply;" ] &&
+     ! grep -q WARNING "$T/mdry.txt" && grep -q "headphone outputs can be very loud" "$T/mapply.txt" &&
+     [ "$(cat "$STATE/mixer-init")" = off ]'
 FF802_AUTO_ROOT=$R sh "$P/ff802-cc-auto-mixer-on" extra > /dev/null 2>&1; rc=$?
 ok "mixer helper with arguments: refused" '[ "$rc" = 2 ] && [ "$(cat "$STATE/mixer-init")" = off ]'
 

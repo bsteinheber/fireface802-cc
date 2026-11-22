@@ -24,6 +24,6 @@ Description: automatic class-compliant mode for the RME Fireface 802
  ff802-cc-auto mixer-init on sets, on every connection in class-compliant
  mode, the routings Playback 1..12 -> Output 1..12 and the volumes of the
  twelve hardware outputs to 0 dB through the ALSA sequencer (MIDI port 2
- of the unit). In this development build the mixer writes are not
- compiled in (FF802_ENABLE_MIXER_WRITE=OFF): the MIDI port is found and
- reported, nothing is sent.
+ of the unit). Existing crossed routings and input routings are not
+ cleared. ff802-mixer-init --dry-run|--apply runs the same initialisation
+ once by hand.

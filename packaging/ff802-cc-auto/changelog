@@ -1,3 +1,19 @@
+ff802-cc-auto (0.2.0~dev2) UNRELEASED; urgency=medium
+
+  * Development build, not released; for the practical test on the unit.
+  * Mixer writes compiled in (FF802_ENABLE_MIXER_WRITE=ON, only in this
+    package build): the ALSA sequencer write path was confirmed on the
+    unit in the hardware tests B.2 (0x2600) and B.3 (0x4228, 0x4269).
+    The automatic initialisation stays OFF after installation
+    ('ff802-cc-auto mixer-init on' turns it on).
+  * New program /usr/bin/ff802-mixer-init (--list, --dry-run, --apply):
+    the same 24 register writes and flow as the service, by hand, with
+    a SEND confirmation; also as 'ff802-cc-auto mixer-init dry-run|apply'.
+  * 10 ms between the 24 messages and 200 ms before unsubscribing (as in
+    B.3); waiting for card and MIDI port up to 15 s.
+
+ -- Bernhard Steinheber <bernhard@steinheber.info>  Sun, 22 Nov 2026 12:00:00 +0100
+
 ff802-cc-auto (0.2.0~dev1) UNRELEASED; urgency=medium
 
   * Development build, not released, not for installation on the

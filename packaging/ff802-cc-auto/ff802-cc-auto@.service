@@ -8,7 +8,7 @@
 # the device, never retries, never switches back to proprietary mode.
 #
 # In class-compliant mode, only if 'ff802-cc-auto mixer-init on' (off by
-# default, independent of the automation): waits up to 10 s for the MIDI
+# default, independent of the automation): waits up to 15 s for the MIDI
 # port "Port 2" of this connection and sets the 24 fixed mixer registers
 # (Playback 1..12 -> Output 1..12 and the volumes of Output 1..12 at
 # 0 dB) through the ALSA sequencer; no USB access for that.

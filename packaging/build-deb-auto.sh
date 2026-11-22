@@ -3,15 +3,17 @@
 #
 # Usage: packaging/build-deb-auto.sh <output dir> [<version override>]
 #
-# Builds ff802-cc-autoswitch in <output dir>/.build-auto as a Release
-# build with FF802_ENABLE_USB_WRITE=ON (the installed service must be able
-# to write). The program is compiled, stripped and copied, but never
-# executed: building or checking the package sends nothing to any device.
+# Builds ff802-cc-autoswitch and ff802-mixer-init in <output dir>/.build-auto
+# as a Release build with FF802_ENABLE_USB_WRITE=ON (the installed service
+# must be able to write). The programs are compiled, stripped and copied,
+# never executed: building or checking the package sends nothing to any device.
 # Version and SOURCE_DATE_EPOCH come from packaging/ff802-cc-auto/changelog.
-# The mixer initialisation is built with the ALSA sequencer backend, but
-# without FF802_ENABLE_MIXER_WRITE (default OFF): the packaged program can
-# find the MIDI port but cannot send mixer registers until a hardware test
-# of the mixer writes has been approved.
+# The mixer initialisation (ff802-cc-autoswitch and ff802-mixer-init) is
+# built with the ALSA sequencer backend and FF802_ENABLE_MIXER_WRITE=ON:
+# this package build is the one place where the production write gate is
+# opened (the CMake default stays OFF; the hardware test programs B.2/B.3
+# are not built). At run time the automatic initialisation stays off until
+# "ff802-cc-auto mixer-init on".
 # Needs: cmake, a C compiler, libusb-1.0-0-dev, libasound2-dev, dpkg-deb,
 # gzip, md5sum, nm.
 
@@ -40,14 +42,17 @@ OUT=$(CDPATH= cd -- "$OUT" && pwd)
 # --- program (compiled only) ------------------------------------------------------
 B=$OUT/.build-auto
 cmake -S "$SRC" -B "$B" -DCMAKE_BUILD_TYPE=Release -DFF802_WERROR=ON \
-      -DBUILD_TESTING=OFF -DFF802_ENABLE_USB_WRITE=ON -DFF802_ENABLE_MIXER_WRITE=OFF \
+      -DBUILD_TESTING=OFF -DFF802_ENABLE_USB_WRITE=ON -DFF802_ENABLE_MIXER_WRITE=ON \
+      -DFF802_BUILD_MIXER_B2=OFF -DFF802_BUILD_MIXER_B3=OFF \
       > "$B.configure.log" 2>&1 ||
     { cat "$B.configure.log" >&2; exit 1; }
-cmake --build "$B" --target ff802-cc-autoswitch -j > "$B.build.log" 2>&1 ||
+cmake --build "$B" --target ff802-cc-autoswitch ff802-mixer-init -j > "$B.build.log" 2>&1 ||
     { cat "$B.build.log" >&2; exit 1; }
-# the package needs the mixer backend (alsa-lib found at configure time)
-nm -D --undefined-only "$B/ff802-cc-autoswitch" | grep -q ' snd_seq_open' ||
-    { echo "build-deb-auto: ff802-cc-autoswitch was built without the ALSA sequencer backend (libasound2-dev missing?)" >&2; exit 1; }
+# the package needs the mixer backend with its write path (nm, nothing executed)
+for p in ff802-cc-autoswitch ff802-mixer-init; do
+    nm -D --undefined-only "$B/$p" | grep -q ' snd_seq_connect_to' ||
+        { echo "build-deb-auto: $p lacks the ALSA sequencer write path (libasound2-dev missing?)" >&2; exit 1; }
+done
 
 # --- stage --------------------------------------------------------------------------
 STAGE=$OUT/.stage-$NAME
@@ -63,6 +68,8 @@ put() { # put <mode> <source> <path in package>
 LX=usr/libexec/ff802-cc
 put 0755 "$B/ff802-cc-autoswitch"           $LX/ff802-cc-autoswitch
 strip --strip-unneeded "$STAGE/$LX/ff802-cc-autoswitch"
+put 0755 "$B/ff802-mixer-init"              usr/bin/ff802-mixer-init
+strip --strip-unneeded "$STAGE/usr/bin/ff802-mixer-init"
 put 0755 "$PKGSRC/ff802-cc-auto-on"         $LX/ff802-cc-auto-on
 put 0755 "$PKGSRC/ff802-cc-auto-off"        $LX/ff802-cc-auto-off
 put 0755 "$PKGSRC/ff802-cc-auto-mixer-on"   $LX/ff802-cc-auto-mixer-on

@@ -58,6 +58,12 @@ Independent of the automation, also for a unit that was switched with
   ff802-cc-auto mixer-init status   state and last result (anyone)
   ff802-cc-auto mixer-init on       turn on  (administrator)
   ff802-cc-auto mixer-init off      turn off (the active local user)
+  ff802-cc-auto mixer-init dry-run  find unit, sound card and MIDI port; send nothing
+  ff802-cc-auto mixer-init apply    initialise once by hand (asks for SEND)
+
+The manual run is /usr/bin/ff802-mixer-init (--list shows the 24
+messages); it works for a normal user of the desktop session, takes the
+lock of the service and does not depend on "mixer-init on".
 
 The state is kept in /var/lib/ff802-cc-auto/mixer-init. When it is on,
 the service sets on EVERY connection of the unit in class-compliant mode
@@ -80,14 +86,20 @@ set the volume in the applications.
 
 Each register is logged (journalctl -t ff802-cc-auto). The result is in
 /run/ff802-cc-auto/mixer-result. If the initialisation fails (MIDI port
-not there within 10 s, port not unambiguous, ALSA error, stopped while
+not there within 15 s, port not unambiguous, ALSA error, stopped while
 sending), nothing is retried and a separate notification "Fireface 802 –
 Mixer-Initialisierung fehlgeschlagen" is shown; the class-compliant mode
 itself is not affected.
 
-This development build does not contain the mixer writes
-(FF802_ENABLE_MIXER_WRITE=OFF): with mixer-init on, the MIDI port is found
-and reported, nothing is sent, and the result is "disabled-build".
+Existing crossed routings (e.g. Playback 9 -> Output 10) and input
+routings are NOT cleared by the initialisation; only the 24 values above
+are set. The messages are sent 10 ms apart over one subscription, then
+the program waits 200 ms before closing it.
+
+Verification: play a test signal on one channel of a sink, e.g.
+  PIPEWIRE_NODE=<node.name> speaker-test -D pipewire -c 2 -s 1 -t sine -l 1
+(node.name from "wpctl inspect <sink id>"); it must be heard on the left
+output of that pair only, -s 2 on the right only.
 
 Automatic and manual switching
 ------------------------------
