@@ -88,6 +88,25 @@ add_test(NAME mixer_b2
             ${PROJECT_SOURCE_DIR} $<TARGET_FILE:ff802-mixer-b2-sim> ${b2_real}
             ${CMAKE_NM} ${CMAKE_CURRENT_BINARY_DIR}/b2-scratch)
 
+# Hardware test program B.3 (one routing write), same scheme as B.2.
+add_executable(ff802-mixer-b3-sim
+    ${PROJECT_SOURCE_DIR}/tools/hw-test/ff802_mixer_b3.c sim_midi.c)
+target_include_directories(ff802-mixer-b3-sim PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(ff802-mixer-b3-sim PRIVATE ff802_auto)
+target_compile_definitions(ff802-mixer-b3-sim PRIVATE
+    FF802_B3_SIM=1 FF802_VERSION="${PROJECT_VERSION}")
+set_target_properties(ff802-mixer-b3-sim PROPERTIES C_EXTENSIONS ON)
+ff802_set_warnings(ff802-mixer-b3-sim)
+if(FF802_HAVE_MIXER_B3)
+    set(b3_real $<TARGET_FILE:ff802-mixer-b3>)
+else()
+    set(b3_real "-")
+endif()
+add_test(NAME mixer_b3
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/test_mixer_b3.sh
+            ${PROJECT_SOURCE_DIR} $<TARGET_FILE:ff802-mixer-b3-sim> ${b3_real}
+            ${CMAKE_NM} ${CMAKE_CURRENT_BINARY_DIR}/b3-scratch)
+
 # Desktop notification (test doubles for notify-send and busctl) and its
 # decoupling from the system service.
 add_test(NAME auto_notify
