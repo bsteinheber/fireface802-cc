@@ -40,6 +40,10 @@ void ff802_mixer_default_options(ff802_mixer_options *o)
     o->timeout_ms = FF802_MIXER_TIMEOUT_MS;
     o->poll_ms = FF802_MIXER_POLL_MS;
     o->gap_ms = FF802_MIXER_GAP_MS;
+    o->settle_ms = FF802_MIXER_SETTLE_MS;
+    o->dry_run = 0;
+    o->confirm = NULL;
+    o->confirm_user = NULL;
 }
 
 const char *ff802_mixer_outcome_str(ff802_mixer_outcome o)
@@ -52,14 +56,17 @@ const char *ff802_mixer_outcome_str(ff802_mixer_outcome o)
     case FF802_MIXER_NO_PORT:        return "no-port";
     case FF802_MIXER_REFUSED:        return "refused";
     case FF802_MIXER_NOT_SENT:       return "not-sent";
-    case FF802_MIXER_INCOMPLETE:     break;
+    case FF802_MIXER_INCOMPLETE:     return "incomplete";
+    case FF802_MIXER_DRY_RUN:        return "dry-run";
+    case FF802_MIXER_ABORTED:        break;
     }
-    return "incomplete";
+    return "aborted";
 }
 
 int ff802_mixer_outcome_failed(ff802_mixer_outcome o)
 {
-    return o != FF802_MIXER_OFF && o != FF802_MIXER_DONE;
+    return o != FF802_MIXER_OFF && o != FF802_MIXER_DONE && o != FF802_MIXER_DRY_RUN &&
+           o != FF802_MIXER_ABORTED;
 }
 
 static void log_ports(FILE *log, const ff802_seq_port *ports, size_t n, int card)
@@ -138,10 +145,15 @@ static ff802_mixer_outcome run_open(const char *root, const ff802_sysfs_dev *d,
     logf_(log, "mixer: MIDI port %d:%d '%s' of card %d for %s.", res->client,
           res->port, res->port_name, res->card, d->kernel_name);
 
+    if (o->dry_run)
+        return finish(res, FF802_MIXER_DRY_RUN, "dry run: port %d:%d found; nothing sent",
+                      res->client, res->port);
     if (!f->write_enabled)
         return finish(res, FF802_MIXER_DISABLED_BUILD,
                       "port %d:%d found, but mixer writes are not compiled into "
                       "this build; nothing sent", res->client, res->port);
+    if (o->confirm != NULL && !o->confirm(o->confirm_user, res))
+        return finish(res, FF802_MIXER_ABORTED, "not confirmed; nothing sent");
 
     char why[128];
     if (!still_same(root, d, res->card, why, sizeof why))
@@ -177,6 +189,8 @@ static ff802_mixer_outcome run_open(const char *root, const ff802_sysfs_dev *d,
         if (o->gap_ms > 0 && i + 1u < FF802_MIXER_INIT_COUNT)
             f->sleep_ms(f->ctx, o->gap_ms);
     }
+    if (o->settle_ms > 0)
+        f->sleep_ms(f->ctx, o->settle_ms);
     return finish(res, FF802_MIXER_DONE, "%u registers sent to MIDI port %d:%d '%s' (card %d)",
                   FF802_MIXER_INIT_COUNT, res->client, res->port, res->port_name, res->card);
 }

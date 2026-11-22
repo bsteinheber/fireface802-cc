@@ -123,3 +123,10 @@ ff802_status ff802_rme_sysex_reg(uint16_t addr, uint16_t value,
     out[11] = 0xF7;
     return FF802_OK;
 }
+
+ff802_status ff802_mixer_init_message(unsigned index, uint8_t out[FF802_MIXER_SYSEX_SIZE])
+{
+    if (index >= FF802_MIXER_INIT_COUNT)
+        return FF802_ERR_ADDR_RANGE;
+    return ff802_rme_sysex_reg(TABLE[index].addr, TABLE[index].value, out);
+}

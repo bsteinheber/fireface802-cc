@@ -249,18 +249,102 @@ static void test_disabled_and_unavailable(void)
 static void test_strings(void)
 {
     static const char *const W[] = { "off", "done", "disabled-build", "unavailable",
-                                     "no-port", "refused", "not-sent", "incomplete" };
-    for (int i = 0; i <= (int)FF802_MIXER_INCOMPLETE; i++) {
+                                     "no-port", "refused", "not-sent", "incomplete",
+                                     "dry-run", "aborted" };
+    for (int i = 0; i <= (int)FF802_MIXER_ABORTED; i++) {
         CHECK(strcmp(ff802_mixer_outcome_str((ff802_mixer_outcome)i), W[i]) == 0);
-        CHECK(ff802_mixer_outcome_failed((ff802_mixer_outcome)i) == (i >= 2));
+        CHECK(ff802_mixer_outcome_failed((ff802_mixer_outcome)i) == (i >= 2 && i <= 7));
     }
     ff802_mixer_options o;
     ff802_mixer_default_options(&o);
-    CHECK(o.timeout_ms == 10000 && o.poll_ms == 100 && o.gap_ms == 1);
+    CHECK(o.timeout_ms == 15000 && o.poll_ms == 100 && o.gap_ms == 10 && o.settle_ms == 200);
+    CHECK(o.dry_run == 0 && o.confirm == NULL && o.confirm_user == NULL);
+}
+
+/* Dry run, confirmation and the pause before closing. */
+static int g_confirm_calls;
+static int confirm_no(void *u, const ff802_mixer_result *r)
+{
+    (void)u;
+    g_confirm_calls++;
+    return r->client == 20 && r->port == 1 ? 0 : 1;
+}
+static int confirm_yes(void *u, const ff802_mixer_result *r)
+{
+    fake_midi *m = u;
+    g_confirm_calls++;
+    /* nothing has been sent or connected when asked */
+    return m->n_connect == 0 && m->n_send_calls == 0 && r->written == 0;
+}
+
+static void test_dry_run_confirm_settle(void)
+{
+    fixture fx; fake_midi m; ff802_mixer_result r;
+    fx_init(&fx); fx_ff802_cc(&fx, 19); card1(&fx);
+    ff802_sysfs_dev d = snapshot(&fx);
+
+    /* dry run: port found and reported, no connect, works without writes */
+    fake_midi_init(&m, 1, 20);
+    m.write_enabled = 0;
+    ff802_midi_factory f = fake_midi_factory(&m);
+    ff802_mixer_options o = fast();
+    o.dry_run = 1;
+    CHECK(ff802_mixer_run(fx.paths.sysfs_root, &d, &f, &o, NULL, &r) == FF802_MIXER_DRY_RUN);
+    CHECK(r.client == 20 && r.port == 1 && m.n_connect == 0 && m.n_send_calls == 0 && m.n_close == 1);
+    CHECK(!ff802_mixer_outcome_failed(r.outcome));
+
+    /* confirmation declined: nothing sent */
+    fake_midi_init(&m, 1, 20);
+    f = fake_midi_factory(&m);
+    o = fast();
+    o.confirm = confirm_no;
+    g_confirm_calls = 0;
+    CHECK(ff802_mixer_run(fx.paths.sysfs_root, &d, &f, &o, NULL, &r) == FF802_MIXER_ABORTED);
+    CHECK(g_confirm_calls == 1 && m.n_connect == 0 && m.n_send_calls == 0 && m.n_close == 1);
+
+    /* confirmation given before anything is sent; then 24 + settle */
+    fake_midi_init(&m, 1, 20);
+    f = fake_midi_factory(&m);
+    o = fast();
+    o.confirm = confirm_yes;
+    o.confirm_user = &m;
+    o.gap_ms = 10;
+    o.settle_ms = 200;
+    g_confirm_calls = 0;
+    CHECK(ff802_mixer_run(fx.paths.sysfs_root, &d, &f, &o, NULL, &r) == FF802_MIXER_DONE);
+    CHECK(g_confirm_calls == 1 && m.n_sent == 24 && m.n_close == 1);
+    CHECK(m.n_sleep == 24 && m.slept_ms == 23u * 10u + 200u);
+
+    /* a build without writes is refused before asking */
+    fake_midi_init(&m, 1, 20);
+    m.write_enabled = 0;
+    f = fake_midi_factory(&m);
+    o = fast();
+    o.confirm = confirm_yes;
+    o.confirm_user = &m;
+    g_confirm_calls = 0;
+    CHECK(ff802_mixer_run(fx.paths.sysfs_root, &d, &f, &o, NULL, &r) == FF802_MIXER_DISABLED_BUILD);
+    CHECK(g_confirm_calls == 0);
+    fx_done(&fx);
+}
+
+static void test_messages(void)
+{
+    const ff802_mixer_entry *t = ff802_mixer_init_table();
+    for (unsigned i = 0; i < 24u; i++) {
+        uint8_t a[12], b[12];
+        CHECK(ff802_mixer_init_message(i, a) == FF802_OK);
+        CHECK(ff802_rme_sysex_reg(t[i].addr, t[i].value, b) == FF802_OK);
+        CHECK_BYTES(a, b, 12);
+    }
+    uint8_t c[12];
+    CHECK(ff802_mixer_init_message(24, c) == FF802_ERR_ADDR_RANGE);
 }
 
 int main(void)
 {
+    test_dry_run_confirm_settle();
+    test_messages();
     test_done();
     test_waits();
     test_no_port();

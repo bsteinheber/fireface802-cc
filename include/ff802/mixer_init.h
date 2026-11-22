@@ -93,6 +93,9 @@ void ff802_mixer_entry_label(const ff802_mixer_entry *e, char *buf, size_t size)
 ff802_status ff802_rme_sysex_reg(uint16_t addr, uint16_t value,
                                  uint8_t out[FF802_MIXER_SYSEX_SIZE]);
 
+/* The SysEx message of entry index (0..23) of the table, e.g. for display. */
+ff802_status ff802_mixer_init_message(unsigned index, uint8_t out[FF802_MIXER_SYSEX_SIZE]);
+
 #ifdef __cplusplus
 }
 #endif

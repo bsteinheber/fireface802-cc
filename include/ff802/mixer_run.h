@@ -28,9 +28,10 @@
 extern "C" {
 #endif
 
-#define FF802_MIXER_TIMEOUT_MS 10000u   /* wait for card and port */
+#define FF802_MIXER_TIMEOUT_MS 15000u   /* wait for card and port */
 #define FF802_MIXER_POLL_MS      100u
-#define FF802_MIXER_GAP_MS         1u   /* pause between two messages */
+#define FF802_MIXER_GAP_MS        10u   /* pause between two messages (as B.3) */
+#define FF802_MIXER_SETTLE_MS    200u   /* after the last one, before unsubscribing */
 
 typedef enum ff802_mixer_outcome {
     FF802_MIXER_OFF = 0,        /* mixer-init is not on: nothing done */
@@ -40,24 +41,40 @@ typedef enum ff802_mixer_outcome {
     FF802_MIXER_NO_PORT,        /* card or port did not appear in time */
     FF802_MIXER_REFUSED,        /* not unambiguous, changed, or table check */
     FF802_MIXER_NOT_SENT,       /* backend or subscription failed */
-    FF802_MIXER_INCOMPLETE      /* sending failed after <written> messages */
+    FF802_MIXER_INCOMPLETE,     /* sending failed after <written> messages */
+    FF802_MIXER_DRY_RUN,        /* options.dry_run: port found, nothing sent */
+    FF802_MIXER_ABORTED         /* options.confirm declined: nothing sent */
 } ff802_mixer_outcome;
 
+/*
+ * timeout_ms: wait for card and port; poll_ms: polling interval;
+ * gap_ms: pause between two messages; settle_ms: pause after the last
+ * message before unsubscribing (the kernel drains the rawmidi output when
+ * the subscription ends). dry_run: stop after the port is found.
+ * confirm (manual use, NULL for the service): called after the port is
+ * found and before anything is sent; nonzero to go on.
+ */
+typedef struct ff802_mixer_result ff802_mixer_result;
 typedef struct ff802_mixer_options {
     unsigned timeout_ms;
     unsigned poll_ms;
     unsigned gap_ms;
+    unsigned settle_ms;
+    int      dry_run;
+    int    (*confirm)(void *user, const ff802_mixer_result *found);
+    void    *confirm_user;
 } ff802_mixer_options;
 
-typedef struct ff802_mixer_result {
+struct ff802_mixer_result {
     ff802_mixer_outcome outcome;
     unsigned written;            /* messages passed to ALSA */
     int  card, client, port;     /* -1 if not found */
     char port_name[FF802_SEQ_NAME_MAX];
     char detail[192];
-} ff802_mixer_result;
+};
 
-/* Defaults: FF802_MIXER_TIMEOUT_MS, _POLL_MS, _GAP_MS. */
+/* Defaults: FF802_MIXER_TIMEOUT_MS, _POLL_MS, _GAP_MS, _SETTLE_MS, no
+ * dry run, no confirmation. */
 void ff802_mixer_default_options(ff802_mixer_options *o);
 
 /*
