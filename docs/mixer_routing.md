@@ -302,6 +302,42 @@ wirkt insgesamt leiser). Eine objektive Messung oder ein Auslesen der
 Register fehlt. Ob die Kopplung auch die Routing-Register betrifft, ist
 offen.
 
+### Hardwaretest B.3 (vorbereitet, Schreibschritte nicht freigegeben)
+
+Ein einzelnes Routing: Playback 9 → Hardware Output 9, `0x4228 = 0x9000`
+(0 dB), `F0 00 20 0D 10 00 00 20 22 11 0C F7`, mit
+[ff802_mixer_b3.c](../tools/hw-test/ff802_mixer_b3.c) (CMake-Option
+`FF802_BUILD_MIXER_B3`, nie installiert). Das Programm schreibt nur diesen
+belegten Wert; „aus“ (`0x0000` laut OSCMix, `0x8000` = −65 dB laut
+FireWire-Protokoll) ist nicht belegt und wird nur von OSCMix geschrieben.
+
+Ablauf: B.3.0 OSCMix (Debug) setzt das Paar Playback 9/10 → Output 9/10
+auf −∞ und Output 9/10 auf 0 dB, alle `setreg`-Zeilen werden gesichert;
+B.3.1 einkanalig links, dann rechts: beide Seiten stumm; B.3.2 Dry-Run;
+B.3.3 `--send`; B.3.4 links-Signal: nur links hörbar; B.3.5
+rechts-Signal: stumm (sonst spiegelt das Gerät die Kopplung); B.3.6
+OSCMix setzt den gewünschten Betriebszustand (voraussichtlich 0 dB auf
+beiden Kanälen). Der Routingwert vor dem Test wird nicht
+wiederhergestellt, sondern durch einen definierten Zustand ersetzt.
+
+**Einkanalige Wiedergabe auf „Headphones Output 9/10“**, ohne die
+Standard-Senke zu ändern (die Zielangabe gilt nur für den einen Prozess):
+
+```sh
+wpctl status                                   # ID der Senke "Headphones Output 9/10"
+wpctl inspect <ID> | grep node.name            # Knotenname der Senke
+PIPEWIRE_NODE=<node.name> speaker-test -D pipewire -c 2 -s 1 -t sine -f 440 -l 3   # nur links
+PIPEWIRE_NODE=<node.name> speaker-test -D pipewire -c 2 -s 2 -t sine -f 440 -l 3   # nur rechts
+```
+
+`speaker-test` (alsa-utils) erzeugt einen Stereostrom, in dem nur der
+gewählte Kanal ein Signal trägt. `PIPEWIRE_NODE` setzt das Ziel des
+ALSA-Plugins `pipewire` für diesen Aufruf. Ersatzweise `-D pulse` mit
+`PULSE_SINK=<node.name>`. Während der Wiedergabe zeigen `wpctl status`
+oder `pw-top`, an welcher Senke der Strom hängt. Die Lautstärke wird mit
+dem Kopfhörerregler am Gerät niedrig gehalten, nicht über die
+gespeicherte Senkenlautstärke.
+
 **Offen bis zum nächsten Hardwaretest:** Verhalten gekoppelter Paare bei
 direkten Registerzugriffen (Ausgangspegel und Routings); eine Folge
 mehrerer Nachrichten über denselben Weg; ob der Lautstärkeknopf am Gerät
