@@ -14,6 +14,7 @@ typedef struct simm {
     char log_path[FF802_AUTO_PATH_MAX + 16u];
     char ports_path[FF802_AUTO_PATH_MAX + 16u];
     unsigned sends;
+    unsigned lists;
 } simm;
 
 static simm g_sim;
@@ -47,6 +48,10 @@ static int s_list(void *self, ff802_seq_port *out, size_t max, size_t *n)
     mlog(s, "seq list");
     if (env_is("FF802_SIM_SEQ_LIST_ERR", "1"))
         return -EIO;
+    s->lists++;
+    const char *after = getenv("FF802_SIM_SEQ_PORTS_AFTER");
+    if (after != NULL && s->lists <= (unsigned)atoi(after))
+        return 0;                       /* the port appears later */
     FILE *f = fopen(s->ports_path, "r");
     if (f == NULL)
         return 0;
@@ -105,6 +110,7 @@ static int f_open(void *ctx, ff802_midi_backend *be)
     if (env_is("FF802_SIM_SEQ_OPEN_ERR", "1"))
         return -ENOENT;
     s->sends = 0;
+    s->lists = 0;
     be->self = s;
     be->list_ports = s_list;
     be->connect = s_connect;

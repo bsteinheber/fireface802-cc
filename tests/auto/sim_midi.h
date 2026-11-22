@@ -16,6 +16,8 @@
  *   FF802_SIM_MIXER_WRITE=0         behave like a build without
  *                                   FF802_ENABLE_MIXER_WRITE
  *   FF802_SIM_MIXER_TIMEOUT_MS=<n>  wait for card/port (default 300)
+ *   FF802_SIM_SEQ_PORTS_AFTER=<n>   the port list is empty for the first
+ *                                   n lists (port appears late)
  */
 #ifndef FF802_SIM_MIDI_H
 #define FF802_SIM_MIDI_H

@@ -47,7 +47,8 @@ unset FF802_SIM_INIT_ERR FF802_SIM_LAYOUT FF802_SIM_OPEN_ERR FF802_SIM_KDRV \
       FF802_SIM_REPLUG_ON_OPEN FF802_SIM_UNPLUG_ON_OPEN FF802_SIM_UNPLUG_ON_WRITE \
       FF802_SIM_WRITE_DELAY_MS INVOCATION_ID \
       FF802_SIM_SEQ_OPEN_ERR FF802_SIM_SEQ_LIST_ERR FF802_SIM_SEQ_CONNECT_ERR \
-      FF802_SIM_SEQ_SEND_ERR_AT FF802_SIM_MIXER_WRITE FF802_SIM_MIXER_TIMEOUT_MS
+      FF802_SIM_SEQ_SEND_ERR_AT FF802_SIM_MIXER_WRITE FF802_SIM_MIXER_TIMEOUT_MS \
+      FF802_SIM_SEQ_PORTS_AFTER
 
 # --- simulated host -------------------------------------------------------------
 reset_root() {
@@ -337,6 +338,82 @@ for p in $pids; do wait "$p"; done
 ok "M13: five simultaneous events: serialised, each a complete block of 24, all exit 0" \
     '[ "$(sysex)" = 120 ] && [ "$(cat "$T"/mrc.* | sort -u)" = 0 ] &&
      [ "$(tr "\n" ";" < "$MIDI" | sed -e "s/sysex F0[^;]*;/S/g" | sed "s/seq open;seq list;seq connect 20:1;SSSSSSSSSSSSSSSSSSSSSSSSseq close;//g")" = "" ]'
+
+# all 24 messages, written out (independent shell computation, as in
+# test_mixer_init_tool.sh)
+EXPECTED24="F0 00 20 0D 10 00 00 20 02 01 0C F7
+F0 00 20 0D 10 00 00 20 06 03 0C F7
+F0 00 20 0D 10 00 00 20 0A 05 0C F7
+F0 00 20 0D 10 00 00 20 0E 07 0C F7
+F0 00 20 0D 10 00 00 20 12 09 0C F7
+F0 00 20 0D 10 00 00 20 16 0B 0C F7
+F0 00 20 0D 10 00 00 20 1A 0D 0C F7
+F0 00 20 0D 10 00 00 20 1E 0F 0C F7
+F0 00 20 0D 10 00 00 20 22 11 0C F7
+F0 00 20 0D 10 00 00 20 26 13 0C F7
+F0 00 20 0D 10 00 00 20 2A 15 0C F7
+F0 00 20 0D 10 00 00 20 2E 17 0C F7
+F0 00 20 0D 10 00 00 00 00 70 09 F7
+F0 00 20 0D 10 00 00 00 00 78 01 F7
+F0 00 20 0D 10 00 00 00 00 00 02 F7
+F0 00 20 0D 10 00 00 00 00 08 0A F7
+F0 00 20 0D 10 00 00 00 00 10 0A F7
+F0 00 20 0D 10 00 00 00 00 18 02 F7
+F0 00 20 0D 10 00 00 00 00 20 0A F7
+F0 00 20 0D 10 00 00 00 00 28 02 F7
+F0 00 20 0D 10 00 00 00 00 30 02 F7
+F0 00 20 0D 10 00 00 00 00 38 0A F7
+F0 00 20 0D 10 00 00 00 00 40 0A F7
+F0 00 20 0D 10 00 00 00 00 48 02 F7"
+sent24() { grep '^sysex F0' "$MIDI" | sed 's/^sysex //'; }
+
+reset_root; mixer on; ccdev 19
+rc=$(event)
+ok "M14: service sends exactly the 24 expected messages, byte for byte, in order" \
+    '[ "$rc" = 0 ] && [ "$(sent24)" = "$EXPECTED24" ]'
+
+reset_root; mixer on; ccdev 19
+rc=$(event FF802_SIM_SEQ_PORTS_AFTER=2 FF802_SIM_MIXER_TIMEOUT_MS=1000)
+ok "M15: MIDI port appears late (after two polls): waited for, then the 24 messages" \
+    '[ "$rc" = 0 ] && [ "$(grep -c "^seq list" "$MIDI")" = 3 ] && [ "$(sysex)" = 24 ] && [ "$(mres outcome)" = done ]'
+reset_root; mixer on; cc 19
+( sleep 0.4; mkdir -p "$DEVS/$PORT/$PORT:1.0/sound/card1/midiC1D0"; seqports 20 ) &
+late=$!
+rc=$(event FF802_SIM_MIXER_TIMEOUT_MS=3000)
+wait "$late"
+ok "M15: sound card appears late (after the udev event): waited for, then initialised" \
+    '[ "$rc" = 0 ] && [ "$(sysex)" = 24 ] && grep -q "^mixer: sound card 1 for $PORT (after [1-9][0-9]* ms)" "$T/journal.txt"'
+
+reset_root; mixer on; ccdev 19
+rc=$(event)
+rm -rf -- "${RUN:?}"; mkdir -p "$RUN"          # reboot: /run empty, unit still connected
+rc2=$(event)                                  # udev coldplug "add" at boot
+ok "M16: reboot with the unit connected (coldplug add): initialised again, state of the run dir rebuilt" \
+    '[ "$rc" = 0 ] && [ "$rc2" = 0 ] && [ "$(sysex)" = 48 ] && [ "$(mres outcome)" = done ] && [ "$(outcome)" = cc-active ]'
+reset_root; mixer on; mode on; prop 18
+rc=$(event)
+rm -rf -- "${RUN:?}"; mkdir -p "$RUN"          # reboot before reconnecting
+unplug; ccdev 19
+rc2=$(event)
+ok "M16: switched, then reboot instead of reconnect: CC at boot is initialised (no pending needed)" \
+    '[ "$rc" = 0 ] && [ "$(writes)" = 1 ] && [ "$rc2" = 0 ] && [ "$(sysex)" = 24 ] && [ ! -e "$RUN/event" ]'
+
+reset_root; mode on; mixer off; prop 18
+rc=$(event); unplug; ccdev 19; rc2=$(event)
+ok "M17: automation on, mixer init off: switch and confirmation as before, mixer untouched" \
+    '[ "$rc" = 0 ] && [ "$rc2" = 0 ] && [ "$(writes)" = 1 ] && [ "$(kind)" = cc-active ] &&
+     [ "$(midi_calls)" = 0 ] && [ ! -e "$RUN/mixer-result" ]'
+reset_root; mode off; mixer off; ccdev 19
+rc=$(event)
+ok "M17: both off: nothing at all" '[ "$rc" = 0 ] && [ "$(usb_calls)" = 0 ] && [ "$(midi_calls)" = 0 ]'
+
+reset_root; mixer on; ccdev 19
+inst=$(instance $PORT); unplug; ccdev 20
+rc=$(service "$inst")
+ok "M18: stale event (unit reconnected, devnum 19 -> 20): nothing for the stale event, no MIDI access" \
+    '[ "$rc" = 3 ] && [ "$(midi_calls)" = 0 ]'
+rc=$(event)
+ok "M18: the event of the new connection initialises" '[ "$rc" = 0 ] && [ "$(sysex)" = 24 ] && [ "$(mres devnum)" = 20 ]'
 
 reset_root; mixer on; ccdev 19
 before=$(cd "$R" && find . | sort)
