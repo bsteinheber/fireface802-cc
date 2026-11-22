@@ -69,3 +69,16 @@ else()
     message(WARNING "alsa-lib not found: ff802-cc-autoswitch is built without "
                     "the mixer initialisation")
 endif()
+
+# Manual mixer initialisation (same flow and backend as the service).
+# Installed by the ff802-cc-auto package as /usr/bin/ff802-mixer-init;
+# sends only in a build with FF802_ENABLE_MIXER_WRITE.
+if(TARGET ff802_midi_alsa)
+    add_executable(ff802-mixer-init ff802_mixer_init.c)
+    target_link_libraries(ff802-mixer-init PRIVATE ff802_auto ff802_midi_alsa)
+    target_compile_definitions(ff802-mixer-init PRIVATE FF802_VERSION="${PROJECT_VERSION}")
+    set_target_properties(ff802-mixer-init PROPERTIES
+        C_EXTENSIONS ON
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+    ff802_set_warnings(ff802-mixer-init)
+endif()

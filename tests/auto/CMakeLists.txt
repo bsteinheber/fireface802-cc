@@ -107,6 +107,25 @@ add_test(NAME mixer_b3
             ${PROJECT_SOURCE_DIR} $<TARGET_FILE:ff802-mixer-b3-sim> ${b3_real}
             ${CMAKE_NM} ${CMAKE_CURRENT_BINARY_DIR}/b3-scratch)
 
+# Manual mixer initialisation with the simulated MIDI backend.
+add_executable(ff802-mixer-init-sim
+    ${PROJECT_SOURCE_DIR}/tools/ff802_mixer_init.c sim_midi.c)
+target_include_directories(ff802-mixer-init-sim PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(ff802-mixer-init-sim PRIVATE ff802_auto)
+target_compile_definitions(ff802-mixer-init-sim PRIVATE
+    FF802_MIXER_INIT_SIM=1 FF802_VERSION="${PROJECT_VERSION}")
+set_target_properties(ff802-mixer-init-sim PROPERTIES C_EXTENSIONS ON)
+ff802_set_warnings(ff802-mixer-init-sim)
+if(TARGET ff802-mixer-init)
+    set(mi_real $<TARGET_FILE:ff802-mixer-init>)
+else()
+    set(mi_real "-")
+endif()
+add_test(NAME mixer_init_tool
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/test_mixer_init_tool.sh
+            ${PROJECT_SOURCE_DIR} $<TARGET_FILE:ff802-mixer-init-sim> ${mi_real}
+            ${CMAKE_NM} ${CMAKE_CURRENT_BINARY_DIR}/mi-scratch)
+
 # Desktop notification (test doubles for notify-send and busctl) and its
 # decoupling from the system service.
 add_test(NAME auto_notify
