@@ -131,6 +131,71 @@ rc=$(FF802_SIM_SEQ_SEND_ERR_AT=1 b3 SEND --send)
 ok "sending fails: exit 4, one attempt, no retry" \
     '[ "$rc" = 4 ] && [ "$(grep -c "^sysex" "$MIDI")" = 1 ] && grep -q "nothing retried" "$T/out.txt"'
 
+# --- restore stereo routing 9/10 ---------------------------------------------------
+MSG10="F0 00 20 0D 10 00 00 20 26 13 0C F7"
+reset 20
+rc=$(b3 "" --restore-stereo --dry-run)
+ok "restore-stereo dry run: both messages listed in order, port found, nothing sent" \
+    '[ "$rc" = 0 ] && [ "$(grep -c "^message " "$T/out.txt")" = 2 ] &&
+     [ "$(grep "^message " "$T/out.txt" | tr "\n" ";")" = "message stereo-9 0x4228 = 0x9000  Playback 9 -> Hardware Output 9 (Phones 9) 0 dB;message stereo-10 0x4269 = 0x9000  Playback 10 -> Hardware Output 10 (Phones 10) 0 dB;" ] &&
+     grep -q "^              $MSG$" "$T/out.txt" && grep -q "^              $MSG10$" "$T/out.txt" &&
+     grep -q "^dry run: nothing sent" "$T/out.txt" && [ "$(connects)" = 0 ] && [ "$(sysex)" = 0 ]'
+rc=$(b3 "" --dry-run --restore-stereo)
+ok "restore-stereo dry run: argument order does not matter" '[ "$rc" = 0 ] && [ "$(sysex)" = 0 ]'
+
+reset 24
+rc=$(b3 SEND --restore-stereo)
+ok "restore-stereo: exactly TWO messages, 0x4228 then 0x4269, to 24:1, one connection" \
+    '[ "$rc" = 0 ] && [ "$(connects)" = 1 ] && [ "$(sysex)" = 2 ] &&
+     [ "$(grep "^sysex " "$MIDI" | tr "\n" ";")" = "sysex $MSG;sysex $MSG10;" ] &&
+     [ "$(tr "\n" ";" < "$MIDI")" = "seq open;seq list;seq list;seq connect 24:1;sysex $MSG;sysex $MSG10;seq close;" ]'
+ok "restore-stereo: both transfers logged, close only after both and the settle time" \
+    'grep -q "message 1 of 2 passed to ALSA" "$T/out.txt" && grep -q "message 2 of 2 passed to ALSA" "$T/out.txt" &&
+     [ "$(grep -n "both messages passed to ALSA; waiting 200 ms" "$T/out.txt" | cut -d: -f1)" -lt "$(grep -n "\] closed$" "$T/out.txt" | cut -d: -f1)" ] &&
+     grep -q "Type SEND to send these TWO messages" "$T/out.txt"'
+ok "restore-stereo: no other register written (no crossed routing, no volume)" \
+    '! grep "^sysex " "$MIDI" | grep -vxE "sysex ($MSG|$MSG10)" | grep -q . &&
+     ! grep -qE "sysex .*(00 00 24 11 04|00 00 20 13 04|30 02|30 0A)" "$MIDI"'
+
+for answer in "" "send" "SEND SEND" "y"; do
+    reset 20
+    rc=$(b3 "$answer" --restore-stereo)
+    ok "restore-stereo confirmation '$answer': aborted, no connect, nothing sent" \
+        '[ "$rc" = 3 ] && [ "$(connects)" = 0 ] && [ "$(sysex)" = 0 ] && grep -q "aborted: nothing sent" "$T/out.txt"'
+done
+
+reset 20
+rc=$(FF802_SIM_SEQ_SEND_ERR_AT=2 b3 SEND --restore-stereo)
+ok "restore-stereo: second message fails: exit 4, first passed, reported as 1 of 2, no retry" \
+    '[ "$rc" = 4 ] && [ "$(grep -c "^sysex F0" "$MIDI")" = 1 ] && grep -qx "sysex $MSG" "$MIDI" &&
+     [ "$(grep -c "^sysex FAILED" "$MIDI")" = 1 ] && grep -q "message 2 of 2 failed .*1 of 2 passed to ALSA" "$T/out.txt" &&
+     grep -q "nothing retried" "$T/out.txt" && grep -q "seq close" "$MIDI"'
+reset 20
+rc=$(FF802_SIM_SEQ_SEND_ERR_AT=1 b3 SEND --restore-stereo)
+ok "restore-stereo: first message fails: exit 4, the second is not sent" \
+    '[ "$rc" = 4 ] && [ "$(grep -c "^sysex" "$MIDI")" = 1 ] && grep -q "0 of 2 passed to ALSA" "$T/out.txt"'
+reset 20
+rc=$(FF802_SIM_MIXER_WRITE=0 b3 SEND --restore-stereo)
+ok "restore-stereo without write functions: refused before asking" \
+    '[ "$rc" = 3 ] && [ "$(connects)" = 0 ] && ! grep -q "Type SEND" "$T/out.txt"'
+reset 20; dev 3-2.4.1.1.4 0424 3fdd 54; card 3-2.4.1.1.4 2
+rc=$(b3 SEND --restore-stereo)
+ok "restore-stereo with two units in CC mode: refused, nothing sent" \
+    '[ "$rc" = 3 ] && [ ! -e "$MIDI" ]'
+reset 20; dev "$PORT" 2a39 3fcd 53
+rc=$(b3 SEND --restore-stereo)
+ok "restore-stereo with the unit in proprietary mode: refused, nothing sent" '[ "$rc" = 3 ] && [ ! -e "$MIDI" ]'
+reset 20; seqports 20 "Fireface 802 (24047128) Port 1"
+rc=$(b3 SEND --restore-stereo)
+ok "restore-stereo with a wrong port name: refused, nothing sent" '[ "$rc" = 3 ] && [ "$(sysex)" = 0 ]'
+for a in "--restore-stereo --send" "--send --restore-stereo" "--restore-stereo --restore-stereo" \
+         "--restore-stereo 9" "--restore-stereo --connection"; do
+    reset 20
+    # shellcheck disable=SC2086
+    rc=$(b3 SEND $a)
+    ok "arguments '$a': usage error, nothing opened" '[ "$rc" = 2 ] && [ ! -e "$MIDI" ]'
+done
+
 # --- refusals before anything is sent ----------------------------------------------
 refused() { # refused <description>: exit 3, no connect, nothing sent
     rc=$(b3 SEND --send)
@@ -161,11 +226,15 @@ ok "simulation refuses to run without its private root" '[ "$rc" = 2 ]'
 
 # --- source: exactly the one message --------------------------------------------------
 B3SRC=$SRC/tools/hw-test/ff802_mixer_b3.c
-ok "source: exactly one SysEx literal, register 0x4228, value 0x9000" \
-    '[ "$(grep -c "{ 0xF0, 0x00, 0x20, 0x0D, 0x10, 0x00," "$B3SRC")" = 1 ] &&
+ok "source: exactly three SysEx literals (route, stereo-9, stereo-10), registers 0x4228/0x4269, value 0x9000" \
+    '[ "$(grep -c "{ 0xF0, 0x00, 0x20, 0x0D, 0x10, 0x00," "$B3SRC")" = 3 ] &&
+     [ "$(grep -c "{ 0xF0, 0x00, 0x20, 0x0D, 0x10, 0x00, 0x00, 0x20, 0x22, 0x11, 0x0C, 0xF7 }" "$B3SRC")" = 2 ] &&
+     [ "$(grep -c "{ 0xF0, 0x00, 0x20, 0x0D, 0x10, 0x00, 0x00, 0x20, 0x26, 0x13, 0x0C, 0xF7 }" "$B3SRC")" = 1 ] &&
      [ "$(grep -c "^#define B3_REG 0x4228u$" "$B3SRC")" = 1 ] &&
-     [ "$(grep -oE "\"route\", 0x[0-9A-F]{4}u" "$B3SRC" | tr "\n" ";")" = "\"route\", 0x9000u;" ] &&
-     ! grep -Eq "0x0000u|0xFF38u|0x2600u|restore" "$B3SRC"'
+     [ "$(grep -c "^#define B3_REG_10 0x4269u$" "$B3SRC")" = 1 ] &&
+     [ "$(grep -oE "\"(route|stereo-9|stereo-10)\", 0x[0-9A-F]{4}u" "$B3SRC" | tr "\n" ";")" = "\"route\", 0x9000u;\"stereo-9\", 0x9000u;\"stereo-10\", 0x9000u;" ] &&
+     [ "$(grep -oE "0x4[0-9A-F]{3}u" "$B3SRC" | sort -u | tr "\n" " ")" = "0x4228u 0x4269u " ] &&
+     ! grep -vE "^ ?(\*|/\*)" "$B3SRC" | grep -Eq "0x0000u|0xFF38u|0x2600u|0x4229|0x4268"'
 ok "source: no other message source (no mixer table, no free address or value)" \
     '! grep -Eq "mixer_init|ff802_rme_sysex_reg|strtoul|strtol|sscanf|atoi" "$B3SRC"'
 ok "simulation build links neither libasound nor libusb" \

@@ -5,19 +5,31 @@
  *
  *   ff802-mixer-b3 --dry-run   [--connection <kernel name>]
  *   ff802-mixer-b3 --send      [--connection <kernel name>]
+ *   ff802-mixer-b3 --restore-stereo [--dry-run] [--connection <kernel name>]
  *   ff802-mixer-b3 --help | --version
  *
- * The program contains exactly ONE message:
+ * --send (the single-write test) sends exactly ONE message:
  *
  *   0x4228 = 0x9000   Playback 9 -> Hardware Output 9 (Phones 9), 0 dB
  *   F0 00 20 0D 10 00 00 20 22 11 0C F7
  *
- * Address and value were measured with OSCMix on the unit; the message
- * is entry 9 of the mixer initialisation. There is no message for "off"
- * (its encoding is not established) and no input for an address or a
- * value. Before anything is sent the literal is checked against the
- * register codec. The start and end state of the test are set with
- * OSCMix, not with this program.
+ * --restore-stereo (after the test, the normal stereo routing of
+ * Playback 9/10) sends exactly TWO messages, in this order:
+ *
+ *   0x4228 = 0x9000   Playback 9 -> Hardware Output 9 (Phones 9), 0 dB
+ *   F0 00 20 0D 10 00 00 20 22 11 0C F7
+ *   0x4269 = 0x9000   Playback 10 -> Hardware Output 10 (Phones 10), 0 dB
+ *   F0 00 20 0D 10 00 00 20 26 13 0C F7
+ *
+ * 10 ms between the two, then 200 ms before unsubscribing (the kernel
+ * drains the rawmidi output when the subscription ends). The crossed
+ * routings 0x4229/0x4268 and the output volumes are not written.
+ *
+ * Addresses and value were measured with OSCMix on the unit; the messages
+ * are entries 9 and 10 of the mixer initialisation. There is no message
+ * for "off" (its encoding is not established) and no input for an address
+ * or a value. Before anything is sent the literals are checked against the
+ * register codec.
  *
  * Flow and safety as in ff802-mixer-b2: the Fireface 802 in CC mode (the
  * only one, or --connection) -> its sound card from sysfs -> the
@@ -73,26 +85,51 @@ typedef struct b3_msg {
     uint16_t    value;
     const char *meaning;
     uint8_t     bytes[MSG_LEN];
+    uint16_t    reg;
 } b3_msg;
 
-/* The only message of this program. */
+/* The single-write test (--send). */
 static const b3_msg MSG = {
     "route", 0x9000u, "Playback 9 -> Hardware Output 9 (Phones 9) 0 dB",
-    { 0xF0, 0x00, 0x20, 0x0D, 0x10, 0x00, 0x00, 0x20, 0x22, 0x11, 0x0C, 0xF7 }
+    { 0xF0, 0x00, 0x20, 0x0D, 0x10, 0x00, 0x00, 0x20, 0x22, 0x11, 0x0C, 0xF7 },
+    B3_REG
 };
+
+/*
+ * --restore-stereo: the normal stereo routing of Playback 9/10, in this
+ * order. The crossed routings 0x4229/0x4268 and all output volumes are
+ * not written.
+ */
+#define B3_REG_10 0x4269u
+static const b3_msg STEREO[2] = {
+    { "stereo-9", 0x9000u, "Playback 9 -> Hardware Output 9 (Phones 9) 0 dB",
+      { 0xF0, 0x00, 0x20, 0x0D, 0x10, 0x00, 0x00, 0x20, 0x22, 0x11, 0x0C, 0xF7 },
+      B3_REG },
+    { "stereo-10", 0x9000u, "Playback 10 -> Hardware Output 10 (Phones 10) 0 dB",
+      { 0xF0, 0x00, 0x20, 0x0D, 0x10, 0x00, 0x00, 0x20, 0x26, 0x13, 0x0C, 0xF7 },
+      B3_REG_10 },
+};
+
+#define STEREO_GAP_MS     10u   /* between the two messages */
+#define STEREO_SETTLE_MS 200u   /* after the last one, before unsubscribing */
 
 static void usage(FILE *out)
 {
     fprintf(out,
         "Usage: ff802-mixer-b3 --dry-run [--connection <kernel name>]\n"
         "       ff802-mixer-b3 --send [--connection <kernel name>]\n"
+        "       ff802-mixer-b3 --restore-stereo [--dry-run] [--connection <kernel name>]\n"
         "       ff802-mixer-b3 --help | --version\n"
         "\n"
         "Hardware test B.3: writes ONE routing register of the Fireface 802\n"
         "in class-compliant mode through the ALSA sequencer port 'Port 2':\n"
         "  0x4228 = 0x9000  Playback 9 -> Hardware Output 9 (Phones 9) 0 dB\n"
+        "--restore-stereo writes the normal stereo routing of Playback 9/10,\n"
+        "exactly two messages in this order:\n"
+        "  0x4228 = 0x9000  Playback 9 -> Hardware Output 9 (Phones 9) 0 dB\n"
+        "  0x4269 = 0x9000  Playback 10 -> Hardware Output 10 (Phones 10) 0 dB\n"
         "--dry-run finds the unit, its sound card and the port and sends\n"
-        "nothing. --send asks for SEND on the terminal and sends the message.\n"
+        "nothing. --send / --restore-stereo ask for SEND on the terminal.\n"
         "Only after an explicit approval of the hardware test.\n"
         "\n"
         "Exit status: 0 ok, 2 usage, 3 refused/nothing sent, 4 sending failed.\n");
@@ -118,17 +155,23 @@ static void hex(const uint8_t *b, size_t n, char *out, size_t size)
         o += (size_t)snprintf(out + o, size - o, i ? " %02X" : "%02X", b[i]);
 }
 
-/* The literal bytes are the codec's SysEx frame of (0x4228, 0x9000). */
-static int msg_ok(void)
+/* The literal bytes are the codec's SysEx frame of (reg, value). */
+static int one_ok(const b3_msg *m)
 {
     uint32_t w;
     uint8_t want[MSG_LEN] = { 0xF0, 0x00, 0x20, 0x0D, 0x10, 0x00 };
-    if (ff802_reg_encode(B3_REG, MSG.value, &w) != FF802_OK)
+    if (ff802_reg_encode(m->reg, m->value, &w) != FF802_OK)
         return 0;
     for (unsigned i = 0; i < 5u; i++)
         want[6u + i] = (uint8_t)((w >> (7u * i)) & 0x7Fu);
     want[11] = 0xF7;
-    return memcmp(want, MSG.bytes, MSG_LEN) == 0;
+    return memcmp(want, m->bytes, MSG_LEN) == 0;
+}
+
+static int msg_ok(void)
+{
+    return one_ok(&MSG) && one_ok(&STEREO[0]) && one_ok(&STEREO[1]) &&
+           MSG.reg == 0x4228u && STEREO[0].reg == 0x4228u && STEREO[1].reg == 0x4269u;
 }
 
 /* The one Fireface 802 in CC mode, or the named connection. */
@@ -170,16 +213,19 @@ static int find_unit(const char *root, const char *want, ff802_sysfs_dev *out)
     return 1;
 }
 
-static int confirm(void)
+static int confirm(size_t count)
 {
 #ifndef FF802_B3_SIM
     if (!isatty(STDIN_FILENO)) {
-        printf("refused: --send needs an interactive terminal\n");
+        printf("refused: --send/--restore-stereo needs an interactive terminal\n");
         return 0;
     }
 #endif
     char line[32];
-    printf("Type SEND to send this ONE message (anything else aborts): ");
+    if (count == 1u)
+        printf("Type SEND to send this ONE message (anything else aborts): ");
+    else
+        printf("Type SEND to send these TWO messages (anything else aborts): ");
     fflush(stdout);
     if (fgets(line, sizeof line, stdin) == NULL)
         return 0;
@@ -190,6 +236,7 @@ static int confirm(void)
 int main(int argc, char **argv)
 {
     const char *mode = NULL, *conn = NULL;
+    int stereo = 0;
     const char *root = "/sys";
     char rootbuf[FF802_SYSFS_STR_MAX * 4];
 
@@ -209,9 +256,22 @@ int main(int argc, char **argv)
             mode = "dry-run";
         } else if (strcmp(argv[i], "--send") == 0 && mode == NULL) {
             mode = "send";
+        } else if (strcmp(argv[i], "--restore-stereo") == 0 && !stereo) {
+            stereo = 1;
         } else if (strcmp(argv[i], "--connection") == 0 && conn == NULL && i + 1 < argc) {
             conn = argv[++i];
         } else {
+            usage(stderr);
+            return EXIT_USAGE;
+        }
+    }
+    /* --restore-stereo alone sends; with --dry-run it only reports */
+    if (stereo) {
+        if (mode == NULL)
+            mode = "restore-stereo";
+        else if (strcmp(mode, "dry-run") == 0)
+            mode = "restore-stereo dry-run";
+        else {
             usage(stderr);
             return EXIT_USAGE;
         }
@@ -220,7 +280,16 @@ int main(int argc, char **argv)
         usage(stderr);
         return EXIT_USAGE;
     }
-    const b3_msg *msg = strcmp(mode, "send") == 0 ? &MSG : NULL;
+    const b3_msg *list[2];
+    size_t count = 0;
+    if (stereo) {
+        list[count++] = &STEREO[0];
+        list[count++] = &STEREO[1];
+    } else {
+        list[count++] = &MSG;
+    }
+    const b3_msg *msg = (strcmp(mode, "send") == 0 || strcmp(mode, "restore-stereo") == 0)
+                        ? list[0] : NULL;
 
     ff802_midi_factory f;
 #ifdef FF802_B3_SIM
@@ -244,11 +313,11 @@ int main(int argc, char **argv)
         printf("refused: the compiled-in message does not match the register codec\n");
         return EXIT_REFUSED;
     }
-    {
+    for (size_t k = 0; k < count; k++) {
         char h[64];
-        hex(MSG.bytes, MSG_LEN, h, sizeof h);
-        printf("message %s 0x%04X = 0x%04X  %s\n              %s\n", MSG.name,
-               B3_REG, (unsigned)MSG.value, MSG.meaning, h);
+        hex(list[k]->bytes, MSG_LEN, h, sizeof h);
+        printf("message %s 0x%04X = 0x%04X  %s\n              %s\n", list[k]->name,
+               (unsigned)list[k]->reg, (unsigned)list[k]->value, list[k]->meaning, h);
     }
     printf("mixer writes in this program: %s\n", f.write_enabled ? "compiled in" : "NOT compiled in");
 
@@ -309,10 +378,19 @@ int main(int argc, char **argv)
         goto done;
     }
     char h[64];
-    hex(msg->bytes, MSG_LEN, h, sizeof h);
-    printf("\nAbout to send to %d:%d: %s\n  %s  (register 0x%04X = 0x%04X)\n",
-           client, port, h, msg->meaning, B3_REG, (unsigned)msg->value);
-    if (!confirm()) {
+    if (!stereo) {
+        hex(msg->bytes, MSG_LEN, h, sizeof h);
+        printf("\nAbout to send to %d:%d: %s\n  %s  (register 0x%04X = 0x%04X)\n",
+               client, port, h, msg->meaning, B3_REG, (unsigned)msg->value);
+    } else {
+        printf("\nAbout to send to %d:%d, in this order:\n", client, port);
+        for (size_t k = 0; k < count; k++) {
+            hex(list[k]->bytes, MSG_LEN, h, sizeof h);
+            printf("  %zu. %s\n     %s  (register 0x%04X = 0x%04X)\n", k + 1u, h,
+                   list[k]->meaning, (unsigned)list[k]->reg, (unsigned)list[k]->value);
+        }
+    }
+    if (!confirm(count)) {
         printf("aborted: nothing sent\n");
         goto done;
     }
@@ -341,16 +419,41 @@ int main(int argc, char **argv)
                strerror(-rc));
         goto done;
     }
-    stamp("sending");
-    rc = be.send_sysex(be.self, msg->bytes, MSG_LEN);
-    if (rc < 0) {
-        stamp("FAILED");
-        printf("sending failed (%s); the register state is unknown; nothing retried\n",
-               strerror(-rc));
-        out = EXIT_SEND_FAILED;
+    if (!stereo) {
+        stamp("sending");
+        rc = be.send_sysex(be.self, msg->bytes, MSG_LEN);
+        if (rc < 0) {
+            stamp("FAILED");
+            printf("sending failed (%s); the register state is unknown; nothing retried\n",
+                   strerror(-rc));
+            out = EXIT_SEND_FAILED;
+            goto done;
+        }
+        stamp("sent 12 bytes; closing (unsubscribe)");
+        out = EXIT_OK;
         goto done;
     }
-    stamp("sent 12 bytes; closing (unsubscribe)");
+    for (size_t k = 0; k < count; k++) {
+        char what[96];
+        snprintf(what, sizeof what, "sending message %zu of %zu (0x%04X = 0x%04X)",
+                 k + 1u, count, (unsigned)list[k]->reg, (unsigned)list[k]->value);
+        stamp(what);
+        rc = be.send_sysex(be.self, list[k]->bytes, MSG_LEN);
+        if (rc < 0) {
+            stamp("FAILED");
+            printf("sending message %zu of %zu failed (%s); %zu of %zu passed to ALSA; "
+                   "the register state is unknown; nothing retried\n", k + 1u, count,
+                   strerror(-rc), k, count);
+            out = EXIT_SEND_FAILED;
+            goto done;
+        }
+        snprintf(what, sizeof what, "message %zu of %zu passed to ALSA (12 bytes)", k + 1u, count);
+        stamp(what);
+        if (k + 1u < count)
+            f.sleep_ms(f.ctx, STEREO_GAP_MS);
+    }
+    stamp("both messages passed to ALSA; waiting 200 ms before closing (unsubscribe)");
+    f.sleep_ms(f.ctx, STEREO_SETTLE_MS);
     out = EXIT_OK;
 done:
     f.close(f.ctx, &be);
