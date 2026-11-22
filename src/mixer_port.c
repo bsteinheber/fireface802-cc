@@ -159,3 +159,66 @@ const char *ff802_seqsel_str(ff802_seqsel s)
     }
     return "port 1 is not a writable 'Port 2'";
 }
+
+ff802_unit_status ff802_mixer_find_unit(const char *sysfs_root, const char *name,
+                                        ff802_sysfs_dev *out, unsigned *count)
+{
+    char dir[PATH_LEN];
+    unsigned n = 0;
+
+    if (count != NULL)
+        *count = 0;
+    if (sysfs_root == NULL || out == NULL)
+        return FF802_UNIT_BAD;
+    if (name != NULL) {
+        ff802_sysfs_dev d;
+        if (!ff802_sysfs_valid_name(name))
+            return FF802_UNIT_BAD;
+        ff802_sysfs_status st = ff802_sysfs_read(sysfs_root, name, &d);
+        if (st == FF802_SYSFS_ABSENT)
+            return FF802_UNIT_NONE;
+        if (st != FF802_SYSFS_OK)
+            return FF802_UNIT_BAD;
+        if (ff802_sysfs_identify(&d) != FF802_ID_CLASS_COMPLIANT)
+            return FF802_UNIT_NOT_CC;
+        *out = d;
+        if (count != NULL)
+            *count = 1;
+        return FF802_UNIT_FOUND;
+    }
+    int k = snprintf(dir, sizeof dir, "%s/bus/usb/devices", sysfs_root);
+    if (k < 0 || (size_t)k >= sizeof dir)
+        return FF802_UNIT_BAD;
+    DIR *dh = opendir(dir);
+    if (dh == NULL)
+        return FF802_UNIT_BAD;
+    struct dirent *de;
+    while ((de = readdir(dh)) != NULL) {
+        ff802_sysfs_dev d;
+        if (!ff802_sysfs_valid_name(de->d_name) ||
+            ff802_sysfs_read(sysfs_root, de->d_name, &d) != FF802_SYSFS_OK ||
+            ff802_sysfs_identify(&d) != FF802_ID_CLASS_COMPLIANT)
+            continue;
+        if (n++ == 0)
+            *out = d;
+    }
+    closedir(dh);
+    if (count != NULL)
+        *count = n;
+    if (n == 0)
+        return FF802_UNIT_NONE;
+    return n == 1 ? FF802_UNIT_FOUND : FF802_UNIT_MULTIPLE;
+}
+
+const char *ff802_unit_status_str(ff802_unit_status s)
+{
+    switch (s) {
+    case FF802_UNIT_FOUND:    return "found";
+    case FF802_UNIT_NONE:     return "no original Fireface 802 in class-compliant mode";
+    case FF802_UNIT_MULTIPLE: return "more than one Fireface 802 in class-compliant mode "
+                                     "(name one with --connection)";
+    case FF802_UNIT_NOT_CC:   return "not an original Fireface 802 in class-compliant mode";
+    case FF802_UNIT_BAD:      break;
+    }
+    return "invalid connection name or unreadable sysfs";
+}

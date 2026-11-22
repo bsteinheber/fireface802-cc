@@ -115,6 +115,24 @@ int ff802_auto_lock(const ff802_auto_paths *p)
     return fd;
 }
 
+int ff802_auto_lock_existing(const ff802_auto_paths *p)
+{
+    char path[FF802_AUTO_PATH_MAX + 16u];
+
+    if (join(path, sizeof path, p->run_dir, "lock") != 0)
+        return -1;
+    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    if (fd < 0)
+        return errno == ENOENT ? -2 : -1;
+    while (flock(fd, LOCK_EX) != 0) {
+        if (errno != EINTR) {
+            close(fd);
+            return -1;
+        }
+    }
+    return fd;
+}
+
 void ff802_auto_unlock(int fd)
 {
     if (fd >= 0) {

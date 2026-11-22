@@ -80,6 +80,14 @@ int ff802_auto_lock(const ff802_auto_paths *p);
 void ff802_auto_unlock(int fd);
 
 /*
+ * For a manual run that must not overlap with the service: take the same
+ * exclusive lock if <run_dir>/lock exists (opened read only, so a normal
+ * user can take it). Returns the fd, -2 if there is no lock file (the
+ * service never ran: nothing to serialise with), -1 on error.
+ */
+int ff802_auto_lock_existing(const ff802_auto_paths *p);
+
+/*
  * Record that this connection is being handled. Returns 1 if it was not
  * handled before (record created), 0 if a record exists already, -1 on
  * error. The record is created before any USB access, so a crash can

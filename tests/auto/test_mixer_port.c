@@ -142,8 +142,59 @@ static void test_select(void)
     CHECK(strcmp(ff802_mport_status_str(FF802_MPORT_FOUND), "found") == 0);
 }
 
+static void test_find_unit(void)
+{
+    fixture fx;
+    ff802_sysfs_dev d;
+    unsigned n = 99;
+
+    fx_init(&fx);
+    CHECK(ff802_mixer_find_unit(fx.paths.sysfs_root, NULL, &d, &n) == FF802_UNIT_NONE && n == 0);
+    fx_ff802_prop(&fx, 18);
+    CHECK(ff802_mixer_find_unit(fx.paths.sysfs_root, NULL, &d, &n) == FF802_UNIT_NONE);
+    CHECK(ff802_mixer_find_unit(fx.paths.sysfs_root, PORT, &d, &n) == FF802_UNIT_NOT_CC);
+    fx_ff802_cc(&fx, 19);
+    CHECK(ff802_mixer_find_unit(fx.paths.sysfs_root, NULL, &d, &n) == FF802_UNIT_FOUND && n == 1);
+    CHECK(strcmp(d.kernel_name, PORT) == 0 && d.devnum == 19);
+    /* other devices with the CC ID but no Fireface identity do not count */
+    fx_dev(&fx, "1-4", "0424", "3fdd", 1, 3, "480", "Microchip", "Fireface 802 (1)");
+    fx_dev(&fx, "1-5", "0424", "3fdd", 1, 4, "480", "RME", "Fireface 802 FS (1)");
+    fx_dev(&fx, "1-6", "0424", "3fdd", 1, 5, "12", "RME", "Fireface 802 (2)");
+    CHECK(ff802_mixer_find_unit(fx.paths.sysfs_root, NULL, &d, &n) == FF802_UNIT_FOUND && n == 1);
+    /* two units: never chosen silently, but each can be named */
+    fx_dev(&fx, "3-2.4.1.1.4", "0424", "3fdd", 3, 20, "480", "RME", "Fireface 802 (12345678)");
+    CHECK(ff802_mixer_find_unit(fx.paths.sysfs_root, NULL, &d, &n) == FF802_UNIT_MULTIPLE && n == 2);
+    CHECK(ff802_mixer_find_unit(fx.paths.sysfs_root, "3-2.4.1.1.4", &d, &n) == FF802_UNIT_FOUND);
+    CHECK(d.devnum == 20);
+    CHECK(ff802_mixer_find_unit(fx.paths.sysfs_root, "1-4", &d, &n) == FF802_UNIT_NOT_CC);
+    CHECK(ff802_mixer_find_unit(fx.paths.sysfs_root, "9-9", &d, &n) == FF802_UNIT_NONE);
+    CHECK(ff802_mixer_find_unit(fx.paths.sysfs_root, "../x", &d, &n) == FF802_UNIT_BAD);
+    CHECK(strstr(ff802_unit_status_str(FF802_UNIT_MULTIPLE), "--connection") != NULL);
+    fx_done(&fx);
+}
+
+static void test_lock_existing(void)
+{
+    fixture fx;
+    fx_init(&fx);
+    char cmd[512];
+    snprintf(cmd, sizeof cmd, "rm -rf -- '%s'", fx.paths.run_dir);
+    if (system(cmd) != 0)
+        exit(2);
+    CHECK(ff802_auto_lock_existing(&fx.paths) == -2);     /* service never ran */
+    int a = ff802_auto_lock(&fx.paths);                   /* the service's lock */
+    CHECK(a >= 0);
+    ff802_auto_unlock(a);
+    int b = ff802_auto_lock_existing(&fx.paths);
+    CHECK(b >= 0);
+    ff802_auto_unlock(b);
+    fx_done(&fx);
+}
+
 int main(void)
 {
+    test_find_unit();
+    test_lock_existing();
     test_find_card();
     test_select();
     TEST_EXIT();

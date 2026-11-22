@@ -23,6 +23,8 @@
 
 #include <stddef.h>
 
+#include "ff802/auto_sysfs.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -63,6 +65,24 @@ typedef enum ff802_seqsel {
 /* Select the port (see 2. above); *index is its position in ports. */
 ff802_seqsel ff802_mixer_select_port(const ff802_seq_port *ports, size_t n,
                                      int card, size_t *index);
+
+/*
+ * The unit for a manual run: the named connection, or - without a name -
+ * the only original Fireface 802 in class-compliant mode. Several units
+ * in CC mode are never chosen silently.
+ */
+typedef enum ff802_unit_status {
+    FF802_UNIT_FOUND = 0,
+    FF802_UNIT_NONE,          /* no Fireface 802 in CC mode (or name absent) */
+    FF802_UNIT_MULTIPLE,      /* more than one in CC mode: name one */
+    FF802_UNIT_NOT_CC,        /* named connection is not a Fireface 802 in CC mode */
+    FF802_UNIT_BAD            /* invalid name or sysfs unreadable */
+} ff802_unit_status;
+
+ff802_unit_status ff802_mixer_find_unit(const char *sysfs_root, const char *name,
+                                        ff802_sysfs_dev *out, unsigned *count);
+
+const char *ff802_unit_status_str(ff802_unit_status s);
 
 const char *ff802_mport_status_str(ff802_mport_status s);
 const char *ff802_seqsel_str(ff802_seqsel s);
