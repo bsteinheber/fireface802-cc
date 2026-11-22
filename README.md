@@ -195,8 +195,12 @@ that this is not always the case: after the unit had been used on Windows
 in between, the routing in CC mode differed from what TotalMix FX had
 shown before.
 
-**Automatic setup of the internal mixer routing is currently not
-implemented in this project.**
+**The released version 0.4.1 does not set up the internal mixer routing.**
+In development (package `ff802-cc-auto` 0.2.0~dev2, not yet released and
+not yet fully tested on the unit) is an optional mixer initialisation: it
+sets Playback 1..12 -> Hardware Output 1..12 and the twelve output levels
+to 0 dB and is off after installation. See
+[docs/mixer_init.md](docs/mixer_init.md) (German).
 
 Observations, conclusions and open questions in detail:
 [docs/mixer_routing.md](docs/mixer_routing.md) (German).
@@ -327,7 +331,7 @@ Playback faders in the unit had been set.
 
 ### Confirmed
 
-- **No mixer:** the internal mixer of the Fireface is neither read nor
+- **No mixer (version 0.4.1):** the internal mixer of the Fireface is neither read nor
   set. This project is **not a replacement for TotalMix FX**.
 - **No automatic routing:** mixer routing and faders are not set up. An
   output can appear in Plasma and receive sound without anything being

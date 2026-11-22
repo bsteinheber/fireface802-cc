@@ -85,7 +85,7 @@ ctest --test-dir build --output-on-failure
 | CMake-Option | Standard | Bedeutung |
 |--------------|----------|-----------|
 | `FF802_ENABLE_USB_WRITE` | `OFF` | Claim und Bulk-Write einkompilieren |
-| `FF802_ENABLE_MIXER_WRITE` | `OFF` | Mixer-Initialisierung: Verbinden mit dem MIDI-Port und Senden der SysEx-Nachrichten einkompilieren (bis zur Freigabe eines Hardwaretests `OFF`, auch im Paket) |
+| `FF802_ENABLE_MIXER_WRITE` | `OFF` | Mixer-Initialisierung (`ff802-cc-autoswitch`, `ff802-mixer-init`): Verbinden mit dem MIDI-Port und Senden der SysEx-Nachrichten einkompilieren; nur der Paketbau `build-deb-auto.sh` setzt `ON` |
 | `FF802_BUILD_MIXER_B2` | `OFF` | Hardwaretest B.2 `ff802-mixer-b2` bauen: das einzige Programm mit Mixer-Schreibfunktion, genau zwei Nachrichten für Register `0x2600`; nie installiert, kein Paket |
 | `FF802_BUILD_MIXER_B3` | `OFF` | Hardwaretest B.3 `ff802-mixer-b3` bauen: genau eine Nachricht `0x4228 = 0x9000` (Playback 9 → Output 9, 0 dB); gleiche Regeln wie B.2 |
 | `FF802_BUILD_TOOLS` | `ON` | Programme bauen (benötigt libusb) |
@@ -167,11 +167,13 @@ neuer), x86-64.
 `libasound2t64` und für die Geräte-Reservierung `pw-reserve` (Paket
 `pipewire-bin`). `ff802-chanmap check` ist nur lesend.
 
-`ff802-cc-autoswitch` wird mit dem ALSA-Sequencer-Backend der
-Mixer-Initialisierung gebaut, wenn `libasound2-dev` vorhanden ist (sonst
-ohne, mit Warnung; `build-deb-auto.sh` bricht dann ab). Das Paket
-`ff802-cc-auto` hängt deshalb ab 0.2.0~dev1 von `libasound2t64` ab. Ablauf,
-Registerliste und Stand der Mixer-Initialisierung: [mixer_routing.md](mixer_routing.md#mixer-initialisierung-im-cc-modus).
+`ff802-cc-autoswitch` und `ff802-mixer-init` werden mit dem
+ALSA-Sequencer-Backend der Mixer-Initialisierung gebaut, wenn
+`libasound2-dev` vorhanden ist (sonst `ff802-cc-autoswitch` ohne, mit
+Warnung, und kein `ff802-mixer-init`; `build-deb-auto.sh` bricht dann ab).
+Das Paket `ff802-cc-auto` hängt deshalb ab 0.2.0~dev1 von `libasound2t64`
+ab. Ablauf, Registerliste, Bedienung und Installation:
+[mixer_init.md](mixer_init.md).
 
 ## Tests
 
@@ -197,7 +199,8 @@ Registerliste und Stand der Mixer-Initialisierung: [mixer_routing.md](mixer_rout
 | `test_auto_sysfs`, `test_auto_switch` | T4: Identität aus sysfs, Zustandsdateien, Sperre, automatischer Ablauf mit allen Fehler- und Änderungsfällen; Mixer-Initialisierung im CC-Zweig |
 | `test_mixer_init`, `test_mixer_port`, `test_mixer_run` | Mixer-Initialisierung: Registerliste gegen Messwerte und Formeln, SysEx-Bytes, Soundkarte aus sysfs, Auswahl des Sequencer-Ports, Ablauf gegen simuliertes MIDI-Backend mit allen Fehlerfällen |
 | `mixer_b2` | Hardwaretest B.2 mit simuliertem MIDI-Backend: Erkennung bei wechselnden Client-Nummern, genau eine Nachricht, Bestätigung, alle Ablehnungen; das echte Programm (falls gebaut) nur `--help`/`--version` und `nm` |
-| `mixer_b3` | Hardwaretest B.3, gleiches Schema wie `mixer_b2` mit der einen Routing-Nachricht |
+| `mixer_b3` | Hardwaretest B.3, gleiches Schema wie `mixer_b2` mit der einen Routing-Nachricht und `--restore-stereo` |
+| `mixer_init_tool` | `ff802-mixer-init`: die 24 Nachrichten bytegenau und in Reihenfolge, Dry-Run, Bestätigung, Geräteauswahl, Sperre mit dem Dienst, alle Fehlerfälle; das echte Programm nur `--help`/`--version`/`--list` und `nm` |
 | `check_mixer_sources`, `autoswitch_mixer_symbols` | Quelltextprüfung (ALSA-Aufrufe, SysEx, Registerliterale nur in den vorgesehenen Dateien) und Symbole des Dienstprogramms (nur Sequencer, ohne Freigabe keine Ausgabefunktionen) |
 | `auto_flow`, `auto_notify`, `auto_control`, `auto_units` | T4: Dienstaufruf wie systemd (auch gleichzeitig), Benachrichtigung mit Test-Doubles, `ff802-cc-auto on/off/status` und `mixer-init on/off/status`, udev-Regel und Units (`systemd-analyze`) |
 | `autoswitch_binary_symbols`, `autoswitch_sim_no_libusb` | T4: Symbole des Dienstprogramms; Simulationsbuild ohne libusb und ohne libasound |
@@ -296,4 +299,5 @@ Versionen dann ebenfalls anzupassen sind.
 - [cc_disable_port_reset.md](cc_disable_port_reset.md): `ff802-cc disable` (USB-MIDI-SysEx) und USB-Hub-Port-Reset nach `enable`
 - [packages.md](packages.md): die drei Debian-Pakete, Projekt- und Paketversion, Bau, Installation, Aktualisierung, Rückbau
 - [mixer_routing.md](mixer_routing.md): interner Mixer, Software-Playback-Fader, Beobachtungen und offene Fragen
+- [mixer_init.md](mixer_init.md): Mixer-Initialisierung im CC-Modus (24 Register, Automatik, manuelle Ausführung, Installation)
 - [development.md](development.md): dieses Dokument

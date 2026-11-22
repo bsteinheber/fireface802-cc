@@ -201,11 +201,15 @@ Port 2“.
 
 ## Mixer-Initialisierung im CC-Modus
 
-**Stand:** implementiert und automatisiert getestet (Simulation), **ohne
-Schreibzugriffe**: Die Build-Option `FF802_ENABLE_MIXER_WRITE` ist `OFF`,
-auch im Paket `ff802-cc-auto 0.2.0~dev1` (unveröffentlicht). Ein solcher
-Build findet und meldet den MIDI-Port, sendet aber nichts
-(Ergebnis `disabled-build`). Am Gerät getestet ist bisher nur der Sendeweg mit einer einzelnen Nachricht (B.2, eigenes Testprogramm); die 24 Register der Initialisierung sind gesperrt.
+**Stand 2026-11-22:** vollständig implementiert und in der Simulation
+getestet; Beschreibung, Registerliste, Bedienung, Installation und
+Einschränkungen in **[mixer_init.md](mixer_init.md)**. Das Paket
+`ff802-cc-auto 0.2.0~dev2` (unveröffentlicht) enthält die Schreibfunktion
+(`FF802_ENABLE_MIXER_WRITE=ON` nur im Paketbau); die automatische
+Initialisierung ist nach der Installation aus. Am Gerät getestet ist der
+Sendeweg mit einer und zwei Nachrichten (B.2, B.3), nicht die Folge von 24.
+Der folgende Überblick ist der Stand der ersten Implementierung; wo er
+abweicht (Abstände, Wartezeit), gilt mixer_init.md.
 
 - **Einschalten:** `ff802-cc-auto mixer-init on|off|status`, Standard aus,
   unabhängig von der automatischen Umschaltung
@@ -225,7 +229,7 @@ Build findet und meldet den MIDI-Port, sendet aber nichts
   ALSA-Sequencer. Der Port wird ohne feste Nummern gefunden: Soundkarte
   der USB-Verbindung aus sysfs, Kernel-Client mit dieser Kartennummer,
   dessen Port 1 mit einem Namen auf „Port 2“; Index und Name müssen
-  übereinstimmen. Warten auf Karte und Port höchstens 10 s.
+  übereinstimmen. Warten auf Karte und Port höchstens 15 s.
 - **Fehler:** keine Wiederholung, kein Zurücksetzen (es wird nichts
   gelesen). Ergebnis in `/run/ff802-cc-auto/mixer-result`, eine
   Journalzeile je Register, bei Fehlern eine eigene Desktop-Benachrichtigung
