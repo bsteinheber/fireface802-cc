@@ -302,23 +302,46 @@ wirkt insgesamt leiser). Eine objektive Messung oder ein Auslesen der
 Register fehlt. Ob die Kopplung auch die Routing-Register betrifft, ist
 offen.
 
-### Hardwaretest B.3 (vorbereitet, Schreibschritte nicht freigegeben)
+### Hardwaretest B.3 (2026-11-22): erfolgreich; Wiederherstellung vorbereitet
 
 Ein einzelnes Routing: Playback 9 → Hardware Output 9, `0x4228 = 0x9000`
 (0 dB), `F0 00 20 0D 10 00 00 20 22 11 0C F7`, mit
 [ff802_mixer_b3.c](../tools/hw-test/ff802_mixer_b3.c) (CMake-Option
-`FF802_BUILD_MIXER_B3`, nie installiert). Das Programm schreibt nur diesen
-belegten Wert; „aus“ (`0x0000` laut OSCMix, `0x8000` = −65 dB laut
-FireWire-Protokoll) ist nicht belegt und wird nur von OSCMix geschrieben.
+`FF802_BUILD_MIXER_B3`, nie installiert). Das Programm schreibt nur den
+belegten Wert `0x9000`; „aus“ (`0x0000` laut OSCMix, `0x8000` = −65 dB laut
+FireWire-Protokoll) ist nicht belegt.
 
-Ablauf: B.3.0 OSCMix (Debug) setzt das Paar Playback 9/10 → Output 9/10
-auf −∞ und Output 9/10 auf 0 dB, alle `setreg`-Zeilen werden gesichert;
-B.3.1 einkanalig links, dann rechts: beide Seiten stumm; B.3.2 Dry-Run;
-B.3.3 `--send`; B.3.4 links-Signal: nur links hörbar; B.3.5
-rechts-Signal: stumm (sonst spiegelt das Gerät die Kopplung); B.3.6
-OSCMix setzt den gewünschten Betriebszustand (voraussichtlich 0 dB auf
-beiden Kanälen). Der Routingwert vor dem Test wird nicht
-wiederhergestellt, sondern durch einen definierten Zustand ersetzt.
+Geplanter Ablauf: B.3.0 OSCMix setzt das Paar Playback 9/10 → Output 9/10
+auf −∞; B.3.1 einkanalig links/rechts: beide stumm; B.3.2 Dry-Run; B.3.3
+`--send`; B.3.4 links-Signal: nur links hörbar; B.3.5 rechts-Signal:
+stumm; B.3.6 Betriebszustand wiederherstellen.
+
+**Ergebnis (vom Anwender gemeldet):** `0x4228 = 0x9000` wurde über das
+eigene ALSA-MIDI-Backend gesendet. Danach war Playback 9 ausschließlich auf
+Hardware Output 9 hörbar; Playback 10 blieb vollständig stumm. Ein
+einzelner Routing-Schreibzugriff wirkt also wie vorgesehen und erzeugt bei
+diesem Paar keine zusätzlichen Signalwege: weder gespiegelt (Playback 10 →
+Output 10) noch gekreuzt (Playback 9 → Output 10).
+
+**B.3.6 mit OSCMix ist misslungen:** OSCMix konnte das normale
+Stereo-Routing nicht wiederherstellen. OSCMix wird für die
+Wiederherstellung nicht weiter verwendet. Nach Angabe des Anwenders hatte
+OSCMix zuvor die gekreuzten Routings `0x4229` und `0x4268` auf `0x0000`
+gesetzt; sie bleiben unverändert.
+
+**Wiederherstellung mit dem eigenen Sendeweg (vorbereitet, nicht
+freigegeben):** `ff802-mixer-b3 --restore-stereo` sendet genau zwei feste
+Nachrichten in dieser Reihenfolge über eine Verbindung, 10 ms Abstand,
+200 ms vor dem Trennen:
+
+| Nr. | Register = Wert | Funktion | SysEx |
+|---|---|---|---|
+| 1 | `0x4228 = 0x9000` | Playback 9 → Hardware Output 9, 0 dB | `F0 00 20 0D 10 00 00 20 22 11 0C F7` |
+| 2 | `0x4269 = 0x9000` | Playback 10 → Hardware Output 10, 0 dB | `F0 00 20 0D 10 00 00 20 26 13 0C F7` |
+
+Gekreuzte Routings und Ausgangspegel werden nicht geschrieben.
+`0x4269 = 0x9000` ist mit OSCMix am Gerät bestätigt (Tabelle oben); über
+den eigenen Sendeweg wurde bisher nur `0x4228` geschrieben.
 
 **Einkanalige Wiedergabe auf „Headphones Output 9/10“**, ohne die
 Standard-Senke zu ändern (die Zielangabe gilt nur für den einen Prozess):
