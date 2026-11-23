@@ -31,8 +31,9 @@ all checks passed
 
 Hörprüfung (Playback auf Analog 1/2 … 7/8 und Phones 9/10, 11/12, Input 9
 auf allen zwölf Ausgängen): vom Anwender als **erfolgreich** gemeldet.
-Nicht einzeln gemeldet: ob die Prüfung nach einem zweiten Aus- und
-Einschalten wiederholt wurde.
+Nach einem zweiten Aus- und Einschalten wiederholt: ebenfalls
+**erfolgreich** (vom Anwender gemeldet). Der Fehler von dev5 trat damit in
+zwei Läufen von dev6 nicht auf.
 
 ## Ergebnis dev5 (2026-11-23, vom Anwender auf dem Host)
 
