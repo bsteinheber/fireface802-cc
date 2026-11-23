@@ -1,6 +1,6 @@
 # Mixer-Initialisierung im Class-Compliant-Modus
 
-> **Stand 2026-11-23, Paket `ff802-cc-auto 0.2.0~dev6` (unveröffentlicht),
+> **Stand 2026-11-23, Release v0.5.0, Paket `ff802-cc-auto` 0.2.0 (am Gerät als 0.2.0~dev6 getestet),
 > Konfiguration `ff802-mixer-init-v3` (38 Register, Prüfsumme `0xEC858A44`).**
 > Die Vorgängerkonfiguration `ff802-mixer-init-v2` (26 Register,
 > `0xC97A359C`, Paket 0.2.0~dev3/dev4) ist darin unverändert enthalten.

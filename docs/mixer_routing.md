@@ -201,6 +201,12 @@ Port 2“.
 
 ## Mixer-Initialisierung im CC-Modus
 
+> **Nachtrag (Release v0.5.0):** Die Mixer-Initialisierung umfasst jetzt
+> 38 Register (`ff802-mixer-init-v3`, zusätzlich Input 9 → alle zwölf
+> Ausgänge mit 30 %) und ist am Gerät getestet
+> ([mixer_v3_integration.md](mixer_v3_integration.md)); der folgende
+> Absatz beschreibt den Stand dev3.
+
 **Stand 2026-11-23:** vollständig implementiert und in der Simulation
 getestet, jetzt mit **26** Registern (zusätzlich Playback 1/2 → Phones 9/10
 aus, siehe D1–D3 unten); Beschreibung, Registerliste, Bedienung, Installation und

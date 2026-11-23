@@ -21,15 +21,16 @@ T3 Integration in PipeWire/WirePlumber/Plasma, T4 USB-Modusverwaltung.
 |-------|--------|-------|
 | 1  | Kodierung der Registerbefehle und Tests | abgeschlossen |
 | 2a | Diagnoseprogramm `ff802-detect`: lesende Geräteerkennung | abgeschlossen, auf dem Host getestet |
-| 2b | Umschaltprogramm `ff802-cc` mit Diagnosemodus | abgeschlossen; `enable` mit Port-Reset und `disable` am 2026-11-19 am Gerät erfolgreich getestet; Paket `ff802-cc` **0.4.0 auf dem Host installiert** (gebaut aus Commit `e12a1d0`, siehe [packages.md](packages.md#installationsstand)) |
+| 2b | Umschaltprogramm `ff802-cc` mit Diagnosemodus | abgeschlossen; `enable` mit Port-Reset und `disable` am 2026-11-19 am Gerät erfolgreich getestet; Paket `ff802-cc` **0.4.0 auf dem Host installiert** (gebaut aus Commit `e12a1d0`, siehe [packages.md](packages.md#v040)) |
 | 3 | ALSA-UCM-Profil mit sechs Stereo-Ausgängen für den CC-Modus, Debian-Paket `ff802-ucm-profile` (T1, T3) | T1 bestanden, T3 funktional erfolgreich getestet (sechs Stereo-Ausgänge, ein Stereo-Eingang; Analog 3/4, Kopfhörer 9/10 und 11/12 mit realer Wiedergabe); Version **0.3.0 auf dem Host installiert**, automatischer USB-Portwechsel erfolgreich getestet (2026-11-18, [audio_t3_usb_port.md](audio_t3_usb_port.md)) |
 | 4 | Messwerkzeug `ff802-chanmap` für die Kanalzuordnung (Hardwaretest T2) | Werkzeug fertig; T2 am 2026-11-17 ausgeführt, **nur Analog Out 1 und 2 nachgewiesen** (Out 3, 5, 7 ohne erkanntes Signal, Out 4 abgebrochen, Rest nicht gemessen; kein Nachweis eines Fehlers). Protokolle und Auswertung: [audio_t2_results/](audio_t2_results/README.md). Die Markierung `FF802-CHANNEL-MAP: UNVERIFIED` im Profil bleibt |
-| T4 | Automatischer Wechsel in den CC-Modus beim Anschließen/Systemstart, Debian-Paket `ff802-cc-auto`; Untersuchung `ff802-cc disable` | Version 0.1.0 auf dem Host installiert und aktiviert, automatische Umschaltung erfolgreich getestet; ob inzwischen 0.1.1 (nur Dokumentation, Neubau) installiert ist, ist nicht bestätigt; `disable` ist Teil von `ff802-cc` |
+| T4 | Automatischer Wechsel in den CC-Modus beim Anschließen/Systemstart, Debian-Paket `ff802-cc-auto`; Untersuchung `ff802-cc disable` | 0.1.x: Umschaltung mit Umstecken, am Gerät getestet; 0.2.0: automatischer Port-Reset (wie `ff802-cc enable`), am Gerät getestet 2026-11-23 ([t4_port_reset.md](t4_port_reset.md)); `disable` ist Teil von `ff802-cc` |
+| M | Mixer-Initialisierung im CC-Modus über den ALSA-Sequencer (Paket `ff802-cc-auto` 0.2.0, `ff802-mixer-init`) | Hardwaretests B.2–B.4, D1–D3, E1; Konfiguration `ff802-mixer-init-v3` mit 38 Registern, Integrationstest mit dev6 bestanden (2026-11-23, [mixer_v3_integration.md](mixer_v3_integration.md)) |
 
-Seit Version 0.4.1 (Tag `v0.4.1`) gibt es Pakete `ff802-cc` 0.4.1,
-`ff802-cc-auto` 0.1.2 und `ff802-ucm-profile` 0.3.1; sie unterscheiden
-sich von den installierten nur in Lizenzangaben und Dokumentation
-([packages.md](packages.md)).
+Release v0.5.0 (in Vorbereitung): Pakete `ff802-cc` 0.5.0,
+`ff802-cc-auto` 0.2.0 und `ff802-ucm-profile` 0.3.1 (unverändert seit
+v0.4.1); Einzelheiten und frühere Releases in [packages.md](packages.md),
+Änderungen in [release-notes-v0.5.0.md](release-notes-v0.5.0.md).
 
 ## Aufbau
 
@@ -111,7 +112,7 @@ Rückbau aller drei Pakete: [packages.md](packages.md).
 
 Mit dem Paket `ff802-cc` liegen `ff802-cc` und `ff802-detect` unter
 `/usr/bin` (auf dem Entwicklungsrechner installiert: 0.4.0 aus Commit
-`e12a1d0`, siehe [packages.md](packages.md#installationsstand)):
+`e12a1d0`, siehe [packages.md](packages.md#v040)):
 
 ```sh
 ff802-detect                 # Geräteerkennung (öffnet kein Gerät)
@@ -227,14 +228,14 @@ deshalb mit kurzem Pfad anlegen, z. B. `build-<name>/` im Projektordner
 
 ## Vorgemerkt für das nächste Paket-Release
 
-Die folgenden Korrekturen betreffen Dateien, die in Debian-Pakete
-installiert werden. Sie sind bewusst **noch nicht** umgesetzt, damit die
-Paketquellen zum Tag `v0.4.1` und zu den daraus gebauten Paketen
-`ff802-ucm-profile` 0.3.1 und `ff802-cc-auto` 0.1.2 passen. Beim nächsten
-Paketbau umsetzen und dabei die Paketversionen erhöhen
-(`ff802-ucm-profile` 0.3.2, `ff802-cc-auto` 0.1.3, jeweils mit
-Changelog-Eintrag „documentation only“), damit gleiche Versionsnummern
-nicht unterschiedliche Inhalte bekommen.
+Die folgende Korrektur betrifft eine Datei des Pakets
+`ff802-ucm-profile`. Sie ist bewusst **noch nicht** umgesetzt: Das Paket
+bleibt in v0.5.0 unverändert bei 0.3.1, damit gleiche Versionsnummern
+nicht unterschiedliche Inhalte bekommen. Beim nächsten Paketbau umsetzen
+und dabei die Version auf 0.3.2 erhöhen (Changelog „documentation
+only“). Die zweite früher vorgemerkte Korrektur (Kopfkommentar von
+`/usr/bin/ff802-cc-auto` zu `ff802-cc disable`) ist mit `ff802-cc-auto`
+0.2.0 umgesetzt.
 
 **1. `packaging/ff802-ucm/README.Debian`**
 (installiert als `/usr/share/doc/ff802-ucm-profile/README.Debian`): Der
@@ -264,32 +265,6 @@ Whether a channel is audible at a socket also depends on the routing
 set.
 ```
 
-**2. `packaging/ff802-cc-auto/ff802-cc-auto`**
-(installiert als `/usr/bin/ff802-cc-auto`): Der Kommentar im Kopf
-behauptet, `ff802-cc disable` sei nicht verfügbar. `usage()` gibt die
-Kopfzeilen 2–15 als Hilfetext aus; die Korrektur ändert also auch die
-Ausgabe von `ff802-cc-auto --help`. Die Zeilenzahl muss gleich bleiben.
-Die Funktion ändert sich nicht.
-
-Bisher (Zeilen 12–13):
-
-```
-# not change the USB mode of the Fireface (that would be "ff802-cc disable",
-# which is not available, see /usr/share/doc/ff802-cc-auto/README.Debian).
-```
-
-Vorgesehen:
-
-```
-# not change the USB mode of the Fireface (that is "sudo ff802-cc disable"
-# of the separate package ff802-cc, see /usr/share/doc/ff802-cc-auto/README.Debian).
-```
-
-Mit beiden Änderungen bestehen die Tests ohne Paketbau, darunter
-`auto_control`; geprüft am 2026-11-20. Vor dem Release laufen zusätzlich
-die Pakettests (`deb_package`, `deb_auto_package`), deren erwartete
-Versionen dann ebenfalls anzupassen sind.
-
 ## Dokumente
 
 - [protocol.md](protocol.md): Registerprotokoll
@@ -312,4 +287,6 @@ Versionen dann ebenfalls anzupassen sind.
 - [mixer_d3.md](mixer_d3.md): Diagnose D3, Playback 1 → Phones 9 abschalten
 - [mixer_e1.md](mixer_e1.md): Hardwaretest E1, Input 9 → Analog 3 mit 30 % linear (`0x4088 = 0x2666`), geführt, mit Wiederherstellung
 - [mixer_v3_integration.md](mixer_v3_integration.md): Integrationstest der Mixer-Initialisierung v3 (38 Register)
+- [release-notes-v0.5.0.md](release-notes-v0.5.0.md): Release-Notizen v0.5.0
+- [hw_results/](hw_results/README.md): unveränderte Protokolle der Hardwaretests
 - [development.md](development.md): dieses Dokument

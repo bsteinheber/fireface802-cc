@@ -13,8 +13,9 @@ Stereo-Eingang für PipeWire.
 > genormtes USB-Audioprotokoll, das Linux von Haus aus versteht. Dieses
 > Projekt schaltet das Gerät von Linux aus in diese Betriebsart (und
 > zurück) und sorgt dafür, dass die Ausgänge in der Desktop-Audioverwaltung
-> sinnvoll benannt und einzeln nutzbar sind. Den internen Mixer des
-> Fireface stellt es **nicht** ein, und es ersetzt TotalMix FX nicht.
+> sinnvoll benannt und einzeln nutzbar sind. Auf Wunsch setzt es bei
+> jeder Verbindung einen festen Grundzustand des internen Mixers
+> (38 Register); es liest den Mixer nicht aus und ersetzt TotalMix FX nicht.
 
 Getestet mit **einem** Gerät (ursprüngliches Fireface 802, nicht 802 FS)
 unter Kubuntu 26.04.1 LTS. Kein Projekt von RME, siehe
@@ -134,8 +135,9 @@ Ein spezieller RME-Treiber ist dafür **nicht** nötig.
 > Fireface bleiben dieselben.
 
 Was sich trotzdem unterscheidet: Im CC-Modus gibt es unter Linux kein
-TotalMix FX. Der interne Mixer arbeitet weiter, lässt sich aber mit
-diesem Projekt nicht einstellen (siehe nächster Abschnitt).
+TotalMix FX. Der interne Mixer arbeitet weiter; dieses Projekt kann nur
+einen festen Grundzustand einstellen, und nur, wenn du das einschaltest
+(siehe nächster Abschnitt).
 
 ---
 
@@ -177,7 +179,8 @@ Drei Dinge müssen also stimmen, und sie sind unabhängig voneinander:
    („Software Playback“) erst über einen Mixer-Regler (*Fader*) an einen
    Hardware-Ausgang. Steht dieser Regler auf null oder ist der Kanal an
    eine andere Buchse geleitet, hört man nichts oder den Ton an der
-   falschen Stelle. **Das stellt dieses Projekt nicht ein.**
+   falschen Stelle. **Dieses Projekt stellt das nur mit der optionalen
+   Mixer-Initialisierung ein** (unten), auf einen festen Grundzustand.
 
 ### Unsere Beobachtung
 
@@ -196,13 +199,20 @@ dokumentiert. Unsere Beobachtungen zeigen, dass das nicht immer der Fall
 ist: Nach zwischenzeitlichem Windows-Betrieb war das Routing im CC-Modus
 ein anderes, als TotalMix FX zuvor angezeigt hatte.
 
-**In der veröffentlichten Version 0.4.1 ist keine Einrichtung des internen
-Mixer-Routings enthalten.** In Entwicklung (Paket `ff802-cc-auto`
-0.2.0~dev3, noch nicht veröffentlicht und noch nicht vollständig am Gerät
-getestet) ist eine optionale Mixer-Initialisierung: Sie schaltet die vom CC-Modus
-gesetzten Verbindungen Playback 1/2 → Phones 9/10 ab und setzt Playback
-1…12 → Hardware Output 1…12 und die zwölf Ausgangspegel auf 0 dB, nach der
-Installation ausgeschaltet. Siehe [docs/mixer_init.md](docs/mixer_init.md).
+**Optionale Mixer-Initialisierung (ab Version 0.5.0, Paket
+`ff802-cc-auto` 0.2.0, nach der Installation ausgeschaltet):** Bei jeder
+Verbindung im CC-Modus setzt sie genau 38 Register des internen Mixers
+(Konfiguration `ff802-mixer-init-v3`, am Gerät getestet):
+
+- Playback 1/2 → Phones 9/10 aus (diese Verbindungen setzt der CC-Modus),
+- Playback 1…12 → Hardware Output 1…12 auf 0 dB,
+- die zwölf Ausgangspegel auf 0 dB,
+- Input 9 (Mic/Inst 9) → alle zwölf Ausgänge mit 30 % (etwa −10,5 dB),
+  auf beiden Kanälen jedes Paars dasselbe Monosignal.
+
+Sonst wird nichts verändert und nichts aus dem Gerät gelesen. Einschalten
+mit `ff802-cc-auto mixer-init on`. Einzelheiten:
+[docs/mixer_init.md](docs/mixer_init.md).
 
 Beobachtungen, Schlussfolgerungen und offene Fragen im Einzelnen:
 [docs/mixer_routing.md](docs/mixer_routing.md).
@@ -241,11 +251,15 @@ Beobachtungen, Schlussfolgerungen und offene Fragen im Einzelnen:
   ist es beim Systemstart so angeschlossen), sendet ein Systemdienst
   einmal den Umschaltbefehl und setzt danach den USB-Anschluss des Geräts
   zurück, genau wie `ff802-cc enable`; das Gerät meldet sich ohne
-  Umstecken im CC-Modus (Entwicklungsstand 0.2.0~dev4, am Gerät noch nicht
-  geprüft; siehe [docs/t4_port_reset.md](docs/t4_port_reset.md)). Nur wenn
-  der Anschluss nicht zurückgesetzt werden kann oder das Gerät nicht im
-  CC-Modus zurückkommt, bittet eine Desktop-Benachrichtigung, das USB-Kabel
+  Umstecken im CC-Modus (am Gerät getestet; siehe
+  [docs/t4_port_reset.md](docs/t4_port_reset.md)). Nur wenn der Anschluss
+  nicht zurückgesetzt werden kann oder das Gerät nicht im CC-Modus
+  zurückkommt, bittet eine Desktop-Benachrichtigung, das USB-Kabel
   **kurz zu trennen und wieder einzustecken**.
+- Optionale Mixer-Initialisierung, unabhängig von der Automatik und nach
+  der Installation ebenfalls aus: `ff802-cc-auto mixer-init on|off|status`,
+  einmalig von Hand: `ff802-cc-auto mixer-init dry-run|apply` (siehe
+  [Abschnitt 3](#3-vom-programm-zum-lautsprecher-usb-audio-und-der-interne-mixer)).
 - Sie schaltet **nur** in Richtung CC, nie zurück, und setzt keinen
   anderen USB-Anschluss zurück. Ein fehlgeschlagener Reset wird bis zum
   nächsten Neustart oder `ff802-cc-auto on` nicht wiederholt.
@@ -297,7 +311,7 @@ in `ff802-cc`, das man nur mit `sudo` von Hand aufruft.
 
 ## 5. Funktionsumfang und Teststand
 
-**Automatisierte Tests** laufen im Dev-Container ohne Gerät: 73 Tests mit
+**Automatisierte Tests** laufen im Dev-Container ohne Gerät: 85 Tests mit
 simuliertem USB, nachgebautem sysfs, nachgebildeter Soundkarte, einer
 privaten PipeWire-Sitzung und Paketinstallation in einer isolierten
 Wurzel. Sie greifen nie auf USB-Hardware oder eine echte Soundkarte zu.
@@ -311,7 +325,9 @@ Kubuntu 26.04.1 durchgeführt.
 | Diagnose `ff802-cc check` | ja | ja |
 | `ff802-cc enable` (proprietär → CC) mit Port-Reset | ja | ja, 2026-11-19 ¹ |
 | `ff802-cc disable` (CC → proprietär) | ja | ja, 2026-11-19 ¹ |
-| automatische Umschaltung `ff802-cc-auto` | ja | ja (mit Umstecken) |
+| automatische Umschaltung `ff802-cc-auto` mit Port-Reset | ja | ja, 2026-11-23 (ohne Umstecken) |
+| Mixer-Initialisierung, 38 Register (`ff802-mixer-init-v3`) | ja | ja, 2026-11-23, zweimal aus- und eingeschaltet ⁴ |
+| Input 9 mit 30 % auf allen zwölf Ausgängen | ja | ja, Hörtest (E1 für Analog 3, dann alle zwölf) ⁴ |
 | UCM-Profil wird von alsa-lib mit der echten Karte geladen (T1) | ja | ja, 29/29 Prüfungen |
 | sechs Ausgänge und ein Eingang in PipeWire/Plasma (T3) | ja | ja |
 | Profilzuordnung an einem anderen USB-Anschluss | ja | ja, 2026-11-18 |
@@ -321,7 +337,9 @@ Kubuntu 26.04.1 durchgeführt.
 | Startlautstärke 40 % für neue Ausgänge | ja | nicht einzeln dokumentiert |
 
 ¹ Getestet mit dem selbst gebauten Programm (`build-write/ff802-cc`) mit
-derselben Umschaltlogik wie im Paket `ff802-cc` 0.4.0/0.4.1.
+derselben Umschaltlogik wie im Paket `ff802-cc` 0.4.0/0.4.1 (in 0.5.0
+unverändert: die Zeitwerte stehen jetzt mit denselben Werten in einer
+gemeinsamen Header-Datei).
 ² Der Messtest T2 vom 2026-11-17 hat nur Analog Out 1 und 2 nachgewiesen
 (sowie Line In 1 als Aufnahmekanal 1). An Out 3, 5 und 7 wurde kein
 Signal erkannt, die Messung an Out 4 wurde abgebrochen, die übrigen
@@ -332,6 +350,11 @@ Auswertung: [docs/audio_t2_results/](docs/audio_t2_results/README.md).
 ³ Hörtest über PipeWire, unabhängig von T2 und keine Messung des
 Kanalindex; die Kopfhörer erst, nachdem die Software-Playback-Fader im
 Gerät eingestellt waren.
+⁴ Hörtests, keine Pegelmessungen. Mit nur einem Durchgang blieb Playback
+9…12 → Phones 9…12 direkt nach dem Einschalten ohne Wirkung; der Dienst
+sendet die Liste deshalb zweimal im Abstand von 5 s. Die Ursache ist
+nicht bekannt. Einzelheiten:
+[docs/mixer_v3_integration.md](docs/mixer_v3_integration.md).
 
 ---
 
@@ -339,15 +362,19 @@ Gerät eingestellt waren.
 
 ### Nachgewiesen
 
-- **Kein Mixer (Version 0.4.1):** Der interne Mixer des Fireface wird weder gelesen noch
-  eingestellt. Dieses Projekt ist **kein Ersatz für TotalMix FX**.
-- **Kein automatisches Routing:** Mixer-Routing und Fader werden nicht
-  eingerichtet. Ein Ausgang kann in Plasma erscheinen und Ton bekommen,
-  ohne dass an der Buchse etwas zu hören ist (siehe
+- **Mixer nur als fester Grundzustand:** Der interne Mixer des Fireface
+  wird nie gelesen; die optionale Initialisierung schreibt 38 feste Werte
+  und sonst nichts. Dieses Projekt ist **kein Ersatz für TotalMix FX**.
+- **Ohne Mixer-Initialisierung kein Routing:** Ein Ausgang kann in Plasma
+  erscheinen und Ton bekommen, ohne dass an der Buchse etwas zu hören ist
+  (siehe
   [Abschnitt 3](#3-vom-programm-zum-lautsprecher-usb-audio-und-der-interne-mixer)).
-- **Automatik braucht Umstecken:** Nach der automatischen Umschaltung muss
-  das USB-Kabel kurz getrennt werden. Nur `ff802-cc enable` setzt den
-  Anschluss selbst zurück.
+- **Kein Rückgängig für die Mixerwerte:** Es gibt kein Programm, das die
+  zwölf Input-9-Verbindungen wieder ausschaltet; Abschalten der
+  Initialisierung oder ein älteres Paket lässt sie unverändert.
+- **Zweiter Durchgang ohne bekannte Ursache:** Der Dienst sendet die
+  Mixerliste zweimal, weil ein einzelner Durchgang direkt nach dem
+  Einschalten am Gerät nicht vollständig wirkte (Fußnote ⁴).
 - **Kein eigenes Lautstärkelimit:** Neue Ausgänge starten mit 40 %
   (Vorgabe von WirePlumber). Eine einmal geänderte Lautstärke merkt sich
   WirePlumber und stellt sie wieder her, auch 100 %.
@@ -381,8 +408,12 @@ Gerät eingestellt waren.
   ersten Mal etwas abspielst: Kopfhörerregler am Gerät ganz zurück,
   Kopfhörer absetzen, Verstärker und Aktivlautsprecher leise oder aus.
 - Im CC-Modus arbeitet der interne Mixer mit einem Zustand, den dieses
-  Projekt weder kennt noch einstellt. Pegel und Routing können anders
-  sein als erwartet, auch lauter.
+  Projekt nicht kennt und ohne Mixer-Initialisierung auch nicht einstellt.
+  Pegel und Routing können anders sein als erwartet, auch lauter.
+- Mit eingeschalteter Mixer-Initialisierung stehen die Kopfhörerausgänge
+  Phones 9–12 auf 0 dB, und ein Signal an Input 9 ist auf allen zwölf
+  Ausgängen zu hören; ein Mikrofon dort kann über Lautsprecher
+  rückkoppeln.
 - Die Lautstärke in Plasma regelt nur den digitalen Pegel. Der Mixer im
   Gerät kann dahinter zusätzlich verstärken oder abschwächen.
 - Gemerkte Lautstärken (auch 100 %) stellt WirePlumber nach jedem
@@ -435,23 +466,23 @@ Abhängigkeiten der Pakete (installiert `apt` automatisch mit):
 | Paket | hängt ab von | empfiehlt |
 |---|---|---|
 | `ff802-cc` | `libc6` (≥ 2.34), `libusb-1.0-0` | – |
-| `ff802-cc-auto` | `libc6` (≥ 2.34), `libusb-1.0-0`, `systemd`, `udev` | `pkexec`, `libnotify-bin` |
+| `ff802-cc-auto` | `libc6` (≥ 2.34), `libusb-1.0-0`, `libasound2t64` (≥ 1.2.10), `systemd`, `udev` | `pkexec`, `libnotify-bin` |
 | `ff802-ucm-profile` | `alsa-ucm-conf` (≥ 1.2.15.3), `libasound2t64` (≥ 1.2.15.3) | – |
 
 ### Pakete beschaffen
 
 Die drei Pakete und die Datei `SHA256SUMS` sind als Anhänge des
-GitHub-Releases **v0.4.1** veröffentlicht:
-<https://github.com/bsteinheber/fireface802-cc/releases/tag/v0.4.1>
+GitHub-Releases **v0.5.0** veröffentlicht:
+<https://github.com/bsteinheber/fireface802-cc/releases/tag/v0.5.0>
 
 ```
-ff802-cc_0.4.1_amd64.deb
-ff802-cc-auto_0.1.2_amd64.deb
+ff802-cc_0.5.0_amd64.deb
+ff802-cc-auto_0.2.0_amd64.deb
 ff802-ucm-profile_0.3.1_all.deb
 SHA256SUMS
 ```
 
-Sie sind reproduzierbar aus dem Tag `v0.4.1` gebaut und lassen sich auch
+Sie sind reproduzierbar aus dem Tag `v0.5.0` gebaut und lassen sich auch
 selbst aus diesem Repository bauen (siehe
 [Entwicklung und Build](#12-entwicklung-und-build)).
 
@@ -479,16 +510,17 @@ nächsten Anschließen.
 **2. Manuelle Umschaltung** (optional):
 
 ```sh
-sudo apt install ./ff802-cc_0.4.1_amd64.deb
+sudo apt install ./ff802-cc_0.5.0_amd64.deb
 ff802-cc --version
 ```
 
 **3. Automatik** (optional):
 
 ```sh
-sudo apt install ./ff802-cc-auto_0.1.2_amd64.deb
+sudo apt install ./ff802-cc-auto_0.2.0_amd64.deb
 ff802-cc-auto status       # nach der Installation: aus
 ff802-cc-auto on           # einschalten (fragt nach dem Administratorpasswort)
+ff802-cc-auto mixer-init status   # optionale Mixer-Initialisierung: nach der Installation aus
 ```
 
 Bei der Installation laden die Pakete nur die Regeln von udev und die
@@ -499,7 +531,7 @@ das Gerät nicht um.
 
 ```sh
 dpkg -l 'ff802-*'
-ff802-cc --version         # ff802-cc 0.4.1 (git <Revision>, Release, USB writes enabled)
+ff802-cc --version         # ff802-cc 0.5.0 (git <Revision>, Release, USB writes enabled)
 ff802-cc-auto status
 sudo ff802-ucm-bind status
 ```
@@ -637,6 +669,7 @@ Die Dokumente unter `docs/` sind auf Deutsch.
 | `ff802-cc disable` und Port-Reset | [docs/cc_disable_port_reset.md](docs/cc_disable_port_reset.md) |
 | Rückweg in den proprietären Modus (Recherche) | [docs/t4_disable.md](docs/t4_disable.md) |
 | Automatik: Architektur, Sicherheit, Diagnose, Rückbau | [docs/t4_usb_mode.md](docs/t4_usb_mode.md) |
+| Automatischer Port-Reset nach dem Umschaltbefehl | [docs/t4_port_reset.md](docs/t4_port_reset.md) |
 | UCM-Profil, Host-Test T1, Lautstärkesicherheit | [docs/audio_ucm.md](docs/audio_ucm.md) |
 | Einbindung des UCM-Profils (Varianten, alsa-lib-Fehler) | [docs/audio_ucm_einbindung.md](docs/audio_ucm_einbindung.md) |
 | Kanalzuordnung, Messwerkzeug `ff802-chanmap` (T2) | [docs/audio_t2_plan.md](docs/audio_t2_plan.md) |
@@ -645,6 +678,9 @@ Die Dokumente unter `docs/` sind auf Deutsch.
 | Profilzuordnung an jedem USB-Anschluss | [docs/audio_t3_usb_port.md](docs/audio_t3_usb_port.md) |
 | Pakete, Versionen, Installationsstand | [docs/packages.md](docs/packages.md) |
 | Interner Mixer, Software-Playback-Fader, Beobachtungen | [docs/mixer_routing.md](docs/mixer_routing.md) |
+| Mixer-Initialisierung (38 Register), Registerliste | [docs/mixer_init.md](docs/mixer_init.md) |
+| Hardwaretests B.4, D1, D3, E1; Integrationstest v3 | [docs/mixer_b4.md](docs/mixer_b4.md), [docs/mixer_d1.md](docs/mixer_d1.md), [docs/mixer_d3.md](docs/mixer_d3.md), [docs/mixer_e1.md](docs/mixer_e1.md), [docs/mixer_v3_integration.md](docs/mixer_v3_integration.md) |
+| Release-Notizen v0.5.0 | [docs/release-notes-v0.5.0.md](docs/release-notes-v0.5.0.md) |
 | Aufbau des Quellcodes, Build-Optionen, Tests, Entwicklungsphasen | [docs/development.md](docs/development.md) |
 
 Die Namen T1–T4 bezeichnen die Testphasen der Entwicklung: T1 Laden des
@@ -662,7 +698,7 @@ Entwicklungswerkzeuge gebraucht.
 ```sh
 cmake -S . -B build
 cmake --build build
-ctest --test-dir build --output-on-failure     # 73 Tests, ohne Hardware
+ctest --test-dir build --output-on-failure     # 85 Tests, ohne Hardware
 ```
 
 Im Standard-Build kann **kein Programm Daten an das Gerät senden**. Die

@@ -4,6 +4,8 @@
 > Kubuntu-Host installiert und aktiv). dev5 hatte einen Fehler
 > (Playback 9–12 → Phones 9–12 nach dem Einschalten ohne Wirkung), der in
 > dev6 mit einem zweiten Durchgang behoben ist.
+> Das Release-Paket `ff802-cc-auto` 0.2.0 (v0.5.0) hat denselben
+> Funktionsstand wie dev6; geändert sind nur Versionsnummern und Texte.
 
 ## Ergebnis dev6 (2026-11-23, vom Anwender auf dem Host)
 
