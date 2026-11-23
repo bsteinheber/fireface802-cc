@@ -84,9 +84,6 @@ static void print_bytes(FILE *out, const uint8_t *b, size_t n)
 }
 
 /* enable: USB hub port reset after the transfer (hardware test 2026-11-19) */
-#define PORT_OFF_MS  2000u
-#define PORT_WAIT_MS 15000u
-
 typedef struct enable_ctx {
     int                    port_reset;  /* 0 with --no-port-reset */
     const ff802_sysfs_dev *dev;         /* sysfs entry checked before */
@@ -116,7 +113,7 @@ static int confirm_on_tty(void *user, const ff802_usb_dev *target,
                "  expected to come back as 0424:3fdd.\n"
                "The command is sent exactly once and is not retried.\n\n"
                "Type %s to send the command, anything else aborts: ",
-               c->port->dir, PORT_OFF_MS / 1000u, FF802_CONFIRM_WORD);
+               c->port->dir, FF802_PORT_OFF_MS / 1000u, FF802_CONFIRM_WORD);
     else
         printf("\n\nThe device is expected to switch only after the next USB\n"
                "disconnect or power cycle (no port reset: --no-port-reset).\n"
@@ -175,9 +172,9 @@ static int enable_port_reset(const char *sysfs, const ff802_sysfs_dev *dev)
 {
     ff802_psw_result r;
     printf("Resetting the USB hub port: disable=1, %u s, disable=0 ...\n",
-           PORT_OFF_MS / 1000u);
+           FF802_PORT_OFF_MS / 1000u);
     fflush(stdout);
-    ff802_psw_status st = ff802_port_switch(sysfs, dev, PORT_OFF_MS, PORT_WAIT_MS,
+    ff802_psw_status st = ff802_port_switch(sysfs, dev, FF802_PORT_OFF_MS, FF802_PORT_WAIT_MS,
                                             FF802_MODE_CLASS_COMPLIANT, NULL, &r);
     if (st == FF802_PSW_OK) {
         printf("Switched: %s is now %04x:%04x (bus %03u, device %03u), class-compliant "

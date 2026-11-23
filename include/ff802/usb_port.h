@@ -2,9 +2,10 @@
  * USB hub port of a device: find it, cycle it (disable=1, wait,
  * disable=0), wait for the device to come back in a given mode.
  *
- * Used by ff802-cc enable: the CC enable command takes effect only when
- * the USB connection is interrupted (hardware test 2026-11-19). The port
- * is found from the device's kernel name (e.g. 3-2.4.1.1.3 -> hub
+ * Used by ff802-cc enable and ff802-cc-autoswitch: the CC enable command
+ * takes effect only when the USB connection is interrupted (hardware
+ * test 2026-11-19). The port is found from the device's kernel name
+ * (e.g. 3-2.4.1.1.3 -> hub
  * 3-2.4.1.1, port 3 -> <hub>/<hub>:1.0/<hub>-port3) and accepted only if
  * its "device" link points to exactly that device. Only the sysfs
  * attribute "disable" of that one port is written; no usbreset, no
@@ -24,6 +25,15 @@ extern "C" {
 #endif
 
 #define FF802_PORT_PATH_MAX 320u
+
+/*
+ * The one port reset sequence after the CC enable command (hardware test
+ * 2026-11-19), used by ff802-cc enable and ff802-cc-autoswitch alike:
+ * disable=1, FF802_PORT_OFF_MS, disable=0, then wait up to
+ * FF802_PORT_WAIT_MS for the class-compliant USB ID at the same port.
+ */
+#define FF802_PORT_OFF_MS   2000u
+#define FF802_PORT_WAIT_MS 15000u
 
 typedef struct ff802_usb_port {
     char     dir[FF802_PORT_PATH_MAX];      /* .../<hub>-port<N> */
