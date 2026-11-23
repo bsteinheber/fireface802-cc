@@ -34,6 +34,7 @@
 #include "ff802/auto_state.h"
 #include "ff802/auto_switch.h"
 #include "ff802/auto_sysfs.h"
+#include "ff802/mixer_init.h"
 
 #ifndef FF802_HAVE_MIXER_SEQ
 #define FF802_HAVE_MIXER_SEQ 0
@@ -210,7 +211,7 @@ static int run_status(const ff802_auto_paths *p)
             printf("  automation: nothing to do (class-compliant mode)\n"
                    "  mixer init: %s\n",
                    ff802_auto_read_mixer_mode(p) == FF802_AUTO_MODE_ON
-                       ? "on, sets the 26 registers on the next connection event"
+                       ? "on, sets the " FF802_MIXER_INIT_ID " registers on the next connection event"
                        : "off, the mixer is not changed");
         else
             printf("  automation: refused (not identified as an original "
@@ -316,13 +317,27 @@ int main(int argc, char **argv)
     ff802_midi_factory midi;
     ff802_mixer_options mopt;
     sim_midi_setup(&paths, &midi, &mopt);
+    /* the service sends the list twice (see below); short pause in tests */
+    mopt.passes = 2;
+    const char *rep = getenv("FF802_SIM_MIXER_REPEAT_MS");
+    mopt.repeat_ms = rep != NULL ? (unsigned)strtoul(rep, NULL, 10) : 20u;
     fac.midi = &midi;
     fac.mixer_opt = &mopt;
     ff802_port_ops pops;
     fac.port_ops = sim_port_setup(&paths, ev.kernel_name, &pops);
 #elif FF802_HAVE_MIXER_SEQ
     ff802_midi_factory midi = ff802_midi_seq_factory();
+    /*
+     * The service sends the whole list twice, FF802_MIXER_REPEAT_MS apart:
+     * right after power-on, part of a single pass had no effect on the
+     * unit, reproducibly (Playback 9..12 -> Phones), while the same list
+     * sent later always did (integration test v3, 2026-11-23).
+     */
+    ff802_mixer_options mopt;
+    ff802_mixer_default_options(&mopt);
+    mopt.passes = 2;
     fac.midi = &midi;
+    fac.mixer_opt = &mopt;
 #endif
     ff802_auto_result res;
     (void)ff802_auto_handle(&paths, &ev, &fac, stderr, &res);

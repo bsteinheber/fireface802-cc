@@ -4,7 +4,8 @@
  *
  * The expected values are literals: the registers measured with OSCMix on
  * the unit (docs/mixer_routing.md), the crossed routings switched off in
- * the hardware tests D2/D3, and SysEx bytes computed independently of the
+ * the hardware tests D2/D3, Input 9 -> Analog 3 of the hardware test E1,
+ * the v2 list and its checksum, and SysEx bytes computed independently of the
  * module under test. They are deliberately not derived from the code
  * under test.
  */
@@ -21,9 +22,11 @@ static const uint16_t MEASURED[][2] = {
     { 0x2900, 0x0000 },   /* observed in register reports only */
     /* switched off through the project's send path (D3, D2 on 2026-11-23) */
     { 0x4220, 0x0000 }, { 0x4261, 0x0000 },
+    /* Input 9 -> Analog 3 at 30 %, hardware test E1 (2026-11-23, passed) */
+    { 0x4088, 0x2666 },
 };
 
-/* The complete expected list in send order. */
+/* The complete expected list in send order (v3). */
 static const uint16_t EXPECTED[FF802_MIXER_INIT_COUNT][2] = {
     { 0x4220, 0x0000 }, { 0x4261, 0x0000 },
     { 0x4020, 0x9000 }, { 0x4061, 0x9000 }, { 0x40A2, 0x9000 }, { 0x40E3, 0x9000 },
@@ -32,7 +35,36 @@ static const uint16_t EXPECTED[FF802_MIXER_INIT_COUNT][2] = {
     { 0x1E00, 0x0000 }, { 0x1F00, 0x0000 }, { 0x2000, 0x0000 }, { 0x2100, 0x0000 },
     { 0x2200, 0x0000 }, { 0x2300, 0x0000 }, { 0x2400, 0x0000 }, { 0x2500, 0x0000 },
     { 0x2600, 0x0000 }, { 0x2700, 0x0000 }, { 0x2800, 0x0000 }, { 0x2900, 0x0000 },
+    { 0x4008, 0x2666 }, { 0x4048, 0x2666 }, { 0x4088, 0x2666 }, { 0x40C8, 0x2666 },
+    { 0x4108, 0x2666 }, { 0x4148, 0x2666 }, { 0x4188, 0x2666 }, { 0x41C8, 0x2666 },
+    { 0x4208, 0x2666 }, { 0x4248, 0x2666 }, { 0x4288, 0x2666 }, { 0x42C8, 0x2666 },
 };
+
+/* The v2 list (0.2.0~dev3/dev4, tested on the unit), literally. */
+static const uint16_t V2[26][2] = {
+    { 0x4220, 0x0000 }, { 0x4261, 0x0000 },
+    { 0x4020, 0x9000 }, { 0x4061, 0x9000 }, { 0x40A2, 0x9000 }, { 0x40E3, 0x9000 },
+    { 0x4124, 0x9000 }, { 0x4165, 0x9000 }, { 0x41A6, 0x9000 }, { 0x41E7, 0x9000 },
+    { 0x4228, 0x9000 }, { 0x4269, 0x9000 }, { 0x42AA, 0x9000 }, { 0x42EB, 0x9000 },
+    { 0x1E00, 0x0000 }, { 0x1F00, 0x0000 }, { 0x2000, 0x0000 }, { 0x2100, 0x0000 },
+    { 0x2200, 0x0000 }, { 0x2300, 0x0000 }, { 0x2400, 0x0000 }, { 0x2500, 0x0000 },
+    { 0x2600, 0x0000 }, { 0x2700, 0x0000 }, { 0x2800, 0x0000 }, { 0x2900, 0x0000 },
+};
+
+/* FNV-1a over the first n literal pairs (independent of the module). */
+static uint32_t fnv_pairs(const uint16_t (*p)[2], unsigned n)
+{
+    uint32_t h = 2166136261u;
+    for (unsigned i = 0; i < n; i++) {
+        const uint8_t b[4] = { (uint8_t)(p[i][0] & 0xFF), (uint8_t)(p[i][0] >> 8),
+                               (uint8_t)(p[i][1] & 0xFF), (uint8_t)(p[i][1] >> 8) };
+        for (unsigned j = 0; j < 4u; j++) {
+            h ^= b[j];
+            h *= 16777619u;
+        }
+    }
+    return h;
+}
 
 /* The former list of 24 entries (until 2026-11-23), unchanged in content. */
 static const uint16_t FORMER24[24][2] = {
@@ -49,11 +81,19 @@ static void test_table(void)
     const ff802_mixer_entry *t = ff802_mixer_init_table();
     CHECK(t != NULL);
     CHECK(ff802_mixer_init_verify() == 0);
-    CHECK_EQ_U32(ff802_mixer_init_checksum(), FF802_MIXER_INIT_CHECKSUM);
-    CHECK_EQ_U32(FF802_MIXER_INIT_CHECKSUM, 0xC97A359Cu);
-    CHECK(strcmp(FF802_MIXER_INIT_ID, "ff802-mixer-init-v2") == 0);
-    CHECK_EQ_U32(FF802_MIXER_INIT_COUNT, 26u);
+    CHECK_EQ_U32(FF802_MIXER_INIT_COUNT, 38u);
+    CHECK_EQ_U32(FF802_MIXER_INIT_V2_COUNT, 26u);
+    CHECK_EQ_U32(FF802_MIXER_INPUT9_COUNT, 12u);
     CHECK_EQ_U32(FF802_MIXER_CROSS_COUNT, 2u);
+    CHECK(strcmp(FF802_MIXER_INIT_ID, "ff802-mixer-init-v3") == 0);
+    CHECK(strcmp(FF802_MIXER_INIT_V2_ID, "ff802-mixer-init-v2") == 0);
+    /* checksums: of the module, of the constants, and recomputed from literals */
+    CHECK_EQ_U32(ff802_mixer_init_checksum(), FF802_MIXER_INIT_CHECKSUM);
+    CHECK_EQ_U32(FF802_MIXER_INIT_CHECKSUM, 0xEC858A44u);
+    CHECK_EQ_U32(fnv_pairs(EXPECTED, 38u), 0xEC858A44u);
+    CHECK_EQ_U32(ff802_mixer_init_v2_checksum(), FF802_MIXER_INIT_V2_CHECKSUM);
+    CHECK_EQ_U32(FF802_MIXER_INIT_V2_CHECKSUM, 0xC97A359Cu);
+    CHECK_EQ_U32(fnv_pairs(V2, 26u), 0xC97A359Cu);
     for (unsigned i = 0; i < FF802_MIXER_INIT_COUNT; i++) {
         CHECK_EQ_U32(t[i].addr, EXPECTED[i][0]);
         CHECK_EQ_U32(t[i].value, EXPECTED[i][1]);
@@ -68,12 +108,52 @@ static void test_table(void)
         CHECK_EQ_U32(t[i].channel, k);
         if (i < 14u)
             CHECK(t[i].kind == FF802_MIXER_ROUTE && t[i].source == k);
-        else
+        else if (i < 26u)
             CHECK(t[i].kind == FF802_MIXER_OUTPUT_VOLUME && t[i].source == 0);
+        else
+            CHECK(t[i].kind == FF802_MIXER_INPUT_ROUTE && t[i].source == 9 &&
+                  t[i].value == 0x2666u);
     }
 }
 
-/* The former 24 values are entries 3..26, unchanged and in the same order. */
+/* Entries 1..26 are exactly the v2 list, in the same order. */
+static void test_v2_unchanged(void)
+{
+    const ff802_mixer_entry *t = ff802_mixer_init_table();
+    for (unsigned i = 0; i < 26u; i++) {
+        CHECK_EQ_U32(t[i].addr, V2[i][0]);
+        CHECK_EQ_U32(t[i].value, V2[i][1]);
+    }
+}
+
+/* Input 9 -> Output k: the formula, the level, the mono signal on both
+ * channels of every pair (same value on the left and right output). */
+static void test_input9(void)
+{
+    const ff802_mixer_entry *t = ff802_mixer_init_table();
+    /* 0x2666 = lround(0.3 * 0x8000), lower (linear) range of OSCMix setmixlevel */
+    CHECK_EQ_U32((uint32_t)(0.3 * 32768.0 + 0.5), 0x2666u);
+    CHECK(0x2666u <= 0x4000u);
+    for (unsigned k = 1; k <= 12u; k++) {
+        const ff802_mixer_entry *e = &t[26u + k - 1u];
+        CHECK_EQ_U32(e->addr, 0x4000u | ((k - 1u) << 6) | 8u);
+        CHECK_EQ_U32(ff802_mixer_input_addr(9, k), e->addr);
+        CHECK_EQ_U32(e->value, FF802_MIXER_INPUT9_LEVEL);
+        CHECK_EQ_U32(e->addr & 0x3Fu, 8u);                 /* source index 8 */
+        CHECK_EQ_U32((e->addr >> 6) & 0x1Fu, k - 1u);       /* output index */
+    }
+    for (unsigned pair = 0; pair < 6u; pair++)
+        CHECK_EQ_U32(t[26u + 2u * pair].value, t[27u + 2u * pair].value);
+    CHECK_EQ_U32(ff802_mixer_input_addr(9, 3), 0x4088u);    /* E1 */
+    CHECK_EQ_U32(ff802_mixer_input_addr(1, 1), 0x4000u);
+    CHECK_EQ_U32(ff802_mixer_input_addr(30, 12), 0x42DDu);
+    CHECK_EQ_U32(ff802_mixer_input_addr(0, 1), 0);
+    CHECK_EQ_U32(ff802_mixer_input_addr(31, 1), 0);
+    CHECK_EQ_U32(ff802_mixer_input_addr(9, 0), 0);
+    CHECK_EQ_U32(ff802_mixer_input_addr(9, 13), 0);
+}
+
+/* The former 24 values (v1) are entries 3..26, unchanged and in the same order. */
 static void test_former_24_unchanged(void)
 {
     const ff802_mixer_entry *t = ff802_mixer_init_table();
@@ -121,7 +201,7 @@ static void test_formulas(void)
     CHECK_EQ_U32(ff802_mixer_outvol_addr(13), 0);
 }
 
-/* Nothing outside the 26 approved writes can be in the list. */
+/* Nothing outside the 38 approved writes can be in the list. */
 static void test_nothing_else(void)
 {
     const ff802_mixer_entry *t = ff802_mixer_init_table();
@@ -130,20 +210,31 @@ static void test_nothing_else(void)
         0x3D00, 0x3D01, 0x3D02, 0x3D03, 0x3D04,   /* control room */
         0x4229, 0x4268, 0x4021, 0x4060,           /* other crossed routings */
         0x4221, 0x4260, 0x4069,                   /* not part of the two found ones */
-        0x4000, 0x4041, 0x4200, 0x4241,           /* inputs -> outputs */
+        0x4000, 0x4041, 0x4200, 0x4241,           /* inputs 1, 2 -> outputs */
+        0x4007, 0x4009, 0x4087, 0x4089, 0x4308,   /* inputs 8, 10; Input 9 -> output 13 */
+        0x0807, 0x0808, 0x0809,                   /* Input 9 gain, 48 V, Hi-Z */
         0x1E01, 0x1E02, 0x2601, 0x2602,           /* pan, mute */
         0x2A00, 0x2B00,                           /* outputs 13, 14 */
     };
-    unsigned cross = 0;
+    unsigned cross = 0, input = 0;
     for (unsigned i = 0; i < FF802_MIXER_INIT_COUNT; i++) {
         for (size_t f = 0; f < sizeof FORBIDDEN / sizeof FORBIDDEN[0]; f++)
             CHECK(t[i].addr != FORBIDDEN[f]);
-        if (t[i].kind == FF802_MIXER_ROUTE || t[i].kind == FF802_MIXER_CROSS_OFF) {
+        if (t[i].kind == FF802_MIXER_ROUTE || t[i].kind == FF802_MIXER_CROSS_OFF ||
+            t[i].kind == FF802_MIXER_INPUT_ROUTE) {
             unsigned out = (t[i].addr >> 6) & 0x1Fu;
             unsigned src = t[i].addr & 0x3Fu;
             CHECK((t[i].addr & 0xF800u) == 0x4000u);
-            CHECK(src >= 0x20u);                  /* a playback, never an input */
-            CHECK(out < 12u && src < 0x20u + 12u);
+            CHECK(out < 12u);
+            if (t[i].kind == FF802_MIXER_INPUT_ROUTE) {
+                CHECK(src == 8u);                 /* Mic/Inst 9 only */
+                CHECK_EQ_U32(t[i].value, 0x2666u);
+                CHECK(i >= 26u);                  /* after the whole v2 part */
+                input++;
+                continue;
+            }
+            CHECK(src >= 0x20u);                  /* a playback */
+            CHECK(src < 0x20u + 12u);
             if (t[i].kind == FF802_MIXER_ROUTE) {
                 CHECK(src == 0x20u + out);        /* the direct routing */
                 CHECK_EQ_U32(t[i].value, 0x9000u);
@@ -158,6 +249,7 @@ static void test_nothing_else(void)
         }
     }
     CHECK_EQ_U32(cross, 2u);
+    CHECK_EQ_U32(input, 12u);
 }
 
 static void test_sysex(void)
@@ -184,7 +276,13 @@ static void test_sysex(void)
     CHECK_BYTES(out, PB2_PH10_OFF, 12);
     CHECK(ff802_mixer_init_message(2, out) == FF802_OK);
     CHECK_BYTES(out, PB1_AN1, 12);
-    CHECK(ff802_mixer_init_message(26, out) == FF802_ERR_ADDR_RANGE);
+    /* Input 9 -> Analog 3, sent on the unit in E1 */
+    static const uint8_t IN9_AN3[12] =
+        { 0xF0, 0x00, 0x20, 0x0D, 0x10, 0x00, 0x66, 0x4C, 0x20, 0x04, 0x0C, 0xF7 };
+    CHECK(ff802_mixer_init_message(28, out) == FF802_OK);
+    CHECK_BYTES(out, IN9_AN3, 12);
+    CHECK(ff802_mixer_init_message(37, out) == FF802_OK);
+    CHECK(ff802_mixer_init_message(38, out) == FF802_ERR_ADDR_RANGE);
 
     CHECK(ff802_rme_sysex_reg(0x4020, 0x9000, out) == FF802_OK);
     CHECK_BYTES(out, PB1_AN1, 12);
@@ -247,6 +345,12 @@ static void test_labels(void)
     CHECK(strcmp(buf, "Playback 10 -> Phones 10, 0 dB") == 0);
     ff802_mixer_entry_label(&t[25], buf, sizeof buf);
     CHECK(strcmp(buf, "Output Phones 12 volume, 0 dB") == 0);
+    ff802_mixer_entry_label(&t[26], buf, sizeof buf);
+    CHECK(strcmp(buf, "Input 9 -> Analog 1, 30 %") == 0);
+    ff802_mixer_entry_label(&t[28], buf, sizeof buf);
+    CHECK(strcmp(buf, "Input 9 -> Analog 3, 30 %") == 0);
+    ff802_mixer_entry_label(&t[37], buf, sizeof buf);
+    CHECK(strcmp(buf, "Input 9 -> Phones 12, 30 %") == 0);
     CHECK(strcmp(ff802_mixer_output_name(0), "?") == 0);
     CHECK(strcmp(ff802_mixer_output_name(8), "Analog 8") == 0);
     ff802_mixer_entry_label(NULL, buf, sizeof buf);
@@ -256,6 +360,8 @@ static void test_labels(void)
 int main(void)
 {
     test_table();
+    test_v2_unchanged();
+    test_input9();
     test_former_24_unchanged();
     test_no_duplicates();
     test_measured_registers_in_table();

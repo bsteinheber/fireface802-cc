@@ -298,10 +298,13 @@ int ff802_auto_write_mixer_result(const ff802_auto_paths *p,
     int n = snprintf(buf, sizeof buf,
                      "time=%lld\noutcome=%s\nport=%s\nbusnum=%u\ndevnum=%u\n"
                      "written=%u/%u\nconfig=%s\nentries=%u\nchecksum=0x%08X\n"
+                     "base=%s\nbase_entries=%u\nbase_checksum=0x%08X\n"
                      "card=%d\nmidi_port=%d:%d %s\ndetail=%s\n",
                      (long long)time(NULL), oc, d->kernel_name, (unsigned)d->bus,
                      (unsigned)d->devnum, written, total, FF802_MIXER_INIT_ID,
                      FF802_MIXER_INIT_COUNT, (unsigned)ff802_mixer_init_checksum(),
+                     FF802_MIXER_INIT_V2_ID, FF802_MIXER_INIT_V2_COUNT,
+                     (unsigned)ff802_mixer_init_v2_checksum(),
                      card, client, port, pname, clean);
     if (n < 0 || (size_t)n >= sizeof buf)
         return -1;

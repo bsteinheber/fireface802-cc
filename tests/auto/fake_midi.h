@@ -22,7 +22,7 @@ typedef struct fake_midi {
     /* records */
     unsigned n_open, n_close, n_list, n_connect, n_sleep, slept_ms;
     int conn_client, conn_port;
-    uint8_t sent[FF802_MIXER_INIT_COUNT + 4u][FF802_MIXER_SYSEX_SIZE];
+    uint8_t sent[2u * FF802_MIXER_INIT_COUNT + 4u][FF802_MIXER_SYSEX_SIZE];   /* two passes */
     unsigned n_sent;                /* messages accepted */
     unsigned n_send_calls;
     void (*on_sleep)(struct fake_midi *m);
@@ -58,7 +58,7 @@ static int fm_send(void *self, const uint8_t *msg, size_t len)
     m->n_send_calls++;
     if (m->send_err_at != 0 && m->n_send_calls == m->send_err_at)
         return -EIO;
-    if (len != FF802_MIXER_SYSEX_SIZE || m->n_sent >= FF802_MIXER_INIT_COUNT + 4u)
+    if (len != FF802_MIXER_SYSEX_SIZE || m->n_sent >= 2u * FF802_MIXER_INIT_COUNT + 4u)
         return -EINVAL;
     memcpy(m->sent[m->n_sent++], msg, len);
     return 0;

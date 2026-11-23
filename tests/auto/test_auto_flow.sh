@@ -259,39 +259,52 @@ ok "M1: mixer init off by default: CC event opens no MIDI, writes no mixer resul
 
 reset_root; mode off; mixer on; ccdev 19
 rc=$(event)
-ok "M2: mixer init on, automation off: 26 SysEx messages to port 20:1, exit 0, no USB access" \
-    '[ "$rc" = 0 ] && [ "$(sysex)" = 26 ] && [ "$(usb_calls)" = 0 ] &&
+ok "M2: mixer init on, automation off: 38 SysEx messages to port 20:1 twice (two passes), exit 0, no USB access" \
+    '[ "$rc" = 0 ] && [ "$(sysex)" = 76 ] && [ "$(usb_calls)" = 0 ] &&
      grep -qx "seq connect 20:1" "$MIDI" && [ "$(mres outcome)" = done ] &&
-     [ "$(mres written)" = 26/26 ] && [ "$(mres card)" = 1 ] &&
-     [ "$(mres config)" = ff802-mixer-init-v2 ] && [ "$(mres entries)" = 26 ] &&
-     [ "$(mres checksum)" = 0xC97A359C ] &&
-     grep -qx "mixer: configuration ff802-mixer-init-v2, 26 entries, checksum 0xC97A359C (verified)." "$T/journal.txt" &&
+     [ "$(mres written)" = 38/38 ] && [ "$(mres card)" = 1 ] &&
+     [ "$(mres config)" = ff802-mixer-init-v3 ] && [ "$(mres entries)" = 38 ] &&
+     [ "$(mres checksum)" = 0xEC858A44 ] && [ "$(mres base)" = ff802-mixer-init-v2 ] &&
+     [ "$(mres base_entries)" = 26 ] && [ "$(mres base_checksum)" = 0xC97A359C ] &&
+     grep -qx "mixer: configuration ff802-mixer-init-v3, 38 entries, checksum 0xEC858A44 (verified)." "$T/journal.txt" &&
+     grep -qx "mixer: entries 1..26 are ff802-mixer-init-v2, checksum 0xC97A359C (verified)." "$T/journal.txt" &&
      [ "$(mres midi_port)" = "20:1 Fireface 802 (24047128) Port 2" ] && [ ! -e "$RUN/mixer-event" ]'
-ok "M2: order: the two crossed routings off first, then routings 1..12, output volumes last" \
+ok "M2: order: the two crossed routings off first, then routings 1..12, output volumes, Input 9 last" \
     '[ "$(nth_sysex 1)" = "sysex F0 00 20 0D 10 00 00 00 00 11 04 F7" ] &&
      [ "$(nth_sysex 2)" = "sysex F0 00 20 0D 10 00 00 00 04 13 04 F7" ] &&
      [ "$(nth_sysex 3)" = "sysex F0 00 20 0D 10 00 00 20 02 01 0C F7" ] &&
      [ "$(nth_sysex 4)" = "sysex F0 00 20 0D 10 00 00 20 06 03 0C F7" ] &&
      [ "$(nth_sysex 11)" = "sysex F0 00 20 0D 10 00 00 20 22 11 0C F7" ] &&
      [ "$(nth_sysex 23)" = "sysex F0 00 20 0D 10 00 00 00 00 30 02 F7" ] &&
+     [ "$(nth_sysex 27)" = "sysex F0 00 20 0D 10 00 66 4C 20 00 04 F7" ] &&
+     [ "$(nth_sysex 29)" = "sysex F0 00 20 0D 10 00 66 4C 20 04 0C F7" ] &&
+     [ "$(nth_sysex 38)" = "sysex F0 00 20 0D 10 00 66 4C 20 16 0C F7" ] &&
      [ "$(tr "\n" ";" < "$MIDI" | sed "s/sysex F0[^;]*;//g")" = "seq open;seq list;seq connect 20:1;seq close;" ]'
 ok "M2: one journal line per register, last-result stays cc-active" \
-    '[ "$(grep -c "^mixer: set 0x" "$T/journal.txt")" = 26 ] &&
-     grep -q "^mixer: set 0x4228 = 0x9000 (Playback 9 -> Phones 9, 0 dB) \[11/26\]$" "$T/journal.txt" &&
-     grep -q "^mixer: set 0x2900 = 0x0000 (Output Phones 12 volume, 0 dB) \[26/26\]$" "$T/journal.txt" &&
+    '[ "$(grep -c "^mixer: set 0x" "$T/journal.txt")" = 38 ] &&
+     grep -q "^mixer: set 0x4228 = 0x9000 (Playback 9 -> Phones 9, 0 dB) \[11/38\]$" "$T/journal.txt" &&
+     grep -q "^mixer: set 0x2900 = 0x0000 (Output Phones 12 volume, 0 dB) \[26/38\]$" "$T/journal.txt" &&
+     grep -q "^mixer: set 0x4088 = 0x2666 (Input 9 -> Analog 3, 30 %) \[29/38\]$" "$T/journal.txt" &&
      [ "$(outcome)" = cc-active ] && grep -q "mixer initialisation: done" "$RUN/last-result"'
+ok "M2: the service sends the whole list twice: pass 2 after the pause, marked in the journal, result 'twice'" \
+    '[ "$(grep -c "^mixer: pass 2: set 0x" "$T/journal.txt")" = 38 ] &&
+     grep -qx "mixer: pass 1 of 2 complete; pass 2 (the same 38 values) in 20 ms." "$T/journal.txt" &&
+     grep -q "^mixer: pass 2: set 0x4228 = 0x9000 (Playback 9 -> Phones 9, 0 dB) \[11/38\]$" "$T/journal.txt" &&
+     [ "$(grep "^sysex F0" "$MIDI" | head -n 38)" = "$(grep "^sysex F0" "$MIDI" | tail -n 38)" ] &&
+     [ "$(mres written)" = 38/38 ] && grep -q "^detail=38 registers sent to MIDI port 20:1 .*, twice$" "$RUN/mixer-result" &&
+     [ "$(tr "\n" ";" < "$MIDI" | grep -o "seq connect" | wc -l)" = 1 ]'
 
 rc=$(event)
 ok "M3: a repeated add event of the same connection initialises again (same values), exit 0" \
-    '[ "$rc" = 0 ] && [ "$(sysex)" = 52 ] && [ "$(nth_sysex 27)" = "$(nth_sysex 1)" ]'
+    '[ "$rc" = 0 ] && [ "$(sysex)" = 152 ] && [ "$(nth_sysex 77)" = "$(nth_sysex 1)" ] && [ "$(nth_sysex 39)" = "$(nth_sysex 1)" ]'
 unplug; ccdev 20 24
 rc=$(event)
 ok "M3: new connection, client number changed (24): found by card, initialised" \
-    '[ "$rc" = 0 ] && [ "$(sysex)" = 78 ] && grep -qx "seq connect 24:1" "$MIDI"'
+    '[ "$rc" = 0 ] && [ "$(sysex)" = 228 ] && grep -qx "seq connect 24:1" "$MIDI"'
 unplug; ccdev 19
 rc=$(event)
 ok "M4: reused device number (19 again): the initialisation is never suppressed" \
-    '[ "$rc" = 0 ] && [ "$(sysex)" = 104 ] && [ "$(mres devnum)" = 19 ] && [ "$(mres outcome)" = done ]'
+    '[ "$rc" = 0 ] && [ "$(sysex)" = 304 ] && [ "$(mres devnum)" = 19 ] && [ "$(mres outcome)" = done ]'
 
 reset_root; mode on; mixer on; prop 18
 rc=$(event)
@@ -300,14 +313,14 @@ ok "M5: proprietary mode: only the switch, no MIDI access" \
 unplug; ccdev 19
 rc=$(event)
 ok "M5: after the switch, reconnected in CC mode: cc-active event and mixer done, kept apart" \
-    '[ "$rc" = 0 ] && [ "$(kind)" = cc-active ] && [ "$(sysex)" = 26 ] && [ ! -e "$RUN/mixer-event" ] &&
+    '[ "$rc" = 0 ] && [ "$(kind)" = cc-active ] && [ "$(sysex)" = 76 ] && [ ! -e "$RUN/mixer-event" ] &&
      [ "$(mres outcome)" = done ]'
 
 reset_root; mixer on; cc 19
 rc=$(event)
 ok "M6: no sound card within the timeout: exit 3, no-port, sequencer never opened, mixer-failed event" \
     '[ "$rc" = 3 ] && [ "$(midi_calls)" = 0 ] && [ "$(mres outcome)" = no-port ] &&
-     [ "$(mkind)" = mixer-failed ] && grep -q "^detail=.*no sound card with MIDI device.*(0 of 26 registers)" "$RUN/mixer-event" &&
+     [ "$(mkind)" = mixer-failed ] && grep -q "^detail=.*no sound card with MIDI device.*(0 of 38 registers)" "$RUN/mixer-event" &&
      [ ! -e "$RUN/event" ] && [ "$(outcome)" = cc-active ]'
 sndcard
 rc=$(event)
@@ -325,9 +338,25 @@ done
 reset_root; mixer on; ccdev 19
 rc=$(event FF802_SIM_SEQ_SEND_ERR_AT=7)
 ok "M9: sending fails at register 7: exit 4, incomplete, 6 sent, nothing retried" \
-    '[ "$rc" = 4 ] && [ "$(sysex)" = 6 ] && [ "$(mres outcome)" = incomplete ] && [ "$(mres written)" = 6/26 ] &&
-     [ "$(grep -c "^sysex FAILED" "$MIDI")" = 1 ] && grep -q "(6 of 26 registers)" "$RUN/mixer-event" &&
+    '[ "$rc" = 4 ] && [ "$(sysex)" = 6 ] && [ "$(mres outcome)" = incomplete ] && [ "$(mres written)" = 6/38 ] &&
+     [ "$(grep -c "^sysex FAILED" "$MIDI")" = 1 ] && grep -q "(6 of 38 registers)" "$RUN/mixer-event" &&
      grep -q "seq close" "$MIDI"'
+
+reset_root; mixer on; ccdev 19
+rc=$(event FF802_SIM_SEQ_SEND_ERR_AT=45)
+ok "M9: sending fails in pass 2 (register 7 again): exit 4, incomplete, pass 1 complete, nothing retried" \
+    '[ "$rc" = 4 ] && [ "$(sysex)" = 44 ] && [ "$(mres outcome)" = incomplete ] && [ "$(mres written)" = 38/38 ] &&
+     grep -q "pass 2: sending register 7 of 38 (0x4124) failed" "$RUN/mixer-result" &&
+     grep -q "^mixer: pass 2: FAILED 0x4124" "$T/journal.txt" && [ "$(mkind)" = mixer-failed ]'
+
+reset_root; mixer on; ccdev 19
+( sleep 0.7; unplug ) &
+gone=$!
+rc=$(event FF802_SIM_MIXER_REPEAT_MS=2000)
+wait "$gone"
+ok "M19: unit gone during the pause: pass 2 skipped, pass 1 counts, done, exit 0" \
+    '[ "$rc" = 0 ] && [ "$(sysex)" = 38 ] && [ "$(mres outcome)" = done ] &&
+     grep -q "^mixer: pass 2 skipped: " "$T/journal.txt" && grep -q "pass 2 skipped" "$RUN/mixer-result"'
 
 reset_root; mixer on; ccdev 19
 rc=$(event FF802_SIM_MIXER_WRITE=0)
@@ -356,13 +385,13 @@ for i in 1 2 3 4 5; do
     pids="$pids $!"
 done
 for p in $pids; do wait "$p"; done
-ok "M13: five simultaneous events: serialised, each a complete block of 26, all exit 0" \
-    '[ "$(sysex)" = 130 ] && [ "$(cat "$T"/mrc.* | sort -u)" = 0 ] &&
-     [ "$(tr "\n" ";" < "$MIDI" | sed -e "s/sysex F0[^;]*;/S/g" | sed "s/seq open;seq list;seq connect 20:1;SSSSSSSSSSSSSSSSSSSSSSSSSSseq close;//g")" = "" ]'
+ok "M13: five simultaneous events: serialised, each a complete block of 2 x 38, all exit 0" \
+    '[ "$(sysex)" = 380 ] && [ "$(cat "$T"/mrc.* | sort -u)" = 0 ] &&
+     [ "$(tr "\n" ";" < "$MIDI" | sed -e "s/sysex F0[^;]*;/S/g" | sed "s/seq open;seq list;seq connect 20:1;SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSseq close;//g")" = "" ]'
 
-# all 26 messages, written out (independent shell computation, as in
+# all 38 messages, written out (independent shell computation, as in
 # test_mixer_init_tool.sh)
-EXPECTED26="F0 00 20 0D 10 00 00 00 00 11 04 F7
+EXPECTED38="F0 00 20 0D 10 00 00 00 00 11 04 F7
 F0 00 20 0D 10 00 00 00 04 13 04 F7
 F0 00 20 0D 10 00 00 20 02 01 0C F7
 F0 00 20 0D 10 00 00 20 06 03 0C F7
@@ -387,39 +416,52 @@ F0 00 20 0D 10 00 00 00 00 28 02 F7
 F0 00 20 0D 10 00 00 00 00 30 02 F7
 F0 00 20 0D 10 00 00 00 00 38 0A F7
 F0 00 20 0D 10 00 00 00 00 40 0A F7
-F0 00 20 0D 10 00 00 00 00 48 02 F7"
-sent26() { grep '^sysex F0' "$MIDI" | sed 's/^sysex //'; }
+F0 00 20 0D 10 00 00 00 00 48 02 F7
+F0 00 20 0D 10 00 66 4C 20 00 04 F7
+F0 00 20 0D 10 00 66 4C 20 02 0C F7
+F0 00 20 0D 10 00 66 4C 20 04 0C F7
+F0 00 20 0D 10 00 66 4C 20 06 04 F7
+F0 00 20 0D 10 00 66 4C 20 08 0C F7
+F0 00 20 0D 10 00 66 4C 20 0A 04 F7
+F0 00 20 0D 10 00 66 4C 20 0C 04 F7
+F0 00 20 0D 10 00 66 4C 20 0E 0C F7
+F0 00 20 0D 10 00 66 4C 20 10 0C F7
+F0 00 20 0D 10 00 66 4C 20 12 04 F7
+F0 00 20 0D 10 00 66 4C 20 14 04 F7
+F0 00 20 0D 10 00 66 4C 20 16 0C F7"
+sent38() { grep '^sysex F0' "$MIDI" | sed 's/^sysex //'; }
+EXPECTED_TWICE=$(printf '%s\n%s' "$EXPECTED38" "$EXPECTED38")
 
 reset_root; mixer on; ccdev 19
 rc=$(event)
-ok "M14: service sends exactly the 26 expected messages, byte for byte, in order" \
-    '[ "$rc" = 0 ] && [ "$(sent26)" = "$EXPECTED26" ]'
+ok "M14: service sends exactly the 38 expected messages, byte for byte, in order, twice" \
+    '[ "$rc" = 0 ] && [ "$(sent38)" = "$EXPECTED_TWICE" ]'
 
 reset_root; mixer on; ccdev 19
 rc=$(event FF802_SIM_SEQ_PORTS_AFTER=2 FF802_SIM_MIXER_TIMEOUT_MS=1000)
-ok "M15: MIDI port appears late (after two polls): waited for, then the 26 messages" \
-    '[ "$rc" = 0 ] && [ "$(grep -c "^seq list" "$MIDI")" = 3 ] && [ "$(sysex)" = 26 ] && [ "$(mres outcome)" = done ]'
+ok "M15: MIDI port appears late (after two polls): waited for, then the 38 messages" \
+    '[ "$rc" = 0 ] && [ "$(grep -c "^seq list" "$MIDI")" = 3 ] && [ "$(sysex)" = 76 ] && [ "$(mres outcome)" = done ]'
 reset_root; mixer on; cc 19
 ( sleep 0.4; mkdir -p "$DEVS/$PORT/$PORT:1.0/sound/card1/midiC1D0"; seqports 20 ) &
 late=$!
 rc=$(event FF802_SIM_MIXER_TIMEOUT_MS=3000)
 wait "$late"
 ok "M15: sound card appears late (after the udev event): waited for, then initialised" \
-    '[ "$rc" = 0 ] && [ "$(sysex)" = 26 ] && grep -q "^mixer: sound card 1 for $PORT (after [1-9][0-9]* ms)" "$T/journal.txt"'
+    '[ "$rc" = 0 ] && [ "$(sysex)" = 76 ] && grep -q "^mixer: sound card 1 for $PORT (after [1-9][0-9]* ms)" "$T/journal.txt"'
 
 reset_root; mixer on; ccdev 19
 rc=$(event)
 rm -rf -- "${RUN:?}"; mkdir -p "$RUN"          # reboot: /run empty, unit still connected
 rc2=$(event)                                  # udev coldplug "add" at boot
 ok "M16: reboot with the unit connected (coldplug add): initialised again, state of the run dir rebuilt" \
-    '[ "$rc" = 0 ] && [ "$rc2" = 0 ] && [ "$(sysex)" = 52 ] && [ "$(mres outcome)" = done ] && [ "$(outcome)" = cc-active ]'
+    '[ "$rc" = 0 ] && [ "$rc2" = 0 ] && [ "$(sysex)" = 152 ] && [ "$(mres outcome)" = done ] && [ "$(outcome)" = cc-active ]'
 reset_root; mixer on; mode on; prop 18
 rc=$(event)
 rm -rf -- "${RUN:?}"; mkdir -p "$RUN"          # reboot before reconnecting
 unplug; ccdev 19
 rc2=$(event)
 ok "M16: switched, then reboot instead of reconnect: CC at boot is initialised (no pending needed)" \
-    '[ "$rc" = 0 ] && [ "$(writes)" = 1 ] && [ "$rc2" = 0 ] && [ "$(sysex)" = 26 ] && [ ! -e "$RUN/event" ]'
+    '[ "$rc" = 0 ] && [ "$(writes)" = 1 ] && [ "$rc2" = 0 ] && [ "$(sysex)" = 76 ] && [ ! -e "$RUN/event" ]'
 
 reset_root; mode on; mixer off; prop 18
 rc=$(event); unplug; ccdev 19; rc2=$(event)
@@ -436,7 +478,7 @@ rc=$(service "$inst")
 ok "M18: stale event (unit reconnected, devnum 19 -> 20): nothing for the stale event, no MIDI access" \
     '[ "$rc" = 3 ] && [ "$(midi_calls)" = 0 ]'
 rc=$(event)
-ok "M18: the event of the new connection initialises" '[ "$rc" = 0 ] && [ "$(sysex)" = 26 ] && [ "$(mres devnum)" = 20 ]'
+ok "M18: the event of the new connection initialises" '[ "$rc" = 0 ] && [ "$(sysex)" = 76 ] && [ "$(mres devnum)" = 20 ]'
 
 reset_root; mixer on; ccdev 19
 before=$(cd "$R" && find . | sort)
@@ -445,7 +487,7 @@ FF802_AUTO_ROOT=$R "$SIM" --mixer-status > "$T/mstatus2.txt" 2>&1; rc2=$?
 ok "status and mixer-status are read only and report the mixer initialisation" \
     '[ "$rc1" = 0 ] && [ "$rc2" = 0 ] && [ "$(cd "$R" && find . | sort)" = "$before" ] &&
      [ "$(midi_calls)" = 0 ] && grep -q "^mixer init: on" "$T/mstatus.txt" &&
-     grep -q "sets the 26 registers on the next connection event" "$T/mstatus.txt" &&
+     grep -q "sets the ff802-mixer-init-v3 registers on the next connection event" "$T/mstatus.txt" &&
      grep -q "^mixer writes in this build: enabled" "$T/mstatus2.txt" &&
      grep -q "are set to 0 dB" "$T/mstatus2.txt"'
 
@@ -476,10 +518,10 @@ ok "P1: journal: command sent, reset triggered, re-enumerated in CC mode; no not
      [ "$(jl "reconnect")" = 0 ]'
 mixer on; sndcard; seqports 20
 rc=$(event)
-ok "P1: the new connection (own instance, devnum 19): cc-active confirmation, pending cleared, 26 registers" \
+ok "P1: the new connection (own instance, devnum 19): cc-active confirmation, pending cleared, 38 registers" \
     '[ "$rc" = 0 ] && [ "$(outcome)" = cc-active ] && [ "$(kind)" = cc-active ] && [ ! -f "$RUN/pending" ] &&
-     [ "$(sysex)" = 26 ] && [ "$(mres outcome)" = done ] && [ "$(mres devnum)" = 19 ] &&
-     [ "$(mres checksum)" = 0xC97A359C ] && [ "$(writes)" = 1 ] && [ "$(resets)" = 1 ]'
+     [ "$(sysex)" = 76 ] && [ "$(mres outcome)" = done ] && [ "$(mres devnum)" = 19 ] &&
+     [ "$(mres checksum)" = 0xEC858A44 ] && [ "$(mres base_checksum)" = 0xC97A359C ] && [ "$(writes)" = 1 ] && [ "$(resets)" = 1 ]'
 
 reset_root; : > "$T/journal.txt"; mode on; prop 18; hubport
 rc=$(event FF802_SIM_REENUM=none)
@@ -549,7 +591,7 @@ cc_inst="$PORT:003:019"       # the event of the re-enumerated device, while the
 wait $p1; wait $p2
 ok "P8: CC event during the reset waits for the lock, then confirms and initialises; no deadlock" \
     '[ "$(cat "$T/rc.enable")" = 0 ] && [ "$(cat "$T/rc.cc")" = 0 ] && [ "$(kind)" = cc-active ] &&
-     [ "$(sysex)" = 26 ] && [ "$(mres devnum)" = 19 ] &&
+     [ "$(sysex)" = 76 ] && [ "$(mres devnum)" = 19 ] &&
      [ "$(sed -n "s/^Result: \([a-z-]*\):.*/\1/p" "$T/journal.txt" | tr "\n" ";")" = "switched;cc-active;" ]'
 
 # --- guards against unintended use ------------------------------------------------

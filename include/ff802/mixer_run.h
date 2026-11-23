@@ -7,12 +7,12 @@
  *   of the connection (sysfs) -> open the MIDI backend -> wait for the
  *   sequencer port "Port 2" of that card -> writes compiled in? -> check
  *   the connection again (same bus/devnum, still CC mode, same card) ->
- *   subscribe -> the 26 SysEx messages of mixer_init.h in order, one
+ *   subscribe -> the 38 SysEx messages of mixer_init.h in order, one
  *   journal line each -> close.
  *
  * No retry, no rollback (the previous values are not known: nothing is
  * read from the device). An error while sending stops at that message
- * and reports how many were passed to ALSA. "done" means that all 26
+ * and reports how many were passed to ALSA. "done" means that all 38
  * messages were passed to ALSA; it does not confirm that the device
  * applied them.
  */
@@ -32,10 +32,11 @@ extern "C" {
 #define FF802_MIXER_POLL_MS      100u
 #define FF802_MIXER_GAP_MS        10u   /* pause between two messages (as B.3) */
 #define FF802_MIXER_SETTLE_MS    200u   /* after the last one, before unsubscribing */
+#define FF802_MIXER_REPEAT_MS   5000u   /* service: pause before the second pass */
 
 typedef enum ff802_mixer_outcome {
     FF802_MIXER_OFF = 0,        /* mixer-init is not on: nothing done */
-    FF802_MIXER_DONE,           /* all 26 messages passed to ALSA */
+    FF802_MIXER_DONE,           /* all 38 messages passed to ALSA */
     FF802_MIXER_DISABLED_BUILD, /* writes not compiled in: nothing sent */
     FF802_MIXER_UNAVAILABLE,    /* no MIDI backend: nothing sent */
     FF802_MIXER_NO_PORT,        /* card or port did not appear in time */
@@ -50,7 +51,14 @@ typedef enum ff802_mixer_outcome {
  * timeout_ms: wait for card and port; poll_ms: polling interval;
  * gap_ms: pause between two messages; settle_ms: pause after the last
  * message before unsubscribing (the kernel drains the rawmidi output when
- * the subscription ends). dry_run: stop after the port is found.
+ * the subscription ends). passes = 2: after the first complete pass, wait
+ * repeat_ms, check the connection again and send the same list once more
+ * over the same subscription (the service: messages that arrive while
+ * the host sets up the freshly enumerated unit were seen to have no
+ * effect, integration test 2026-11-23; the values are absolute, so the
+ * second pass changes nothing that the first set correctly). A failure
+ * in the second pass is reported as incomplete; nothing is retried.
+ * dry_run: stop after the port is found.
  * confirm (manual use, NULL for the service): called after the port is
  * found and before anything is sent; nonzero to go on.
  */
@@ -60,6 +68,8 @@ typedef struct ff802_mixer_options {
     unsigned poll_ms;
     unsigned gap_ms;
     unsigned settle_ms;
+    unsigned passes;       /* 1 (default) or 2: the whole list again */
+    unsigned repeat_ms;    /* pause between the passes */
     int      dry_run;
     int    (*confirm)(void *user, const ff802_mixer_result *found);
     void    *confirm_user;
@@ -67,13 +77,15 @@ typedef struct ff802_mixer_options {
 
 struct ff802_mixer_result {
     ff802_mixer_outcome outcome;
-    unsigned written;            /* messages passed to ALSA */
+    unsigned written;            /* messages of the first pass passed to ALSA */
+    unsigned passes_done;        /* complete passes */
     int  card, client, port;     /* -1 if not found */
     char port_name[FF802_SEQ_NAME_MAX];
     char detail[192];
 };
 
-/* Defaults: FF802_MIXER_TIMEOUT_MS, _POLL_MS, _GAP_MS, _SETTLE_MS, no
+/* Defaults: FF802_MIXER_TIMEOUT_MS, _POLL_MS, _GAP_MS, _SETTLE_MS, one
+ * pass (repeat_ms FF802_MIXER_REPEAT_MS), no
  * dry run, no confirmation. */
 void ff802_mixer_default_options(ff802_mixer_options *o);
 

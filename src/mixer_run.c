@@ -2,6 +2,7 @@
 
 #include "ff802/mixer_run.h"
 
+#include <errno.h>
 #include <stdarg.h>
 #include <string.h>
 
@@ -41,6 +42,8 @@ void ff802_mixer_default_options(ff802_mixer_options *o)
     o->poll_ms = FF802_MIXER_POLL_MS;
     o->gap_ms = FF802_MIXER_GAP_MS;
     o->settle_ms = FF802_MIXER_SETTLE_MS;
+    o->passes = 1;
+    o->repeat_ms = FF802_MIXER_REPEAT_MS;
     o->dry_run = 0;
     o->confirm = NULL;
     o->confirm_user = NULL;
@@ -106,6 +109,40 @@ static int still_same(const char *root, const ff802_sysfs_dev *d, int card,
     return 1;
 }
 
+/*
+ * One pass over the whole list. pass 1 counts res->written; the log lines
+ * of pass 2 are marked. Returns the index of the failed message + 1, or
+ * 0 when all were passed to ALSA; *err the error.
+ */
+static unsigned send_pass(const ff802_midi_factory *f, const ff802_mixer_options *o,
+                          ff802_midi_backend *be, FILE *log, unsigned pass,
+                          ff802_mixer_result *res, int *err)
+{
+    const ff802_mixer_entry *t = ff802_mixer_init_table();
+    const char *mark = pass > 1u ? "pass 2: " : "";
+    for (unsigned i = 0; i < FF802_MIXER_INIT_COUNT; i++) {
+        uint8_t msg[FF802_MIXER_SYSEX_SIZE];
+        char label[64];
+        ff802_mixer_entry_label(&t[i], label, sizeof label);
+        int rc = ff802_rme_sysex_reg(t[i].addr, t[i].value, msg) != FF802_OK ? -EINVAL
+                 : be->send_sysex(be->self, msg, sizeof msg);
+        if (rc < 0) {
+            logf_(log, "mixer: %sFAILED 0x%04X = 0x%04X (%s) [%u/%u]: %s", mark,
+                  (unsigned)t[i].addr, (unsigned)t[i].value, label, i + 1u,
+                  FF802_MIXER_INIT_COUNT, err_str(rc));
+            *err = rc;
+            return i + 1u;
+        }
+        if (pass == 1u)
+            res->written++;
+        logf_(log, "mixer: %sset 0x%04X = 0x%04X (%s) [%u/%u]", mark, (unsigned)t[i].addr,
+              (unsigned)t[i].value, label, i + 1u, FF802_MIXER_INIT_COUNT);
+        if (o->gap_ms > 0 && i + 1u < FF802_MIXER_INIT_COUNT)
+            f->sleep_ms(f->ctx, o->gap_ms);
+    }
+    return 0;
+}
+
 static ff802_mixer_outcome run_open(const char *root, const ff802_sysfs_dev *d,
                                     const ff802_midi_factory *f,
                                     const ff802_mixer_options *o, unsigned waited,
@@ -165,32 +202,38 @@ static ff802_mixer_outcome run_open(const char *root, const ff802_sysfs_dev *d,
                       "nothing sent", res->client, res->port, err_str(rc));
 
     const ff802_mixer_entry *t = ff802_mixer_init_table();
-    for (unsigned i = 0; i < FF802_MIXER_INIT_COUNT; i++) {
-        uint8_t msg[FF802_MIXER_SYSEX_SIZE];
-        char label[64];
-        ff802_mixer_entry_label(&t[i], label, sizeof label);
-        if (ff802_rme_sysex_reg(t[i].addr, t[i].value, msg) != FF802_OK)
-            return finish(res, FF802_MIXER_INCOMPLETE, "cannot encode register 0x%04X; "
-                          "%u of %u written, nothing retried", (unsigned)t[i].addr,
-                          res->written, FF802_MIXER_INIT_COUNT);
-        rc = be->send_sysex(be->self, msg, sizeof msg);
-        if (rc < 0) {
-            logf_(log, "mixer: FAILED 0x%04X = 0x%04X (%s) [%u/%u]: %s",
-                  (unsigned)t[i].addr, (unsigned)t[i].value, label, i + 1u,
-                  FF802_MIXER_INIT_COUNT, err_str(rc));
-            return finish(res, FF802_MIXER_INCOMPLETE,
-                          "sending register %u of %u (0x%04X) failed (%s); %u written, "
-                          "nothing retried", i + 1u, FF802_MIXER_INIT_COUNT,
-                          (unsigned)t[i].addr, err_str(rc), res->written);
+    int err = 0;
+    unsigned failed = send_pass(f, o, be, log, 1u, res, &err);
+    if (failed)
+        return finish(res, FF802_MIXER_INCOMPLETE,
+                      "sending register %u of %u (0x%04X) failed (%s); %u written, "
+                      "nothing retried", failed, FF802_MIXER_INIT_COUNT,
+                      (unsigned)t[failed - 1u].addr, err_str(err), res->written);
+    res->passes_done = 1;
+    if (o->passes >= 2u) {
+        logf_(log, "mixer: pass 1 of 2 complete; pass 2 (the same %u values) in %u ms.",
+              FF802_MIXER_INIT_COUNT, o->repeat_ms);
+        f->sleep_ms(f->ctx, o->repeat_ms);
+        if (!still_same(root, d, res->card, why, sizeof why)) {
+            logf_(log, "mixer: pass 2 skipped: %s.", why);
+            return finish(res, FF802_MIXER_DONE, "%u registers sent to MIDI port %d:%d "
+                          "'%s' (card %d); pass 2 skipped (%s)", FF802_MIXER_INIT_COUNT,
+                          res->client, res->port, res->port_name, res->card, why);
         }
-        res->written++;
-        logf_(log, "mixer: set 0x%04X = 0x%04X (%s) [%u/%u]", (unsigned)t[i].addr,
-              (unsigned)t[i].value, label, i + 1u, FF802_MIXER_INIT_COUNT);
-        if (o->gap_ms > 0 && i + 1u < FF802_MIXER_INIT_COUNT)
-            f->sleep_ms(f->ctx, o->gap_ms);
+        failed = send_pass(f, o, be, log, 2u, res, &err);
+        if (failed)
+            return finish(res, FF802_MIXER_INCOMPLETE,
+                          "pass 2: sending register %u of %u (0x%04X) failed (%s); pass 1 "
+                          "complete, nothing retried", failed, FF802_MIXER_INIT_COUNT,
+                          (unsigned)t[failed - 1u].addr, err_str(err));
+        res->passes_done = 2;
     }
     if (o->settle_ms > 0)
         f->sleep_ms(f->ctx, o->settle_ms);
+    if (res->passes_done == 2u)
+        return finish(res, FF802_MIXER_DONE, "%u registers sent to MIDI port %d:%d '%s' "
+                      "(card %d), twice", FF802_MIXER_INIT_COUNT, res->client, res->port,
+                      res->port_name, res->card);
     return finish(res, FF802_MIXER_DONE, "%u registers sent to MIDI port %d:%d '%s' (card %d)",
                   FF802_MIXER_INIT_COUNT, res->client, res->port, res->port_name, res->card);
 }
@@ -221,6 +264,9 @@ ff802_mixer_outcome ff802_mixer_run(const char *sysfs_root,
         return finish(res, FF802_MIXER_REFUSED, "register table check failed; nothing sent");
     logf_(log, "mixer: configuration %s, %u entries, checksum 0x%08X (verified).",
           FF802_MIXER_INIT_ID, FF802_MIXER_INIT_COUNT, (unsigned)ff802_mixer_init_checksum());
+    logf_(log, "mixer: entries 1..%u are %s, checksum 0x%08X (verified).",
+          FF802_MIXER_INIT_V2_COUNT, FF802_MIXER_INIT_V2_ID,
+          (unsigned)ff802_mixer_init_v2_checksum());
     if (f == NULL || f->open == NULL || f->close == NULL || f->sleep_ms == NULL)
         return finish(res, FF802_MIXER_UNAVAILABLE,
                       "no MIDI backend in this program; nothing sent");

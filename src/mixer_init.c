@@ -5,6 +5,7 @@
 #define X(p, o, a) { a, FF802_MIXER_ROUTE_OFF, o, FF802_MIXER_CROSS_OFF, p }
 #define R(k, a) { a, FF802_MIXER_ROUTE_0DB, k, FF802_MIXER_ROUTE, k }
 #define V(k, a) { a, FF802_MIXER_OUTVOL_0DB, k, FF802_MIXER_OUTPUT_VOLUME, 0 }
+#define I(k, a) { a, FF802_MIXER_INPUT9_LEVEL, k, FF802_MIXER_INPUT_ROUTE, FF802_MIXER_INPUT9 }
 
 /*
  * The complete list, written out: no address is computed at run time.
@@ -12,6 +13,7 @@
  * checksum, and the tests compare it with the measured registers.
  */
 static const ff802_mixer_entry TABLE[FF802_MIXER_INIT_COUNT] = {
+    /* v2 (unchanged): crossed routings off, routings, output volumes */
     X(1, 9, 0x4220), X(2, 10, 0x4261),
     R(1, 0x4020), R(2, 0x4061), R(3, 0x40A2), R(4, 0x40E3),
     R(5, 0x4124), R(6, 0x4165), R(7, 0x41A6), R(8, 0x41E7),
@@ -19,6 +21,10 @@ static const ff802_mixer_entry TABLE[FF802_MIXER_INIT_COUNT] = {
     V(1, 0x1E00), V(2, 0x1F00), V(3, 0x2000), V(4, 0x2100),
     V(5, 0x2200), V(6, 0x2300), V(7, 0x2400), V(8, 0x2500),
     V(9, 0x2600), V(10, 0x2700), V(11, 0x2800), V(12, 0x2900),
+    /* v3: Input 9 (Mic/Inst 9) -> Output 1..12 at 30 % linear */
+    I(1, 0x4008), I(2, 0x4048), I(3, 0x4088), I(4, 0x40C8),
+    I(5, 0x4108), I(6, 0x4148), I(7, 0x4188), I(8, 0x41C8),
+    I(9, 0x4208), I(10, 0x4248), I(11, 0x4288), I(12, 0x42C8),
 };
 
 const ff802_mixer_entry *ff802_mixer_init_table(void)
@@ -26,10 +32,10 @@ const ff802_mixer_entry *ff802_mixer_init_table(void)
     return TABLE;
 }
 
-uint32_t ff802_mixer_init_checksum(void)
+static uint32_t fnv(size_t n)
 {
     uint32_t h = 2166136261u;
-    for (size_t i = 0; i < FF802_MIXER_INIT_COUNT; i++) {
+    for (size_t i = 0; i < n; i++) {
         const uint8_t b[4] = {
             (uint8_t)(TABLE[i].addr & 0xFFu), (uint8_t)(TABLE[i].addr >> 8),
             (uint8_t)(TABLE[i].value & 0xFFu), (uint8_t)(TABLE[i].value >> 8)
@@ -42,12 +48,30 @@ uint32_t ff802_mixer_init_checksum(void)
     return h;
 }
 
+uint32_t ff802_mixer_init_checksum(void)
+{
+    return fnv(FF802_MIXER_INIT_COUNT);
+}
+
+uint32_t ff802_mixer_init_v2_checksum(void)
+{
+    return fnv(FF802_MIXER_INIT_V2_COUNT);
+}
+
 uint16_t ff802_mixer_matrix_addr(unsigned playback, unsigned output)
 {
     if (playback < 1u || playback > FF802_MIXER_CHANNELS ||
         output < 1u || output > FF802_MIXER_CHANNELS)
         return 0;
     return (uint16_t)(0x4000u | ((output - 1u) << 6) | (0x20u + playback - 1u));
+}
+
+/* Hardware input i (1..30) -> Output o: matrix source index i-1. */
+uint16_t ff802_mixer_input_addr(unsigned input, unsigned output)
+{
+    if (input < 1u || input > 30u || output < 1u || output > FF802_MIXER_CHANNELS)
+        return 0;
+    return (uint16_t)(0x4000u | ((output - 1u) << 6) | (input - 1u));
 }
 
 uint16_t ff802_mixer_route_addr(unsigned k)
@@ -67,7 +91,8 @@ uint16_t ff802_mixer_outvol_addr(unsigned k)
 
 int ff802_mixer_init_verify(void)
 {
-    if (ff802_mixer_init_checksum() != FF802_MIXER_INIT_CHECKSUM)
+    if (ff802_mixer_init_v2_checksum() != FF802_MIXER_INIT_V2_CHECKSUM ||
+        ff802_mixer_init_checksum() != FF802_MIXER_INIT_CHECKSUM)
         return -1;
     for (unsigned i = 0; i < FF802_MIXER_INIT_COUNT; i++) {
         const ff802_mixer_entry *e = &TABLE[i];
@@ -75,6 +100,14 @@ int ff802_mixer_init_verify(void)
             unsigned p = CROSS[i][0], o = CROSS[i][1];
             if (e->kind != FF802_MIXER_CROSS_OFF || e->source != p || e->channel != o ||
                 e->addr != ff802_mixer_matrix_addr(p, o) || e->value != FF802_MIXER_ROUTE_OFF)
+                return -1;
+            continue;
+        }
+        if (i >= FF802_MIXER_INIT_V2_COUNT) {          /* v3: Input 9 -> Output k */
+            unsigned k = i - FF802_MIXER_INIT_V2_COUNT + 1u;
+            if (e->kind != FF802_MIXER_INPUT_ROUTE || e->source != FF802_MIXER_INPUT9 ||
+                e->channel != k || e->addr != ff802_mixer_input_addr(FF802_MIXER_INPUT9, k) ||
+                e->value != FF802_MIXER_INPUT9_LEVEL)
                 return -1;
             continue;
         }
@@ -116,6 +149,9 @@ void ff802_mixer_entry_label(const ff802_mixer_entry *e, char *buf, size_t size)
     }
     if (e->kind == FF802_MIXER_ROUTE)
         snprintf(buf, size, "Playback %u -> %s, 0 dB", (unsigned)e->channel,
+                 ff802_mixer_output_name(e->channel));
+    else if (e->kind == FF802_MIXER_INPUT_ROUTE)
+        snprintf(buf, size, "Input %u -> %s, 30 %%", (unsigned)e->source,
                  ff802_mixer_output_name(e->channel));
     else if (e->kind == FF802_MIXER_CROSS_OFF)
         snprintf(buf, size, "Playback %u -> %s, off", (unsigned)e->source,

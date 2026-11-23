@@ -1,6 +1,7 @@
 /*
  * ff802-mixer-init: manual mixer initialisation of the original RME
- * Fireface 802 in class-compliant mode - the same 26 register writes and
+ * Fireface 802 in class-compliant mode - the same 38 register writes
+ * (ff802-mixer-init-v3) and
  * the same flow (ff802_mixer_run) as the automatic initialisation of
  * ff802-cc-auto@.service, started by hand.
  *
@@ -9,10 +10,10 @@
  *   ff802-mixer-init --apply   [--connection <kernel name>]
  *   ff802-mixer-init --help | --version
  *
- * --list prints the 26 messages (no device access). --dry-run finds the
+ * --list prints the 38 messages (no device access). --dry-run finds the
  * unit, its sound card and the MIDI port and sends nothing. --apply does
  * the same, shows what will be sent, asks for SEND on a terminal and sends
- * the 26 messages over one subscription (10 ms apart, 200 ms before
+ * the 38 messages over one subscription (10 ms apart, 200 ms before
  * unsubscribing). No retry; nothing is read from the unit.
  *
  * The unit is the named connection or the only Fireface 802 in CC mode;
@@ -64,16 +65,18 @@ static void usage(FILE *out)
         "\n"
         "Sets the internal mixer of an original RME Fireface 802 in\n"
         "class-compliant mode to the defined basic state, through the ALSA\n"
-        "sequencer port 'Port 2' of the unit (26 register writes):\n"
+        "sequencer port 'Port 2' of the unit (38 register writes,\n"
+        "configuration " FF802_MIXER_INIT_ID "):\n"
         "  Playback 1 -> Phones 9, Playback 2 -> Phones 10   off (0x0000)\n"
         "  Playback 1..12 -> Hardware Output 1..12          0 dB (0x9000)\n"
         "  Volume of Hardware Output 1..12                  0 dB (0x0000)\n"
-        "Nothing else is changed; other crossed routings and input\n"
-        "routings are NOT cleared.\n"
+        "  Input 9 (Mic/Inst 9) -> Hardware Output 1..12    30 %% (0x2666)\n"
+        "Nothing else is changed; other crossed routings, other input\n"
+        "routings and the input gain are NOT changed.\n"
         "\n"
-        "  --list     print the 26 messages; no device access\n"
+        "  --list     print the 38 messages; no device access\n"
         "  --dry-run  find the unit, its sound card and MIDI port; send nothing\n"
-        "  --apply    the same, then ask for SEND and send the 26 messages\n"
+        "  --apply    the same, then ask for SEND and send the 38 messages\n"
         "\n"
         "WARNING: 0 dB on the headphone outputs Phones 9-12 can be very loud.\n"
         "\n"
@@ -85,6 +88,8 @@ static void list_messages(void)
     const ff802_mixer_entry *t = ff802_mixer_init_table();
     printf("configuration %s, %u entries, checksum 0x%08X\n", FF802_MIXER_INIT_ID,
            FF802_MIXER_INIT_COUNT, (unsigned)ff802_mixer_init_checksum());
+    printf("entries 1..%u unchanged from %s, checksum 0x%08X\n", FF802_MIXER_INIT_V2_COUNT,
+           FF802_MIXER_INIT_V2_ID, (unsigned)ff802_mixer_init_v2_checksum());
     printf("%u messages, in this order:\n", FF802_MIXER_INIT_COUNT);
     for (unsigned i = 0; i < FF802_MIXER_INIT_COUNT; i++) {
         uint8_t m[FF802_MIXER_SYSEX_SIZE];
