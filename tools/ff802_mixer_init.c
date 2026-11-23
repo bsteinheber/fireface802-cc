@@ -1,6 +1,6 @@
 /*
  * ff802-mixer-init: manual mixer initialisation of the original RME
- * Fireface 802 in class-compliant mode - the same 24 register writes and
+ * Fireface 802 in class-compliant mode - the same 26 register writes and
  * the same flow (ff802_mixer_run) as the automatic initialisation of
  * ff802-cc-auto@.service, started by hand.
  *
@@ -9,10 +9,10 @@
  *   ff802-mixer-init --apply   [--connection <kernel name>]
  *   ff802-mixer-init --help | --version
  *
- * --list prints the 24 messages (no device access). --dry-run finds the
+ * --list prints the 26 messages (no device access). --dry-run finds the
  * unit, its sound card and the MIDI port and sends nothing. --apply does
  * the same, shows what will be sent, asks for SEND on a terminal and sends
- * the 24 messages over one subscription (10 ms apart, 200 ms before
+ * the 26 messages over one subscription (10 ms apart, 200 ms before
  * unsubscribing). No retry; nothing is read from the unit.
  *
  * The unit is the named connection or the only Fireface 802 in CC mode;
@@ -64,15 +64,16 @@ static void usage(FILE *out)
         "\n"
         "Sets the internal mixer of an original RME Fireface 802 in\n"
         "class-compliant mode to the defined basic state, through the ALSA\n"
-        "sequencer port 'Port 2' of the unit (24 register writes):\n"
-        "  Playback 1..12 -> Hardware Output 1..12   0 dB (0x9000)\n"
-        "  Volume of Hardware Output 1..12           0 dB (0x0000)\n"
-        "Nothing else is changed; existing crossed routings and input\n"
+        "sequencer port 'Port 2' of the unit (26 register writes):\n"
+        "  Playback 1 -> Phones 9, Playback 2 -> Phones 10   off (0x0000)\n"
+        "  Playback 1..12 -> Hardware Output 1..12          0 dB (0x9000)\n"
+        "  Volume of Hardware Output 1..12                  0 dB (0x0000)\n"
+        "Nothing else is changed; other crossed routings and input\n"
         "routings are NOT cleared.\n"
         "\n"
-        "  --list     print the 24 messages; no device access\n"
+        "  --list     print the 26 messages; no device access\n"
         "  --dry-run  find the unit, its sound card and MIDI port; send nothing\n"
-        "  --apply    the same, then ask for SEND and send the 24 messages\n"
+        "  --apply    the same, then ask for SEND and send the 26 messages\n"
         "\n"
         "WARNING: 0 dB on the headphone outputs Phones 9-12 can be very loud.\n"
         "\n"

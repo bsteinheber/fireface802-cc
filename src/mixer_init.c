@@ -2,8 +2,9 @@
 
 #include <stdio.h>
 
-#define R(k, a) { a, FF802_MIXER_ROUTE_0DB, k, FF802_MIXER_ROUTE }
-#define V(k, a) { a, FF802_MIXER_OUTVOL_0DB, k, FF802_MIXER_OUTPUT_VOLUME }
+#define X(p, o, a) { a, FF802_MIXER_ROUTE_OFF, o, FF802_MIXER_CROSS_OFF, p }
+#define R(k, a) { a, FF802_MIXER_ROUTE_0DB, k, FF802_MIXER_ROUTE, k }
+#define V(k, a) { a, FF802_MIXER_OUTVOL_0DB, k, FF802_MIXER_OUTPUT_VOLUME, 0 }
 
 /*
  * The complete list, written out: no address is computed at run time.
@@ -11,6 +12,7 @@
  * checksum, and the tests compare it with the measured registers.
  */
 static const ff802_mixer_entry TABLE[FF802_MIXER_INIT_COUNT] = {
+    X(1, 9, 0x4220), X(2, 10, 0x4261),
     R(1, 0x4020), R(2, 0x4061), R(3, 0x40A2), R(4, 0x40E3),
     R(5, 0x4124), R(6, 0x4165), R(7, 0x41A6), R(8, 0x41E7),
     R(9, 0x4228), R(10, 0x4269), R(11, 0x42AA), R(12, 0x42EB),
@@ -40,12 +42,21 @@ uint32_t ff802_mixer_init_checksum(void)
     return h;
 }
 
+uint16_t ff802_mixer_matrix_addr(unsigned playback, unsigned output)
+{
+    if (playback < 1u || playback > FF802_MIXER_CHANNELS ||
+        output < 1u || output > FF802_MIXER_CHANNELS)
+        return 0;
+    return (uint16_t)(0x4000u | ((output - 1u) << 6) | (0x20u + playback - 1u));
+}
+
 uint16_t ff802_mixer_route_addr(unsigned k)
 {
-    if (k < 1u || k > FF802_MIXER_CHANNELS)
-        return 0;
-    return (uint16_t)(0x4000u | ((k - 1u) << 6) | (0x20u + k - 1u));
+    return ff802_mixer_matrix_addr(k, k);
 }
+
+/* The two crossed routings that the CC mode sets and the list switches off. */
+static const uint8_t CROSS[FF802_MIXER_CROSS_COUNT][2] = { { 1, 9 }, { 2, 10 } };
 
 uint16_t ff802_mixer_outvol_addr(unsigned k)
 {
@@ -60,15 +71,23 @@ int ff802_mixer_init_verify(void)
         return -1;
     for (unsigned i = 0; i < FF802_MIXER_INIT_COUNT; i++) {
         const ff802_mixer_entry *e = &TABLE[i];
-        unsigned k = (i % FF802_MIXER_CHANNELS) + 1u;
-        int route = i < FF802_MIXER_CHANNELS;
+        if (i < FF802_MIXER_CROSS_COUNT) {
+            unsigned p = CROSS[i][0], o = CROSS[i][1];
+            if (e->kind != FF802_MIXER_CROSS_OFF || e->source != p || e->channel != o ||
+                e->addr != ff802_mixer_matrix_addr(p, o) || e->value != FF802_MIXER_ROUTE_OFF)
+                return -1;
+            continue;
+        }
+        unsigned j = i - FF802_MIXER_CROSS_COUNT;
+        unsigned k = (j % FF802_MIXER_CHANNELS) + 1u;
+        int route = j < FF802_MIXER_CHANNELS;
         if (e->channel != k)
             return -1;
-        if (route && (e->kind != FF802_MIXER_ROUTE ||
+        if (route && (e->kind != FF802_MIXER_ROUTE || e->source != k ||
                       e->addr != ff802_mixer_route_addr(k) ||
                       e->value != FF802_MIXER_ROUTE_0DB))
             return -1;
-        if (!route && (e->kind != FF802_MIXER_OUTPUT_VOLUME ||
+        if (!route && (e->kind != FF802_MIXER_OUTPUT_VOLUME || e->source != 0 ||
                        e->addr != ff802_mixer_outvol_addr(k) ||
                        e->value != FF802_MIXER_OUTVOL_0DB))
             return -1;
@@ -97,6 +116,9 @@ void ff802_mixer_entry_label(const ff802_mixer_entry *e, char *buf, size_t size)
     }
     if (e->kind == FF802_MIXER_ROUTE)
         snprintf(buf, size, "Playback %u -> %s, 0 dB", (unsigned)e->channel,
+                 ff802_mixer_output_name(e->channel));
+    else if (e->kind == FF802_MIXER_CROSS_OFF)
+        snprintf(buf, size, "Playback %u -> %s, off", (unsigned)e->source,
                  ff802_mixer_output_name(e->channel));
     else
         snprintf(buf, size, "Output %s volume, 0 dB",

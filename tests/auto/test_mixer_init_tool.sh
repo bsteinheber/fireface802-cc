@@ -1,7 +1,7 @@
 #!/bin/sh
 # Manual mixer initialisation (ff802-mixer-init), without hardware:
 #  - the simulation build (simulated MIDI backend, fake sysfs below a
-#    private root): --list, --dry-run, --apply with the 24 messages byte
+#    private root): --list, --dry-run, --apply with the 26 messages byte
 #    for byte and in order, confirmation, unit selection, lock, all
 #    failures;
 #  - the real program: only --help, --version, --list and usage errors
@@ -45,9 +45,11 @@ unset FF802_SIM_SEQ_OPEN_ERR FF802_SIM_SEQ_LIST_ERR FF802_SIM_SEQ_CONNECT_ERR \
       FF802_SIM_SEQ_SEND_ERR_AT FF802_SIM_MIXER_WRITE FF802_SIM_MIXER_TIMEOUT_MS \
       FF802_SIM_SEQ_PORTS_AFTER
 
-# The 24 messages, written out (computed with an independent shell
+# The 26 messages, written out (computed with an independent shell
 # implementation of the parity and 7-bit split, not with the C codec).
-EXPECTED="F0 00 20 0D 10 00 00 20 02 01 0C F7
+EXPECTED="F0 00 20 0D 10 00 00 00 00 11 04 F7
+F0 00 20 0D 10 00 00 00 04 13 04 F7
+F0 00 20 0D 10 00 00 20 02 01 0C F7
 F0 00 20 0D 10 00 00 20 06 03 0C F7
 F0 00 20 0D 10 00 00 20 0A 05 0C F7
 F0 00 20 0D 10 00 00 20 0E 07 0C F7
@@ -104,12 +106,12 @@ sent_list() { grep '^sysex F0' "$MIDI" | sed 's/^sysex //'; }
 # --- the table -------------------------------------------------------------------------
 reset
 rc=$(mi "" --list)
-ok "--list: 24 messages, the expected bytes in order, no device access" \
-    '[ "$rc" = 0 ] && [ "$(grep -cE "^ +[0-9]+  0x" "$T/out.txt")" = 24 ] &&
+ok "--list: 26 messages, the expected bytes in order, no device access" \
+    '[ "$rc" = 0 ] && [ "$(grep -cE "^ +[0-9]+  0x" "$T/out.txt")" = 26 ] &&
      [ "$(grep -E "^ +[0-9]+  0x" "$T/out.txt" | sed "s/.*\(F0 .*F7\)$/\1/")" = "$EXPECTED" ] &&
      [ ! -e "$MIDI" ]'
-ok "--list: 12 routings 0x9000, then 12 output volumes 0x0000, documented registers only" \
-    '[ "$(grep -E "^ +[0-9]+  0x" "$T/out.txt" | awk "{ print \$2 \"=\" \$4 }" | tr "\n" " ")" = "0x4020=0x9000 0x4061=0x9000 0x40A2=0x9000 0x40E3=0x9000 0x4124=0x9000 0x4165=0x9000 0x41A6=0x9000 0x41E7=0x9000 0x4228=0x9000 0x4269=0x9000 0x42AA=0x9000 0x42EB=0x9000 0x1E00=0x0000 0x1F00=0x0000 0x2000=0x0000 0x2100=0x0000 0x2200=0x0000 0x2300=0x0000 0x2400=0x0000 0x2500=0x0000 0x2600=0x0000 0x2700=0x0000 0x2800=0x0000 0x2900=0x0000 " ]'
+ok "--list: 2 crossed routings off, then 12 routings 0x9000, then 12 output volumes 0x0000" \
+    '[ "$(grep -E "^ +[0-9]+  0x" "$T/out.txt" | awk "{ print \$2 \"=\" \$4 }" | tr "\n" " ")" = "0x4220=0x0000 0x4261=0x0000 0x4020=0x9000 0x4061=0x9000 0x40A2=0x9000 0x40E3=0x9000 0x4124=0x9000 0x4165=0x9000 0x41A6=0x9000 0x41E7=0x9000 0x4228=0x9000 0x4269=0x9000 0x42AA=0x9000 0x42EB=0x9000 0x1E00=0x0000 0x1F00=0x0000 0x2000=0x0000 0x2100=0x0000 0x2200=0x0000 0x2300=0x0000 0x2400=0x0000 0x2500=0x0000 0x2600=0x0000 0x2700=0x0000 0x2800=0x0000 0x2900=0x0000 " ]'
 
 # --- dry run ------------------------------------------------------------------------------
 reset 20
@@ -117,7 +119,7 @@ rc=$(mi "" --dry-run)
 ok "--dry-run: unit, card 1, port 20:1, nothing connected or sent" \
     '[ "$rc" = 0 ] && grep -q "^identity: Fireface 802, class-compliant mode" "$T/out.txt" &&
      grep -q "^mixer: MIDI port 20:1 .Fireface 802 (24047128) Port 2. of card 1" "$T/out.txt" &&
-     grep -q "^result: dry-run (0 of 24 registers)" "$T/out.txt" &&
+     grep -q "^result: dry-run (0 of 26 registers)" "$T/out.txt" &&
      [ "$(connects)" = 0 ] && [ "$(sysex)" = 0 ]'
 reset 20
 rc=$(FF802_SIM_MIXER_WRITE=0 mi "" --dry-run)
@@ -127,21 +129,23 @@ ok "--dry-run also works in a build without writes" '[ "$rc" = 0 ] && grep -q "N
 for c in 20 24 129; do
     reset "$c"
     rc=$(mi SEND --apply)
-    ok "--apply (client $c): one connection, exactly the 24 messages in order, then close" \
+    ok "--apply (client $c): one connection, exactly the 26 messages in order, then close" \
         '[ "$rc" = 0 ] && [ "$(connects)" = 1 ] && grep -qx "seq connect $c:1" "$MIDI" &&
-         [ "$(sysex)" = 24 ] && [ "$(sent_list)" = "$EXPECTED" ] &&
+         [ "$(sysex)" = 26 ] && [ "$(sent_list)" = "$EXPECTED" ] &&
          [ "$(tail -n 1 "$MIDI")" = "seq close" ] &&
-         grep -q "^result: done (24 of 24 registers)" "$T/out.txt"'
+         grep -q "^result: done (26 of 26 registers)" "$T/out.txt"'
 done
 ok "--apply: one log line per register" \
-    '[ "$(grep -c "^mixer: set 0x" "$T/out.txt")" = 24 ] &&
-     grep -q "^mixer: set 0x4269 = 0x9000 (Playback 10 -> Phones 10, 0 dB) \[10/24\]$" "$T/out.txt"'
+    '[ "$(grep -c "^mixer: set 0x" "$T/out.txt")" = 26 ] &&
+     grep -q "^mixer: set 0x4220 = 0x0000 (Playback 1 -> Phones 9, off) \[1/26\]$" "$T/out.txt" &&
+     grep -q "^mixer: set 0x4261 = 0x0000 (Playback 2 -> Phones 10, off) \[2/26\]$" "$T/out.txt" &&
+     grep -q "^mixer: set 0x4269 = 0x9000 (Playback 10 -> Phones 10, 0 dB) \[12/26\]$" "$T/out.txt"'
 reset 20
 mi SEND --apply > /dev/null; first=$(sent_list)
 rc=$(mi SEND --apply)
-ok "--apply twice: the same 24 values again, nothing else" \
-    '[ "$rc" = 0 ] && [ "$(sysex)" = 48 ] && [ "$(sent_list | head -n 24)" = "$first" ] &&
-     [ "$(sent_list | tail -n 24)" = "$EXPECTED" ]'
+ok "--apply twice: the same 26 values again, nothing else" \
+    '[ "$rc" = 0 ] && [ "$(sysex)" = 52 ] && [ "$(sent_list | head -n 26)" = "$first" ] &&
+     [ "$(sent_list | tail -n 26)" = "$EXPECTED" ]'
 
 for answer in "" "send" "yes" "SEND " "SENDSEND"; do
     reset 20
@@ -161,7 +165,7 @@ reset 20
 rc=$(FF802_SIM_SEQ_SEND_ERR_AT=13 mi SEND --apply)
 ok "message 13 fails: exit 4, 12 sent, stopped, no retry, connection closed" \
     '[ "$rc" = 4 ] && [ "$(sysex)" = 12 ] && [ "$(grep -c "^sysex FAILED" "$MIDI")" = 1 ] &&
-     grep -q "^result: incomplete (12 of 24 registers)" "$T/out.txt" && grep -q "nothing retried" "$T/out.txt" &&
+     grep -q "^result: incomplete (12 of 26 registers)" "$T/out.txt" && grep -q "nothing retried" "$T/out.txt" &&
      [ "$(tail -n 1 "$MIDI")" = "seq close" ]'
 reset 20
 rc=$(FF802_SIM_SEQ_SEND_ERR_AT=1 mi SEND --apply)
@@ -197,10 +201,10 @@ rc=$(mi SEND --apply)
 ok "two units in CC mode: refused, never chosen silently" '[ "$rc" = 3 ] && [ ! -e "$MIDI" ] && grep -q "name one with --connection" "$T/out.txt"'
 rc=$(mi SEND --apply --connection "$PORT")
 ok "two units, one named: only that one (its card 1) is initialised" \
-    '[ "$rc" = 0 ] && [ "$(sysex)" = 24 ] && grep -q "of card 1 for $PORT" "$T/out.txt"'
+    '[ "$rc" = 0 ] && [ "$(sysex)" = 26 ] && grep -q "of card 1 for $PORT" "$T/out.txt"'
 reset 20; dev 1-4 0424 3fdd 9; echo Microchip > "$DEVS/1-4/manufacturer"
 rc=$(mi SEND --apply)
-ok "other device with the CC USB ID: ignored, the Fireface is used" '[ "$rc" = 0 ] && [ "$(sysex)" = 24 ]'
+ok "other device with the CC USB ID: ignored, the Fireface is used" '[ "$rc" = 0 ] && [ "$(sysex)" = 26 ]'
 
 # --- lock with the service -------------------------------------------------------------
 reset 20; mkdir -p "$R/run/ff802-cc-auto"; : > "$R/run/ff802-cc-auto/lock"
@@ -212,7 +216,7 @@ rc=$(mi SEND --apply)
 end=$(date +%s%N)
 wait "$holder"
 ok "the service lock is held: the manual run waits for it, then sends" \
-    '[ "$rc" = 0 ] && [ "$(sysex)" = 24 ] && [ $(( (end - start) / 1000000 )) -ge 600 ] &&
+    '[ "$rc" = 0 ] && [ "$(sysex)" = 26 ] && [ $(( (end - start) / 1000000 )) -ge 600 ] &&
      ! grep -q "no lock needed" "$T/out.txt"'
 reset 20
 rc=$(mi "" --dry-run)

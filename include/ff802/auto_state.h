@@ -125,7 +125,7 @@ long ff802_auto_write_mixer_event(const ff802_auto_paths *p,
 
 /*
  * <run_dir>/mixer-result: time, outcome, port, busnum, devnum,
- * written=<n>/24, card, midi_port, detail. Strings are sanitised.
+ * written=<n>/26, card, midi_port, detail. Strings are sanitised.
  */
 int ff802_auto_write_mixer_result(const ff802_auto_paths *p,
                                   const ff802_sysfs_dev *d, const char *outcome,

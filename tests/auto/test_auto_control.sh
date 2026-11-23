@@ -140,8 +140,8 @@ ok "mixer-init status and status report it as on" \
     'grep -q "^mixer init: on" "$T/ms1.txt" && grep -q "are set to 0 dB" "$T/ms1.txt" &&
      grep -q "^mixer init: on" "$T/s1.txt" && grep -q "^automation: off" "$T/s1.txt"'
 echo 20 > "$DEVS/$PORT/devnum"; rc=$(cc_event)
-ok "mixer-init on: the next CC connection sets the 24 registers (automation off)" \
-    '[ "$rc" = 0 ] && [ "$(sysex)" = 24 ] && [ "$(writes)" = 0 ]'
+ok "mixer-init on: the next CC connection sets the 26 registers (automation off)" \
+    '[ "$rc" = 0 ] && [ "$(sysex)" = 26 ] && [ "$(writes)" = 0 ]'
 ctl mixer-init status > "$T/ms2.txt" 2>&1
 ok "mixer-init status shows the last initialisation" \
     'grep -q "^last mixer initialisation:" "$T/ms2.txt" && grep -q "outcome=done" "$T/ms2.txt"'
@@ -150,7 +150,7 @@ ctl mixer-init off > "$T/moff.txt" 2>&1; rc=$?
 echo 21 > "$DEVS/$PORT/devnum"; rc2=$(cc_event)
 ok "mixer-init off: 'off', explains that the current settings stay; next connection: mixer untouched" \
     '[ "$rc" = 0 ] && [ "$(cat "$STATE/mixer-init")" = off ] && grep -q "current mixer settings of the unit are not changed" "$T/moff.txt" &&
-     [ "$rc2" = 0 ] && [ "$(sysex)" = 24 ]'
+     [ "$rc2" = 0 ] && [ "$(sysex)" = 26 ]'
 
 for a in "mixer-init" "mixer-init yes" "mixer-init on extra" "mixer on" "status mixer-init"; do
     # shellcheck disable=SC2086

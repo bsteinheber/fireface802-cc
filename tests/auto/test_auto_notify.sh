@@ -163,9 +163,9 @@ mevent() { # mevent <seq> <devnum> [<detail>] [<kind>]
     printf 'seq=%s\nkind=%s\ntime=%s\nport=%s\nbusnum=3\ndevnum=%s\ndetail=%s\n' \
         "$1" "${4:-mixer-failed}" "$now" "$PORT" "$2" "${3:-x}" > "$R/run/ff802-cc-auto/mixer-event"
 }
-MTEXT="[Fireface 802 – Mixer-Initialisierung fehlgeschlagen] [Der Class-Compliant-Modus ist aktiv, aber der interne Mixer wurde nicht vollständig eingestellt: MIDI port of card 1 not available after 10000 ms; nothing sent (0 of 24 registers). Details: ff802-cc-auto mixer-init status, journalctl -t ff802-cc-auto]"
+MTEXT="[Fireface 802 – Mixer-Initialisierung fehlgeschlagen] [Der Class-Compliant-Modus ist aktiv, aber der interne Mixer wurde nicht vollständig eingestellt: MIDI port of card 1 not available after 10000 ms; nothing sent (0 of 26 registers). Details: ff802-cc-auto mixer-init status, journalctl -t ff802-cc-auto]"
 
-reset; dev 0424 19; mevent 1 19 "MIDI port of card 1 not available after 10000 ms; nothing sent (0 of 24 registers)"
+reset; dev 0424 19; mevent 1 19 "MIDI port of card 1 not available after 10000 ms; nothing sent (0 of 26 registers)"
 rc=$(notify bin-full)
 ok "mixer-failed: critical notification of its own, clearly not the CC confirmation" \
     '[ "$rc" = 0 ] && [ "$(shown notify-send)" = 1 ] && grep -qF "[--urgency=critical] $MTEXT" "$CALLS" &&
@@ -173,7 +173,7 @@ ok "mixer-failed: critical notification of its own, clearly not the CC confirmat
 notify bin-full > /dev/null
 ok "mixer-failed: shown once per session" '[ "$(shown notify-send)" = 1 ]'
 
-reset; dev 0424 19; event 4 cc-active 19; mevent 5 19 "x (3 of 24 registers)"
+reset; dev 0424 19; event 4 cc-active 19; mevent 5 19 "x (3 of 26 registers)"
 rc=$(notify bin-full)
 ok "cc-active and mixer-failed of the same connection: both shown, two different texts" \
     '[ "$rc" = 0 ] && [ "$(shown notify-send)" = 2 ] &&
@@ -213,7 +213,7 @@ ok "service with mixer init and no MIDI port: mixer-event written, shown as mixe
     '[ "$src" = 3 ] && [ "$rc" = 0 ] && [ ! -e "$R/run/ff802-cc-auto/event" ] &&
      [ "$(stat -c %a "$R/run/ff802-cc-auto/mixer-event")" = 644 ] &&
      grep -qF "[Fireface 802 – Mixer-Initialisierung fehlgeschlagen]" "$CALLS" &&
-     grep -qF "no sound card with MIDI device for the connection after 0 ms; nothing sent (0 of 24 registers)" "$CALLS"'
+     grep -qF "no sound card with MIDI device for the connection after 0 ms; nothing sent (0 of 26 registers)" "$CALLS"'
 
 reset; mkdir -p "$R/var/lib/ff802-cc-auto"; echo on > "$R/var/lib/ff802-cc-auto/mode"
 d=$DEVS/$PORT; mkdir -p "$d"

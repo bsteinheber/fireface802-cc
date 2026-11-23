@@ -52,22 +52,22 @@ static void test_done(void)
     fake_midi_init(&m, 1, 20);
 
     CHECK(run(&fx, &m, &r) == FF802_MIXER_DONE);
-    CHECK(r.outcome == FF802_MIXER_DONE && r.written == 24 && r.card == 1);
+    CHECK(r.outcome == FF802_MIXER_DONE && r.written == 26 && r.card == 1);
     CHECK(r.client == 20 && r.port == 1);
     CHECK(strcmp(r.port_name, "Fireface 802 (24047128) Port 2") == 0);
     CHECK(m.n_open == 1 && m.n_close == 1 && m.n_connect == 1);
     CHECK(m.conn_client == 20 && m.conn_port == 1);
-    CHECK(m.n_sent == 24);
+    CHECK(m.n_sent == 26);
     /* exactly the table, in order */
     const ff802_mixer_entry *t = ff802_mixer_init_table();
-    for (unsigned i = 0; i < 24u; i++) {
+    for (unsigned i = 0; i < 26u; i++) {
         uint8_t want[12];
         CHECK(ff802_rme_sysex_reg(t[i].addr, t[i].value, want) == FF802_OK);
         CHECK_BYTES(m.sent[i], want, 12);
     }
     /* 1 ms between messages, no waiting for card or port */
-    CHECK(m.n_sleep == 23 && m.slept_ms == 23);
-    CHECK(strstr(r.detail, "24 registers sent to MIDI port 20:1") != NULL);
+    CHECK(m.n_sleep == 25 && m.slept_ms == 25);
+    CHECK(strstr(r.detail, "26 registers sent to MIDI port 20:1") != NULL);
     CHECK(strcmp(ff802_mixer_outcome_str(r.outcome), "done") == 0);
     CHECK(!ff802_mixer_outcome_failed(r.outcome));
 
@@ -75,7 +75,7 @@ static void test_done(void)
     fake_midi m2;
     fake_midi_init(&m2, 1, 20);
     CHECK(run(&fx, &m2, &r) == FF802_MIXER_DONE);
-    CHECK(m2.n_sent == 24 && memcmp(m.sent, m2.sent, sizeof m.sent) == 0);
+    CHECK(m2.n_sent == 26 && memcmp(m.sent, m2.sent, sizeof m.sent) == 0);
     fx_done(&fx);
 }
 
@@ -96,8 +96,8 @@ static void test_waits(void)
     m.on_sleep = appear_on_third_sleep;
     m.ports_after_lists = 2;
     CHECK(run(&fx, &m, &r) == FF802_MIXER_DONE);
-    CHECK(m.n_list == 3 && m.n_sent == 24);
-    CHECK(m.slept_ms == 300 + 200 + 23);
+    CHECK(m.n_list == 3 && m.n_sent == 26);
+    CHECK(m.slept_ms == 300 + 200 + 25);
     fx_done(&fx);
 }
 
@@ -215,7 +215,7 @@ static void test_errors(void)
     m.send_err_at = 7;
     CHECK(run(&fx, &m, &r) == FF802_MIXER_INCOMPLETE);
     CHECK(r.written == 6 && m.n_sent == 6 && m.n_send_calls == 7 && m.n_close == 1);
-    CHECK(strstr(r.detail, "register 7 of 24 (0x41A6)") != NULL);
+    CHECK(strstr(r.detail, "register 7 of 26 (0x4124)") != NULL);
     CHECK(strstr(r.detail, "6 written, nothing retried") != NULL);
 
     /* the first message fails */
@@ -302,7 +302,7 @@ static void test_dry_run_confirm_settle(void)
     CHECK(ff802_mixer_run(fx.paths.sysfs_root, &d, &f, &o, NULL, &r) == FF802_MIXER_ABORTED);
     CHECK(g_confirm_calls == 1 && m.n_connect == 0 && m.n_send_calls == 0 && m.n_close == 1);
 
-    /* confirmation given before anything is sent; then 24 + settle */
+    /* confirmation given before anything is sent; then 26 + settle */
     fake_midi_init(&m, 1, 20);
     f = fake_midi_factory(&m);
     o = fast();
@@ -312,8 +312,8 @@ static void test_dry_run_confirm_settle(void)
     o.settle_ms = 200;
     g_confirm_calls = 0;
     CHECK(ff802_mixer_run(fx.paths.sysfs_root, &d, &f, &o, NULL, &r) == FF802_MIXER_DONE);
-    CHECK(g_confirm_calls == 1 && m.n_sent == 24 && m.n_close == 1);
-    CHECK(m.n_sleep == 24 && m.slept_ms == 23u * 10u + 200u);
+    CHECK(g_confirm_calls == 1 && m.n_sent == 26 && m.n_close == 1);
+    CHECK(m.n_sleep == 26 && m.slept_ms == 25u * 10u + 200u);
 
     /* a build without writes is refused before asking */
     fake_midi_init(&m, 1, 20);
@@ -331,14 +331,14 @@ static void test_dry_run_confirm_settle(void)
 static void test_messages(void)
 {
     const ff802_mixer_entry *t = ff802_mixer_init_table();
-    for (unsigned i = 0; i < 24u; i++) {
+    for (unsigned i = 0; i < 26u; i++) {
         uint8_t a[12], b[12];
         CHECK(ff802_mixer_init_message(i, a) == FF802_OK);
         CHECK(ff802_rme_sysex_reg(t[i].addr, t[i].value, b) == FF802_OK);
         CHECK_BYTES(a, b, 12);
     }
     uint8_t c[12];
-    CHECK(ff802_mixer_init_message(24, c) == FF802_ERR_ADDR_RANGE);
+    CHECK(ff802_mixer_init_message(26, c) == FF802_ERR_ADDR_RANGE);
 }
 
 int main(void)

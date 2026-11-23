@@ -201,7 +201,7 @@ static int run_status(const ff802_auto_paths *p)
             printf("  automation: nothing to do (class-compliant mode)\n"
                    "  mixer init: %s\n",
                    ff802_auto_read_mixer_mode(p) == FF802_AUTO_MODE_ON
-                       ? "on, sets the 24 registers on the next connection event"
+                       ? "on, sets the 26 registers on the next connection event"
                        : "off, the mixer is not changed");
         else
             printf("  automation: refused (not identified as an original "
@@ -226,9 +226,9 @@ static int run_mixer_status(const ff802_auto_paths *p)
     printf("mixer init: %s (%s/mixer-init)\n", ff802_auto_mode_str(m), p->state_dir);
     printf("mixer writes in this build: %s\n", mixer_backend_str());
     if (m == FF802_AUTO_MODE_ON)
-        printf("on every connection in class-compliant mode: Playback 1..12 -> "
-               "Output 1..12 and the volumes of Output 1..12 (Analog 1-8, Phones "
-               "9-12) are set to 0 dB\n");
+        printf("on every connection in class-compliant mode: Playback 1/2 -> "
+               "Phones 9/10 are switched off, Playback 1..12 -> Output 1..12 and the "
+               "volumes of Output 1..12 (Analog 1-8, Phones 9-12) are set to 0 dB\n");
     else
         printf("the mixer of the Fireface 802 is not changed\n");
     print_file(p->run_dir, "mixer-result", "last mixer initialisation");
