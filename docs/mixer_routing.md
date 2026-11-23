@@ -380,6 +380,13 @@ schaltet sie mit genau einer Nachricht `0x4261 = 0x0000` ab
 (`F0 00 20 0D 10 00 00 00 04 13 04 F7`). Der vorherige Wert ist nicht
 wiederherstellbar. Einzelheiten: [mixer_b4.md](mixer_b4.md).
 
+### Diagnose D1 (vorbereitet, nicht ausgeführt)
+
+Prüft, ob `0x0000` eine Matrixverbindung abschaltet, an der nachweislich
+hörbaren Verbindung Playback 10 → Phones 10: `0x4269 = 0x0000`
+(`F0 00 20 0D 10 00 00 00 24 13 0C F7`), Rückweg `0x4269 = 0x9000`.
+Einzelheiten: [mixer_d1.md](mixer_d1.md).
+
 ## Weitere Quellen
 
 - RME-Forum: Remote controlling Fireface 802 in class compliant mode?

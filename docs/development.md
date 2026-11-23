@@ -89,6 +89,7 @@ ctest --test-dir build --output-on-failure
 | `FF802_BUILD_MIXER_B2` | `OFF` | Hardwaretest B.2 `ff802-mixer-b2` bauen: das einzige Programm mit Mixer-Schreibfunktion, genau zwei Nachrichten für Register `0x2600`; nie installiert, kein Paket |
 | `FF802_BUILD_MIXER_B3` | `OFF` | Hardwaretest B.3 `ff802-mixer-b3` bauen: genau eine Nachricht `0x4228 = 0x9000` (Playback 9 → Output 9, 0 dB); gleiche Regeln wie B.2 |
 | `FF802_BUILD_MIXER_B4` | `OFF` | Hardwaretest B.4 `ff802-mixer-b4` bauen: genau eine Nachricht `0x4261 = 0x0000` (Playback 2 → Output 10 aus), Dry-Run als Standard; gleiche Regeln wie B.2/B.3 |
+| `FF802_BUILD_MIXER_D1` | `OFF` | Diagnose D1 `ff802-mixer-d1` bauen: `0x4269 = 0x0000` (`--apply`) bzw. `= 0x9000` (`--restore`), je eine Nachricht, Dry-Run als Standard |
 | `FF802_BUILD_TOOLS` | `ON` | Programme bauen (benötigt libusb) |
 | `FF802_WERROR` | `ON` | Warnungen als Fehler |
 | `FF802_REQUIRE_ALSA_TESTS` | aus Umgebung, sonst `OFF` | ALSA-/Pakettests schlagen fehl statt übersprungen zu werden (Dev-Container: `ON`) |
@@ -202,6 +203,7 @@ ab. Ablauf, Registerliste, Bedienung und Installation:
 | `mixer_b2` | Hardwaretest B.2 mit simuliertem MIDI-Backend: Erkennung bei wechselnden Client-Nummern, genau eine Nachricht, Bestätigung, alle Ablehnungen; das echte Programm (falls gebaut) nur `--help`/`--version` und `nm` |
 | `mixer_b3` | Hardwaretest B.3, gleiches Schema wie `mixer_b2` mit der einen Routing-Nachricht und `--restore-stereo` |
 | `mixer_b4` | Hardwaretest B.4, gleiches Schema wie `mixer_b3`: Dry-Run als Standard, genau eine Nachricht `0x4261 = 0x0000`, Kodierung unabhängig nachgerechnet, falsches Gerät/Modus, fehlende Bestätigung |
+| `mixer_d1` | Diagnose D1: beide Nachrichten unabhängig nachgerechnet (Parität), Dry-Run ohne Zugriff, je genau eine Nachricht, keine automatische Wiederherstellung, Bestätigung, MIDI-Fehler, falsches Gerät/Modus |
 | `mixer_init_tool` | `ff802-mixer-init`: die 24 Nachrichten bytegenau und in Reihenfolge, Dry-Run, Bestätigung, Geräteauswahl, Sperre mit dem Dienst, alle Fehlerfälle; das echte Programm nur `--help`/`--version`/`--list` und `nm` |
 | `check_mixer_sources`, `autoswitch_mixer_symbols` | Quelltextprüfung (ALSA-Aufrufe, SysEx, Registerliterale nur in den vorgesehenen Dateien) und Symbole des Dienstprogramms (nur Sequencer, ohne Freigabe keine Ausgabefunktionen) |
 | `auto_flow`, `auto_notify`, `auto_control`, `auto_units` | T4: Dienstaufruf wie systemd (auch gleichzeitig), Benachrichtigung mit Test-Doubles, `ff802-cc-auto on/off/status` und `mixer-init on/off/status`, udev-Regel und Units (`systemd-analyze`) |
@@ -303,4 +305,5 @@ Versionen dann ebenfalls anzupassen sind.
 - [mixer_routing.md](mixer_routing.md): interner Mixer, Software-Playback-Fader, Beobachtungen und offene Fragen
 - [mixer_init.md](mixer_init.md): Mixer-Initialisierung im CC-Modus (24 Register, Automatik, manuelle Ausführung, Installation)
 - [mixer_b4.md](mixer_b4.md): Hardwaretest B.4, Routing Playback 2 → Phones 10 abschalten
+- [mixer_d1.md](mixer_d1.md): Diagnose D1, Wirkung von `0x0000` an `0x4269`
 - [development.md](development.md): dieses Dokument
