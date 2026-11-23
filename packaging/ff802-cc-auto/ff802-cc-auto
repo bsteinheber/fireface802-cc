@@ -9,8 +9,9 @@
 #                          may do this without a password)
 #   ff802-cc-auto mixer-init status|on|off
 #                          mixer initialisation in class-compliant mode:
-#                          on every connection, Playback 1..12 -> Output
-#                          1..12 and the volumes of Output 1..12 at 0 dB
+#                          on every connection, Playback 1/2 -> Phones
+#                          9/10 off, Playback 1..12 -> Output 1..12 and
+#                          the volumes of Output 1..12 at 0 dB
 #                          (on: administrator; off: the active local user)
 #   ff802-cc-auto mixer-init dry-run|apply
 #                          run the mixer initialisation once by hand
@@ -40,7 +41,7 @@ LIBEXEC=${FF802_AUTO_LIBEXEC:-/usr/libexec/ff802-cc}
 MIXER_INIT=${FF802_MIXER_INIT:-/usr/bin/ff802-mixer-init}
 
 usage() {
-    sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'
     exit 2
 }
 
@@ -48,10 +49,11 @@ mixer_warning() {
     cat <<'EOF'
 WARNING: with the mixer initialisation on, every connection of the
 Fireface 802 in class-compliant mode (reconnect, power cycle, boot) sets
+  - Playback 1/2 -> Phones 9/10 (set by the class-compliant mode) off,
   - Playback 1..12 -> Hardware Output 1..12 to 0 dB and
   - the volumes of all twelve Hardware Outputs (Analog 1-8 and the
     headphone outputs Phones 9-12) to 0 dB,
-overwriting changes made to these 24 values with TotalMix FX or OSCMix.
+overwriting changes made to these 26 values with TotalMix FX or OSCMix.
 0 dB on the headphone outputs can be very loud: take headphones off and
 turn amplifiers down before connecting the unit, and set the volume in
 the applications. Other routings, mute, pan and inputs are not changed.

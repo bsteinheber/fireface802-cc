@@ -61,23 +61,26 @@ Independent of the automation, also for a unit that was switched with
   ff802-cc-auto mixer-init dry-run  find unit, sound card and MIDI port; send nothing
   ff802-cc-auto mixer-init apply    initialise once by hand (asks for SEND)
 
-The manual run is /usr/bin/ff802-mixer-init (--list shows the 24
+The manual run is /usr/bin/ff802-mixer-init (--list shows the 26
 messages); it works for a normal user of the desktop session, takes the
 lock of the service and does not depend on "mixer-init on".
 
 The state is kept in /var/lib/ff802-cc-auto/mixer-init. When it is on,
 the service sets on EVERY connection of the unit in class-compliant mode
-(reconnect, power cycle, boot) exactly these 24 registers of the internal
+(reconnect, power cycle, boot) exactly these 26 registers of the internal
 mixer, in this order, through the ALSA sequencer (MIDI "Port 2" of that
 USB connection, found by its sound card; no fixed ALSA numbers):
 
-  Playback 1..12 -> Hardware Output 1..12     0 dB (0x9000)
-  Volume of Hardware Output 1..12             0 dB (0x0000)
+  Playback 1 -> Phones 9, Playback 2 -> Phones 10   off (0x0000)
+  Playback 1..12 -> Hardware Output 1..12           0 dB (0x9000)
+  Volume of Hardware Output 1..12                   0 dB (0x0000)
   (Output 1-8 = Analog 1-8, 9-12 = Phones 9-12)
 
-Nothing else is changed: no crossed routings, inputs, mute, pan, other
-outputs or stored setups. Nothing is read from the unit, so there is no
-undo: changes made to these 24 values with TotalMix FX or OSCMix are
+The class-compliant mode routes Playback 1/2 also to Phones 9/10; the
+first two writes switch exactly these two crossed routings off (found in
+the hardware tests D2/D3). Nothing else is changed: no other crossed
+routings, inputs, mute, pan, other outputs or stored setups. Nothing is
+read from the unit, so there is no undo: changes made to these 26 values with TotalMix FX or OSCMix are
 overwritten at the next connection.
 
 WARNING: 0 dB on the headphone outputs Phones 9-12 can be very loud. Take
@@ -91,8 +94,8 @@ sending), nothing is retried and a separate notification "Fireface 802 –
 Mixer-Initialisierung fehlgeschlagen" is shown; the class-compliant mode
 itself is not affected.
 
-Existing crossed routings (e.g. Playback 9 -> Output 10) and input
-routings are NOT cleared by the initialisation; only the 24 values above
+Other crossed routings (e.g. Playback 9 -> Output 10) and input
+routings are NOT cleared by the initialisation; only the 26 values above
 are set. The messages are sent 10 ms apart over one subscription, then
 the program waits 200 ms before closing it.
 

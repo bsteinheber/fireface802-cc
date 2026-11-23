@@ -1,3 +1,16 @@
+ff802-cc-auto (0.2.0~dev3) UNRELEASED; urgency=medium
+
+  * Development build, not released; for the practical test on the unit.
+  * Mixer initialisation with 26 instead of 24 register writes: first the
+    two crossed routings that the class-compliant mode sets are switched
+    off, Playback 1 -> Phones 9 (0x4220) and Playback 2 -> Phones 10
+    (0x4261), value 0x0000 (confirmed on the unit in the hardware tests
+    D1-D3); then, unchanged, Playback 1..12 -> Output 1..12 and the
+    volumes of Output 1..12 at 0 dB. Other crossed routings are not
+    changed.
+
+ -- Bernhard Steinheber <bernhard@steinheber.info>  Mon, 23 Nov 2026 12:00:00 +0100
+
 ff802-cc-auto (0.2.0~dev2) UNRELEASED; urgency=medium
 
   * Development build, not released; for the practical test on the unit.

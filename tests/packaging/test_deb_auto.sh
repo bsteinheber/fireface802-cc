@@ -53,7 +53,7 @@ calls() { cat "$TW/calls.log" 2>/dev/null; }
 # --- build -----------------------------------------------------------------------
 DEB=$(sh "$SRC/packaging/build-deb-auto.sh" "$T/deb" 2> "$T/build.err")
 DEB2=$(sh "$SRC/packaging/build-deb-auto.sh" "$T/deb2" 2>> "$T/build.err")
-ok "package builds" '[ -f "$DEB" ] && [ "${DEB##*/}" = "ff802-cc-auto_0.2.0~dev2_${ARCH}.deb" ]'
+ok "package builds" '[ -f "$DEB" ] && [ "${DEB##*/}" = "ff802-cc-auto_0.2.0~dev3_${ARCH}.deb" ]'
 [ -f "$DEB" ] || { cat "$T/build.err"; exit 1; }
 ok "build is reproducible (identical bytes in another directory)" 'cmp -s "$DEB" "$DEB2"'
 ok "19: building the package called no tripwire (nothing executed, no system access)" '[ -z "$(calls)" ]'
@@ -157,7 +157,7 @@ ok "packaged program is the installed build, not the simulation" \
     '! grep -aq "SIMULATED backend" "$BIN" && ! grep -aq "FF802_AUTO_ROOT must be" "$BIN" &&
      grep -aq "only started by ff802-cc-auto@.service" "$BIN"'
 ok "control: name, version, architecture, dependencies, off after installation" \
-    'grep -qx "Package: ff802-cc-auto" "$X/DEBIAN/control" && grep -qx "Version: 0.2.0~dev2" "$X/DEBIAN/control" &&
+    'grep -qx "Package: ff802-cc-auto" "$X/DEBIAN/control" && grep -qx "Version: 0.2.0~dev3" "$X/DEBIAN/control" &&
      grep -qx "Architecture: $ARCH" "$X/DEBIAN/control" &&
      grep -qx "Depends: libc6 (>= 2.34), libusb-1.0-0 (>= 2:1.0.22), libasound2t64 (>= 1.2.10), systemd, udev" "$X/DEBIAN/control" &&
      grep -q "The automation is off after installation" "$X/DEBIAN/control"'
@@ -213,7 +213,7 @@ FF802_AUTO_ROOT=$R sh "$R/usr/libexec/ff802-cc/ff802-cc-auto-mixer-on" > "$T/mon
 ok "installed mixer helper writes only the mixer-init state" \
     '[ "$(cat "$R/var/lib/ff802-cc-auto/mixer-init")" = on ] && [ "$(cat "$R/var/lib/ff802-cc-auto/mode")" = on ] &&
      [ "$(ls "$R/var/lib/ff802-cc-auto" | tr "\n" " ")" = "mixer-init mode " ]'
-DEBUP=$(sh "$SRC/packaging/build-deb-auto.sh" "$T/deb-up" 0.2.0~dev3 2>> "$T/build.err")
+DEBUP=$(sh "$SRC/packaging/build-deb-auto.sh" "$T/deb-up" 0.2.0~dev4 2>> "$T/build.err")
 rc=$(run upgrade.txt dpkg_r -i "$DEBUP")
 ok "upgrade keeps the automation state (on) and the mixer-init state (on) and reports them" \
     '[ "$rc" = 0 ] && [ "$(cat "$R/var/lib/ff802-cc-auto/mode")" = on ] && [ "$(cat "$R/var/lib/ff802-cc-auto/mixer-init")" = on ] &&
