@@ -219,6 +219,8 @@ ff802_mixer_outcome ff802_mixer_run(const char *sysfs_root,
 
     if (ff802_mixer_init_verify() != 0)
         return finish(res, FF802_MIXER_REFUSED, "register table check failed; nothing sent");
+    logf_(log, "mixer: configuration %s, %u entries, checksum 0x%08X (verified).",
+          FF802_MIXER_INIT_ID, FF802_MIXER_INIT_COUNT, (unsigned)ff802_mixer_init_checksum());
     if (f == NULL || f->open == NULL || f->close == NULL || f->sleep_ms == NULL)
         return finish(res, FF802_MIXER_UNAVAILABLE,
                       "no MIDI backend in this program; nothing sent");

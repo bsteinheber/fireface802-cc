@@ -50,6 +50,8 @@ static void test_table(void)
     CHECK(t != NULL);
     CHECK(ff802_mixer_init_verify() == 0);
     CHECK_EQ_U32(ff802_mixer_init_checksum(), FF802_MIXER_INIT_CHECKSUM);
+    CHECK_EQ_U32(FF802_MIXER_INIT_CHECKSUM, 0xC97A359Cu);
+    CHECK(strcmp(FF802_MIXER_INIT_ID, "ff802-mixer-init-v2") == 0);
     CHECK_EQ_U32(FF802_MIXER_INIT_COUNT, 26u);
     CHECK_EQ_U32(FF802_MIXER_CROSS_COUNT, 2u);
     for (unsigned i = 0; i < FF802_MIXER_INIT_COUNT; i++) {

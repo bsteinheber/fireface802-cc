@@ -109,6 +109,7 @@ rc=$(mi "" --list)
 ok "--list: 26 messages, the expected bytes in order, no device access" \
     '[ "$rc" = 0 ] && [ "$(grep -cE "^ +[0-9]+  0x" "$T/out.txt")" = 26 ] &&
      [ "$(grep -E "^ +[0-9]+  0x" "$T/out.txt" | sed "s/.*\(F0 .*F7\)$/\1/")" = "$EXPECTED" ] &&
+     grep -qx "configuration ff802-mixer-init-v2, 26 entries, checksum 0xC97A359C" "$T/out.txt" &&
      [ ! -e "$MIDI" ]'
 ok "--list: 2 crossed routings off, then 12 routings 0x9000, then 12 output volumes 0x0000" \
     '[ "$(grep -E "^ +[0-9]+  0x" "$T/out.txt" | awk "{ print \$2 \"=\" \$4 }" | tr "\n" " ")" = "0x4220=0x0000 0x4261=0x0000 0x4020=0x9000 0x4061=0x9000 0x40A2=0x9000 0x40E3=0x9000 0x4124=0x9000 0x4165=0x9000 0x41A6=0x9000 0x41E7=0x9000 0x4228=0x9000 0x4269=0x9000 0x42AA=0x9000 0x42EB=0x9000 0x1E00=0x0000 0x1F00=0x0000 0x2000=0x0000 0x2100=0x0000 0x2200=0x0000 0x2300=0x0000 0x2400=0x0000 0x2500=0x0000 0x2600=0x0000 0x2700=0x0000 0x2800=0x0000 0x2900=0x0000 " ]'
@@ -245,6 +246,7 @@ if [ "$REAL" != "-" ]; then
     "$REAL" --apply --dry-run > /dev/null 2>&1; rc4=$?
     ok "real program: --version/--help/--list, usage error; --list without device access" \
         '[ "$rc1" = 0 ] && [ "$rc2" = 0 ] && [ "$rc3" = 0 ] && [ "$rc4" = 2 ] &&
+         grep -qx "configuration ff802-mixer-init-v2, 26 entries, checksum 0xC97A359C" "$T/rl.txt" &&
          [ "$(grep -E "^ +[0-9]+  0x" "$T/rl.txt" | sed "s/.*\(F0 .*F7\)$/\1/")" = "$EXPECTED" ]'
     und=$("$NM" -D --undefined-only "$REAL" | awk '{ print $2 }' | sed 's/@.*//')
     has() { printf '%s\n' "$und" | grep -qx "$1"; }

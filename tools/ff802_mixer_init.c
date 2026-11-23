@@ -83,6 +83,8 @@ static void usage(FILE *out)
 static void list_messages(void)
 {
     const ff802_mixer_entry *t = ff802_mixer_init_table();
+    printf("configuration %s, %u entries, checksum 0x%08X\n", FF802_MIXER_INIT_ID,
+           FF802_MIXER_INIT_COUNT, (unsigned)ff802_mixer_init_checksum());
     printf("%u messages, in this order:\n", FF802_MIXER_INIT_COUNT);
     for (unsigned i = 0; i < FF802_MIXER_INIT_COUNT; i++) {
         uint8_t m[FF802_MIXER_SYSEX_SIZE];

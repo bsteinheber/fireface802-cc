@@ -61,6 +61,14 @@ extern "C" {
 /* FNV-1a (32 bit) over address and value (little-endian) of all entries. */
 #define FF802_MIXER_INIT_CHECKSUM 0xC97A359Cu
 
+/*
+ * Name of this register list for logs and mixer-result. Changes whenever
+ * an entry is added, removed, reordered or changes its value:
+ *   v1  24 entries (12 routings, 12 volumes)
+ *   v2  26 entries (v1 + Playback 1/2 -> Phones 9/10 off, sent first)
+ */
+#define FF802_MIXER_INIT_ID "ff802-mixer-init-v2"
+
 typedef enum ff802_mixer_kind {
     FF802_MIXER_ROUTE = 0,        /* Playback k -> Hardware Output k */
     FF802_MIXER_OUTPUT_VOLUME,    /* Hardware Output k volume */

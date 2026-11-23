@@ -247,6 +247,9 @@ ok "M2: mixer init on, automation off: 26 SysEx messages to port 20:1, exit 0, n
     '[ "$rc" = 0 ] && [ "$(sysex)" = 26 ] && [ "$(usb_calls)" = 0 ] &&
      grep -qx "seq connect 20:1" "$MIDI" && [ "$(mres outcome)" = done ] &&
      [ "$(mres written)" = 26/26 ] && [ "$(mres card)" = 1 ] &&
+     [ "$(mres config)" = ff802-mixer-init-v2 ] && [ "$(mres entries)" = 26 ] &&
+     [ "$(mres checksum)" = 0xC97A359C ] &&
+     grep -qx "mixer: configuration ff802-mixer-init-v2, 26 entries, checksum 0xC97A359C (verified)." "$T/journal.txt" &&
      [ "$(mres midi_port)" = "20:1 Fireface 802 (24047128) Port 2" ] && [ ! -e "$RUN/mixer-event" ]'
 ok "M2: order: the two crossed routings off first, then routings 1..12, output volumes last" \
     '[ "$(nth_sysex 1)" = "sysex F0 00 20 0D 10 00 00 00 00 11 04 F7" ] &&

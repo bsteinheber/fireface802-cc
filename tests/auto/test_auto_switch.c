@@ -400,6 +400,8 @@ static void test_mixer_in_cc_branch(void)
     CHECK(r.mixer_event_seq == 0 && !fx_exists(&fx, "run/ff802-cc-auto/mixer-event"));
     fx_read(&fx, "run/ff802-cc-auto/mixer-result", buf, sizeof buf);
     CHECK(strstr(buf, "outcome=done\n") != NULL && strstr(buf, "written=26/26\n") != NULL);
+    CHECK(strstr(buf, "written=26/26\nconfig=ff802-mixer-init-v2\nentries=26\n"
+                      "checksum=0xC97A359C\n") != NULL);
     CHECK(strstr(buf, "port=" PORT "\nbusnum=3\ndevnum=19\n") != NULL);
     CHECK(strstr(buf, "midi_port=20:1 Fireface 802 (24047128) Port 2\n") != NULL);
     fx_read(&fx, "run/ff802-cc-auto/last-result", buf, sizeof buf);

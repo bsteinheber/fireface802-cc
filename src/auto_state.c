@@ -2,6 +2,8 @@
 
 #include "ff802/auto_state.h"
 
+#include "ff802/mixer_init.h"
+
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -294,10 +296,12 @@ int ff802_auto_write_mixer_result(const ff802_auto_paths *p,
     sanitize(oc, sizeof oc, outcome);
     int n = snprintf(buf, sizeof buf,
                      "time=%lld\noutcome=%s\nport=%s\nbusnum=%u\ndevnum=%u\n"
-                     "written=%u/%u\ncard=%d\nmidi_port=%d:%d %s\ndetail=%s\n",
+                     "written=%u/%u\nconfig=%s\nentries=%u\nchecksum=0x%08X\n"
+                     "card=%d\nmidi_port=%d:%d %s\ndetail=%s\n",
                      (long long)time(NULL), oc, d->kernel_name, (unsigned)d->bus,
-                     (unsigned)d->devnum, written, total, card, client, port,
-                     pname, clean);
+                     (unsigned)d->devnum, written, total, FF802_MIXER_INIT_ID,
+                     FF802_MIXER_INIT_COUNT, (unsigned)ff802_mixer_init_checksum(),
+                     card, client, port, pname, clean);
     if (n < 0 || (size_t)n >= sizeof buf)
         return -1;
     return write_atomic(p->run_dir, "mixer-result", buf);
