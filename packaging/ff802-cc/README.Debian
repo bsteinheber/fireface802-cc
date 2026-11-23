@@ -45,15 +45,15 @@ Versions
 --------
 
   ff802-cc --version       (example)
-  ff802-cc 0.4.1 (git <revision>, Release, USB writes enabled)
+  ff802-cc 0.5.0 (git <revision>, Release, USB writes enabled)
 
-- Project version (0.4.1): version of the fireface802-cc sources, set in
+- Project version (0.5.0): version of the fireface802-cc sources, set in
   CMakeLists.txt; shown by --version of all programs.
 - Git revision (12 hex digits): the commit the programs were built from,
   determined by CMake at configure time.
-- Package version (changelog of this package, 0.4.1 here): version
+- Package version (changelog of this package, 0.5.0 here): version
   of the Debian package ff802-cc. It may differ from the project version,
-  e.g. 0.4.1-2 for a package-only change, or 0.4.2 built for an upgrade
+  e.g. 0.5.0-2 for a package-only change, or 0.5.1 built for an upgrade
   test.
 - /usr/share/doc/ff802-cc/BUILDINFO: commit, build type, compiler, CMake
   and libusb versions and SOURCE_DATE_EPOCH of the build. The package is

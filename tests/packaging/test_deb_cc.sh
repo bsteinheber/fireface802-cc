@@ -71,7 +71,7 @@ calls() { cat "$TW/calls.log" 2>/dev/null; }
 # --- build -----------------------------------------------------------------------
 DEB=$(sh "$A/packaging/build-deb-cc.sh" "$T/deb-a" 2> "$T/build-a.err")
 DEB_B=$(sh "$B/packaging/build-deb-cc.sh" "$T/deb-b" 2> "$T/build-b.err")
-ok "package builds from a clean checkout" '[ -f "$DEB" ] && [ "${DEB##*/}" = "ff802-cc_0.4.1_${ARCH}.deb" ]'
+ok "package builds from a clean checkout" '[ -f "$DEB" ] && [ "${DEB##*/}" = "ff802-cc_0.5.0_${ARCH}.deb" ]'
 [ -f "$DEB" ] || { cat "$T/build-a.err"; exit 1; }
 ok "same commit from another checkout path: byte-identical package" 'cmp -s "$DEB" "$DEB_B"'
 DEB_R=$(sh "$A/packaging/build-deb-cc.sh" "$T/deb-a" 2>> "$T/build-a.err")
@@ -127,7 +127,7 @@ X=$T/x
 dpkg-deb -x "$DEB" "$X"
 dpkg-deb -e "$DEB" "$X/DEBIAN"
 ok "control: name, package version, architecture, dependencies, no conflicts" \
-    'grep -qx "Package: ff802-cc" "$X/DEBIAN/control" && grep -qx "Version: 0.4.1" "$X/DEBIAN/control" &&
+    'grep -qx "Package: ff802-cc" "$X/DEBIAN/control" && grep -qx "Version: 0.5.0" "$X/DEBIAN/control" &&
      grep -qx "Architecture: $ARCH" "$X/DEBIAN/control" &&
      grep -qx "Depends: libc6 (>= 2.34), libusb-1.0-0 (>= 2:1.0.22)" "$X/DEBIAN/control" &&
      grep -qx "Suggests: ff802-cc-auto, ff802-ucm-profile" "$X/DEBIAN/control" &&
@@ -143,7 +143,7 @@ ok "packaged documentation equals the repository" \
 ok "BUILDINFO names the commit, the revision, the release build and the tool versions" \
     'grep -qx "git commit: $(git -C "$A" rev-parse HEAD)" "$X/usr/share/doc/ff802-cc/BUILDINFO" &&
      grep -qx "git revision: $REV" "$X/usr/share/doc/ff802-cc/BUILDINFO" &&
-     grep -qx "project version: 0.4.1" "$X/usr/share/doc/ff802-cc/BUILDINFO" &&
+     grep -qx "project version: 0.5.0" "$X/usr/share/doc/ff802-cc/BUILDINFO" &&
      grep -q "^build type: Release, FF802_ENABLE_USB_WRITE=ON" "$X/usr/share/doc/ff802-cc/BUILDINFO" &&
      grep -q "^compiler: " "$X/usr/share/doc/ff802-cc/BUILDINFO" &&
      grep -q "^libusb-1.0-0-dev: " "$X/usr/share/doc/ff802-cc/BUILDINFO"'
@@ -174,8 +174,8 @@ ok "the programs are the release build of this commit, not a simulation" \
 # constants are printed); run with the tripwires in PATH
 ver=$("$CC_BIN" --version 2>&1); dver=$("$DET_BIN" --version 2>&1)
 ok "ff802-cc --version: project version, revision, build type, write gate" \
-    '[ "$ver" = "ff802-cc 0.4.1 (git $REV, Release, USB writes enabled)" ] &&
-     [ "$dver" = "ff802-detect 0.4.1 (git $REV, Release)" ]'
+    '[ "$ver" = "ff802-cc 0.5.0 (git $REV, Release, USB writes enabled)" ] &&
+     [ "$dver" = "ff802-detect 0.5.0 (git $REV, Release)" ]'
 echo "info $ver"
 
 # --- isolated root: coexistence with ff802-cc-auto ---------------------------------
@@ -226,12 +226,12 @@ ok "removing ff802-cc leaves ff802-cc-auto and its state (on) untouched" \
           var/lib/ff802-cc-auto -print 2>/dev/null | sort | xargs -r cksum 2>/dev/null)" = "$auto_files" ] &&
      [ "$(cat "$R/var/lib/ff802-cc-auto/mode")" = on ]'
 rc=$(run inst-cc2.txt dpkg_r -i "$DEB")
-DEB42=$(sh "$A/packaging/build-deb-cc.sh" "$T/deb-42" 0.4.2 2>> "$T/build-a.err")
+DEB42=$(sh "$A/packaging/build-deb-cc.sh" "$T/deb-42" 0.5.1 2>> "$T/build-a.err")
 rc2=$(run up-cc.txt dpkg_r -i "$DEB42")
-ok "upgrade 0.4.1 -> 0.4.2 (package version only; program still reports project 0.4.1)" \
+ok "upgrade 0.5.0 -> 0.5.1 (package version only; program still reports project 0.5.0)" \
     '[ "$rc" = 0 ] && [ "$rc2" = 0 ] &&
-     dpkg-query --admindir="$R/var/lib/dpkg" -W -f="\${Version}" ff802-cc | grep -qx 0.4.2 &&
-     "$R/usr/bin/ff802-cc" --version | grep -q "^ff802-cc 0.4.1 (git $REV, "'
+     dpkg-query --admindir="$R/var/lib/dpkg" -W -f="\${Version}" ff802-cc | grep -qx 0.5.1 &&
+     "$R/usr/bin/ff802-cc" --version | grep -q "^ff802-cc 0.5.0 (git $REV, "'
 rc=$(run rm-auto.txt dpkg_r -P ff802-cc-auto)
 ok "purging ff802-cc-auto leaves ff802-cc untouched" \
     '[ "$rc" = 0 ] && [ -x "$R/usr/bin/ff802-cc" ] && [ -x "$R/usr/bin/ff802-detect" ] &&

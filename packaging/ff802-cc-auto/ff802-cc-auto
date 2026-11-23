@@ -19,8 +19,8 @@
 #                          asks for SEND); independent of on/off
 #
 # "off" only stops Linux from switching the device automatically; it does
-# not change the USB mode of the Fireface (that would be "ff802-cc disable",
-# which is not available, see /usr/share/doc/ff802-cc-auto/README.Debian).
+# not change the USB mode of the Fireface (that is "sudo ff802-cc disable"
+# of the separate package ff802-cc, see /usr/share/doc/ff802-cc-auto/README.Debian).
 # The state is kept in /var/lib/ff802-cc-auto/mode and survives reboots.
 # Default after installation: off. The mixer initialisation is independent
 # of it (/var/lib/ff802-cc-auto/mixer-init), also off by default.

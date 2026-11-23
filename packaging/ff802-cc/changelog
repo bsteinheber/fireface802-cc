@@ -1,3 +1,14 @@
+ff802-cc (0.5.0) unstable; urgency=medium
+
+  * Project version 0.5.0 (release v0.5.0 of fireface802-cc).
+  * No functional change of ff802-cc or ff802-detect: the timing of the
+    USB hub port reset after "ff802-cc enable" (port off 2 s, up to 15 s
+    waiting for the class-compliant unit) now comes from usb_port.h with
+    the same values, shared with the automatic switch of ff802-cc-auto
+    0.2.0.
+
+ -- Bernhard Steinheber <bernhard@steinheber.info>  Mon, 23 Nov 2026 23:00:00 +0100
+
 ff802-cc (0.4.1) unstable; urgency=medium
 
   * Project version 0.4.1, the first public release of fireface802-cc.

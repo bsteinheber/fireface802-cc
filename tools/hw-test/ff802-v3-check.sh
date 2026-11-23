@@ -2,7 +2,10 @@
 # ff802-v3-check.sh: read-only checks for the integration test of the
 # mixer initialisation ff802-mixer-init-v3 (docs/mixer_v3_integration.md).
 #
-#   tools/hw-test/ff802-v3-check.sh pre            before the installation
+#   tools/hw-test/ff802-v3-check.sh pre [<dir>]    before the installation:
+#                                                  <dir> with the release
+#                                                  packages and SHA256SUMS,
+#                                                  without: the dev6 package
 #   tools/hw-test/ff802-v3-check.sh post <since>   after the power cycle,
 #                                                  <since> as for journalctl
 #                                                  (e.g. "10 min ago")
@@ -32,9 +35,20 @@ sha() { sha256sum "$1" 2>/dev/null | cut -d" " -f1; }
 
 case ${1:-} in
 pre)
-    ok "dev6 package present, SHA-256 $NEW_SHA" '[ "$(sha "$NEW")" = "$NEW_SHA" ]'
+    if [ -n "${2:-}" ]; then
+        # release packages: <dir> with the .deb files and their SHA256SUMS
+        dir=$2
+        ok "SHA256SUMS in $dir matches every listed package" \
+            '[ -s "$dir/SHA256SUMS" ] && (cd "$dir" && sha256sum --quiet -c SHA256SUMS)'
+        for p in ff802-cc-auto_0.2.0_amd64.deb ff802-cc_0.5.0_amd64.deb ff802-ucm-profile_0.3.1_all.deb; do
+            ok "$p present and listed in SHA256SUMS" \
+                '[ -f "$dir/$p" ] && grep -q "  $p\$" "$dir/SHA256SUMS"'
+        done
+    else
+        ok "dev6 package present, SHA-256 $NEW_SHA" '[ "$(sha "$NEW")" = "$NEW_SHA" ]'
+    fi
     ok "dev4 package (way back) present and unchanged, SHA-256 $DEV4_SHA" '[ "$(sha "$DEV4")" = "$DEV4_SHA" ]'
-    info "installed: $(dpkg-query -W -f='${Package} ${Version} ${Status}' ff802-cc-auto 2>/dev/null || echo none)"
+    info "installed: $(dpkg-query -W -f='${Package} ${Version} ${Status}\n' 'ff802-*' 2>/dev/null || echo none)"
     info "automation: $(cat "$STATE/mode" 2>/dev/null || echo off), mixer init: $(cat "$STATE/mixer-init" 2>/dev/null || echo off)"
     ;;
 post)
@@ -82,7 +96,7 @@ post)
     rm -f "$J"
     ;;
 *)
-    sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'
     exit 2
     ;;
 esac

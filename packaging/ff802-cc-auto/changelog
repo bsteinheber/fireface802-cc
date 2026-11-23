@@ -1,3 +1,24 @@
+ff802-cc-auto (0.2.0) unstable; urgency=medium
+
+  * Release v0.5.0 of fireface802-cc. Same function as the development
+    build 0.2.0~dev6, which passed the integration test on the unit
+    (2026-11-23); the entries 0.2.0~dev1 ... dev6 below record the steps.
+  * Automatic switch without replugging: after the class-compliant
+    enable command the USB hub port of exactly this unit is reset (same
+    code and timing as "ff802-cc enable"), new unit
+    ff802-cc-auto-enable@.service with write access to that one port
+    attribute only; a failed reset is not repeated until reboot or
+    "ff802-cc-auto on".
+  * Optional mixer initialisation in class-compliant mode, off after
+    installation ("ff802-cc-auto mixer-init on|off|status|dry-run|apply"):
+    38 register writes through the ALSA sequencer (ff802-mixer-init-v3,
+    checksum 0xEC858A44), sent twice by the service, 5 s apart; new
+    program /usr/bin/ff802-mixer-init. New dependency libasound2t64.
+  * Help text of ff802-cc-auto: "ff802-cc disable" is part of the separate
+    package ff802-cc (it was wrongly described as not available).
+
+ -- Bernhard Steinheber <bernhard@steinheber.info>  Mon, 23 Nov 2026 23:00:00 +0100
+
 ff802-cc-auto (0.2.0~dev6) UNRELEASED; urgency=medium
 
   * Development build, not released; for the integration test on the unit.
