@@ -48,7 +48,7 @@ unset FF802_SIM_INIT_ERR FF802_SIM_LAYOUT FF802_SIM_OPEN_ERR FF802_SIM_KDRV \
       FF802_SIM_WRITE_DELAY_MS INVOCATION_ID \
       FF802_SIM_SEQ_OPEN_ERR FF802_SIM_SEQ_LIST_ERR FF802_SIM_SEQ_CONNECT_ERR \
       FF802_SIM_SEQ_SEND_ERR_AT FF802_SIM_MIXER_WRITE FF802_SIM_MIXER_TIMEOUT_MS \
-      FF802_SIM_SEQ_PORTS_AFTER
+      FF802_SIM_SEQ_PORTS_AFTER FF802_SIM_REENUM FF802_SIM_REENUM_AFTER FF802_SIM_PORT_STUCK
 
 # --- simulated host -------------------------------------------------------------
 reset_root() {
@@ -68,17 +68,32 @@ cc() { dev "$PORT" 0424 3fdd 3 "$1"; }
 unplug() { rm -rf -- "${DEVS:?}/$PORT"; }
 mode() { echo "$1" > "$STATE/mode"; }
 
-# udev: the instance for an "add" event, from the rule's SYSTEMD_WANTS
-WANTS=$(sed -n 's/^ACTION=="add", ENV{SYSTEMD_WANTS}+="\(.*\)"$/\1/p' "$RULE")
-instance() { # instance <kernel name>: like udev, BUSNUM/DEVNUM zero-padded
+# udev: the unit and instance for an "add" event, from the rule's
+# SYSTEMD_WANTS: per port for 2a39:3fcd, per connection otherwise
+wants() { sed -n "/^LABEL=\"$1\"\$/,/^LABEL=/s/^ACTION==\"add\", ENV{SYSTEMD_WANTS}+=\"\(.*\)\"\$/\1/p" "$RULE"; }
+WANTS_PROP=$(wants ff802_cc_auto_prop)
+WANTS_CC=$(wants ff802_cc_auto_cc)
+cinst() { # cinst <kernel name>: the instance <k>:<busnum>:<devnum>, zero-padded like udev
     b=$(printf '%03d' "$(cat "$DEVS/$1/busnum")")
     n=$(printf '%03d' "$(cat "$DEVS/$1/devnum")")
-    unit=$(printf '%s\n' "$WANTS" | sed -e "s/%k/$1/" -e "s/\$env{BUSNUM}/$b/" -e "s/\$env{DEVNUM}/$n/")
+    unit=$(printf '%s\n' "$WANTS_CC" | sed -e "s/%k/$1/" -e "s/\$env{BUSNUM}/$b/" -e "s/\$env{DEVNUM}/$n/")
     unit=${unit#ff802-cc-auto@}
     printf '%s\n' "${unit%.service}"
 }
-# systemd: ExecStart of the unit with %i, the program replaced by SIM
+instance() { # instance <kernel name>: the instance udev would want for it now
+    if [ "$(cat "$DEVS/$1/idVendor")" = 2a39 ] && [ "$(cat "$DEVS/$1/idProduct")" = 3fcd ]; then
+        unit=$(printf '%s\n' "$WANTS_PROP" | sed -e "s/%k/$1/")
+        unit=${unit#ff802-cc-auto-enable@}
+        printf '%s\n' "${unit%.service}"
+    else
+        cinst "$1"
+    fi
+}
+# systemd: ExecStart of the unit with %i, the program replaced by SIM (both
+# units have the same ExecStart, checked below)
+ESVC=$SRC/packaging/ff802-cc-auto/ff802-cc-auto-enable@.service
 EXEC=$(sed -n 's/^ExecStart=//p' "$SVC")
+EXEC_E=$(sed -n 's/^ExecStart=//p' "$ESVC")
 service() { # service <instance> [env...]: run like systemd, print the exit code
     inst=$1; shift
     cmd=$(printf '%s\n' "$EXEC" | sed -e "s|^/usr/libexec/ff802-cc/ff802-cc-autoswitch|$SIM|" -e "s/%i/$inst/")
@@ -92,9 +107,10 @@ usb_calls() { [ -f "$R/usb.log" ] && wc -l < "$R/usb.log" || echo 0; }
 kind() { sed -n 's/^kind=//p' "$RUN/event" 2>/dev/null; }
 outcome() { sed -n 's/^outcome=//p' "$RUN/last-result" 2>/dev/null; }
 
-ok "udev rule and unit give the instance <kernel>:<busnum>:<devnum>" \
-    'reset_root; prop 19; [ "$(instance $PORT)" = "3-2.4.1.1.3:003:019" ] &&
-     [ "$EXEC" = "/usr/libexec/ff802-cc/ff802-cc-autoswitch --service %i" ]'
+ok "udev rule and units: proprietary -> enable@<kernel>, CC -> @<kernel>:<busnum>:<devnum>, same ExecStart" \
+    'reset_root; prop 19; [ "$(instance $PORT)" = "3-2.4.1.1.3" ] &&
+     cc 19; [ "$(instance $PORT)" = "3-2.4.1.1.3:003:019" ] &&
+     [ "$EXEC" = "/usr/libexec/ff802-cc/ff802-cc-autoswitch --service %i" ] && [ "$EXEC_E" = "$EXEC" ]'
 
 # --- 1 / 10: CC mode ---------------------------------------------------------------
 reset_root; mode on; cc 19
@@ -161,7 +177,7 @@ rc=$(event FF802_SIM_UNPLUG_ON_WRITE=1)
 ok "5: removed during the write: exit 4, reported as disconnected, no retry" \
     '[ "$rc" = 4 ] && [ "$(writes)" = 1 ] && grep -q "device was disconnected" "$RUN/event"'
 reset_root; mode on; prop 18
-inst=$(instance $PORT); prop 19
+inst=$(cinst $PORT); prop 19
 rc=$(service "$inst")
 ok "5: reconnected before the service runs (stale event devnum 18, now 19): nothing for the stale event" \
     '[ "$rc" = 3 ] && [ "$(usb_calls)" = 0 ] && grep -q "reconnected since the event" "$RUN/last-result"'
@@ -207,7 +223,7 @@ ok "18: ten simultaneous events for one connection: exactly one transfer, all ex
     '[ "$(writes)" = 1 ] && [ "$(cat "$T"/rc.* | sort -u)" = 0 ] &&
      [ "$(grep -c "^Result: already-handled" "$T/journal.txt")" -ge 9 ]'
 reset_root; mode on; prop 18
-old=$(instance $PORT); prop 19; new=$(instance $PORT)
+old=$(cinst $PORT); prop 19; new=$(cinst $PORT)
 (service "$old" FF802_SIM_WRITE_DELAY_MS=200 > "$T/rc.old") & p1=$!
 (service "$new" FF802_SIM_WRITE_DELAY_MS=200 > "$T/rc.new") & p2=$!
 wait $p1; wait $p2
@@ -432,6 +448,109 @@ ok "status and mixer-status are read only and report the mixer initialisation" \
      grep -q "sets the 26 registers on the next connection event" "$T/mstatus.txt" &&
      grep -q "^mixer writes in this build: enabled" "$T/mstatus2.txt" &&
      grep -q "are set to 0 dB" "$T/mstatus2.txt"'
+
+# --- automatic port reset after the command (ff802_port_switch) ----------------------
+HUB=3-2.4.1.1
+HUBPORT=$DEVS/$HUB/$HUB:1.0/$HUB-port3
+hubport() { # the hub port of $PORT: "disable" and the "device" link to the device
+    mkdir -p "$HUBPORT"
+    echo 0 > "$HUBPORT/disable"
+    ln -s "../../../$PORT" "$HUBPORT/device"
+}
+disable_val() { cat "$HUBPORT/disable" 2>/dev/null; }
+resets() { n=$(grep -c '^port off ' "$R/usb.log" 2>/dev/null); echo "${n:-0}"; }
+jl() { grep -c "$1" "$T/journal.txt"; }
+
+reset_root; : > "$T/journal.txt"; mode on; prop 18; hubport
+rc=$(event FF802_SIM_REENUM=cc)
+ok "P1: proprietary, port resettable: command, then disable=1 / 2000 ms / disable=0, back as 0424:3fdd" \
+    '[ "$rc" = 0 ] && [ "$(outcome)" = switched ] && [ "$(writes)" = 1 ] && [ "$(resets)" = 1 ] &&
+     [ "$(grep -v "^list\|^layout" "$R/usb.log" | tr "\n" ";")" = "init;open 3:18;kdrv if 1;claim if 1;write ep=0x0C bytes=01 00 44 BD bus=3 addr=18 timeout=1000;release if 1;close;exit;port off 2000 ms disable=1;port on disable=0;sim: $PORT re-enumerated (cc) as devnum 19 after 3 polls;" ] &&
+     [ "$(disable_val)" = 0 ] && [ "$(cat "$DEVS/$PORT/idVendor")" = 0424 ] && [ "$(cat "$DEVS/$PORT/devnum")" = 19 ]'
+ok "P1: journal: command sent, reset triggered, re-enumerated in CC mode; no notification yet, pending set" \
+    '[ "$(jl "^CC command sent: 01 00 44 BD to $PORT (bus 3, devnum 18), 4 bytes.$")" = 1 ] &&
+     [ "$(jl "^Port reset triggered: .*/$HUB-port3/disable = 1, 2000 ms, = 0; waiting up to 15000 ms for 0424:3fdd at $PORT.$")" = 1 ] &&
+     [ "$(jl "^Re-enumerated in class-compliant mode: $PORT 0424:3fdd bus 3 devnum 19 (was devnum 18)")" = 1 ] &&
+     [ "$(jl "^Result: switched: switched $PORT: command sent, port reset, back as 0424:3fdd devnum 19$")" = 1 ] &&
+     [ ! -f "$RUN/event" ] && [ -f "$RUN/pending" ] && [ ! -e "$RUN/reset-blocked" ] &&
+     [ "$(jl "reconnect")" = 0 ]'
+mixer on; sndcard; seqports 20
+rc=$(event)
+ok "P1: the new connection (own instance, devnum 19): cc-active confirmation, pending cleared, 26 registers" \
+    '[ "$rc" = 0 ] && [ "$(outcome)" = cc-active ] && [ "$(kind)" = cc-active ] && [ ! -f "$RUN/pending" ] &&
+     [ "$(sysex)" = 26 ] && [ "$(mres outcome)" = done ] && [ "$(mres devnum)" = 19 ] &&
+     [ "$(mres checksum)" = 0xC97A359C ] && [ "$(writes)" = 1 ] && [ "$(resets)" = 1 ]'
+
+reset_root; : > "$T/journal.txt"; mode on; prop 18; hubport
+rc=$(event FF802_SIM_REENUM=none)
+ok "P2: device not re-enumerated within 15 s: exit 5, 'not-reenumerated', event reset-failed, reset blocked" \
+    '[ "$rc" = 5 ] && [ "$(outcome)" = not-reenumerated ] && [ "$(kind)" = reset-failed ] &&
+     [ "$(resets)" = 1 ] && [ "$(disable_val)" = 0 ] && [ -f "$RUN/reset-blocked" ] &&
+     [ "$(jl "^Port reset done, device not re-enumerated at $PORT within 15000 ms.$")" = 1 ] &&
+     grep -q "^detail=command sent, port reset, device not back within 15 s; reconnect the USB cable$" "$RUN/event"'
+ok "P2: nothing retried: one command, one reset" \
+    '[ "$(writes)" = 1 ] && [ "$(jl "^Port reset triggered")" = 1 ]'
+
+reset_root; : > "$T/journal.txt"; mode on; prop 18; hubport
+rc=$(event FF802_SIM_REENUM=prop)
+ok "P3: back in proprietary mode (new devnum): exit 5, 'reenumerated-not-cc', reset blocked" \
+    '[ "$rc" = 5 ] && [ "$(outcome)" = reenumerated-not-cc ] && [ "$(kind)" = reset-failed ] &&
+     [ -f "$RUN/reset-blocked" ] &&
+     [ "$(jl "^Port reset done, re-enumerated at $PORT as 2a39:3fcd devnum 19: not class-compliant mode.$")" = 1 ]'
+rc=$(event FF802_SIM_REENUM=prop)
+rc2=$(event FF802_SIM_REENUM=prop)
+ok "P3: no retry loop: the new connection gets the command once, no second reset, asked to reconnect" \
+    '[ "$rc" = 0 ] && [ "$rc2" = 0 ] && [ "$(writes)" = 2 ] && [ "$(resets)" = 1 ] &&
+     [ "$(outcome)" = already-handled ] && [ "$(kind)" = prepared ] &&
+     [ "$(jl "^No automatic port reset: an automatic port reset failed earlier on this boot")" = 1 ]'
+FF802_AUTO_ROOT=$R "$SRC/packaging/ff802-cc-auto/ff802-cc-auto-on" > /dev/null 2>&1
+ok "P3: 'ff802-cc-auto on' lifts the reset block" '[ ! -e "$RUN/reset-blocked" ]'
+rm -rf -- "${RUN:?}"; mkdir -p "$RUN"; mode on
+unplug; prop 20
+rc=$(event FF802_SIM_REENUM=cc)
+ok "P3: after a reboot (/run empty) a new connection is reset again" \
+    '[ "$rc" = 0 ] && [ "$(outcome)" = switched ] && [ "$(resets)" = 2 ]'
+
+reset_root; : > "$T/journal.txt"; mode on; prop 18; hubport
+rc=$(event FF802_SIM_REENUM=cc FF802_SIM_PORT_STUCK=1)
+ok "P4: disable=0 fails: exit 5, 'reset-failed', hint that the port may stay disabled, reset blocked" \
+    '[ "$rc" = 5 ] && [ "$(outcome)" = reset-failed ] && [ "$(kind)" = reset-failed ] &&
+     [ -f "$RUN/reset-blocked" ] &&
+     [ "$(jl "^Port reset failed: writing 0 to .*/$HUB-port3/disable failed (Is a directory); the port may stay disabled. Re-enable it: echo 0 | sudo tee .*/$HUB-port3/disable >/dev/null$")" = 1 ]'
+
+reset_root; : > "$T/journal.txt"; mode on; prop 18; hubport; chmod 0444 "$HUBPORT/disable"
+rc=$(event FF802_SIM_REENUM=cc)
+ok "P5: port not writable for the service (e.g. read-only /sys): command sent, no reset, asked to reconnect" \
+    '[ "$rc" = 0 ] && [ "$(outcome)" = sent ] && [ "$(kind)" = prepared ] && [ "$(writes)" = 1 ] &&
+     [ "$(resets)" = 0 ] && [ "$(disable_val)" = 0 ] && [ ! -e "$RUN/reset-blocked" ] &&
+     [ "$(jl "^No automatic port reset: hub port $HUB-port3 not writable for this service.")" = 1 ] &&
+     grep -q "^detail=enable command transferred to $PORT (4 bytes); no automatic port reset (hub port $HUB-port3 not writable for this service): reconnect the USB cable$" "$RUN/event"'
+chmod 0644 "$HUBPORT/disable"
+
+reset_root; : > "$T/journal.txt"; mode on; prop 18; mkdir -p "$HUBPORT"; echo 0 > "$HUBPORT/disable"
+ln -s "../../../3-2.4.1.1.2" "$HUBPORT/device"; dev 3-2.4.1.1.2 0424 2514 3 9 "USB2514B" "Microchip"
+rc=$(event FF802_SIM_REENUM=cc)
+ok "P6: the port's device link is another device: never written, command sent, asked to reconnect" \
+    '[ "$rc" = 0 ] && [ "$(outcome)" = sent ] && [ "$(resets)" = 0 ] && [ "$(disable_val)" = 0 ] &&
+     [ "$(jl "^No automatic port reset: ")" = 1 ]'
+
+reset_root; : > "$T/journal.txt"; prop 18; hubport
+rc=$(event FF802_SIM_REENUM=cc)
+mode on; cc 19
+rc2=$(event)
+ok "P7: automation off: no command, no reset; a CC device is never reset" \
+    '[ "$rc" = 0 ] && [ "$rc2" = 0 ] && [ "$(usb_calls)" = 0 ] && [ "$(disable_val)" = 0 ]'
+
+reset_root; : > "$T/journal.txt"; mode on; prop 18; hubport; mixer on; sndcard; seqports 20
+(service "$(instance $PORT)" FF802_SIM_REENUM=cc FF802_SIM_WRITE_DELAY_MS=400 > "$T/rc.enable") & p1=$!
+sleep 0.2
+cc_inst="$PORT:003:019"       # the event of the re-enumerated device, while the lock is held
+(service "$cc_inst" > "$T/rc.cc") & p2=$!
+wait $p1; wait $p2
+ok "P8: CC event during the reset waits for the lock, then confirms and initialises; no deadlock" \
+    '[ "$(cat "$T/rc.enable")" = 0 ] && [ "$(cat "$T/rc.cc")" = 0 ] && [ "$(kind)" = cc-active ] &&
+     [ "$(sysex)" = 26 ] && [ "$(mres devnum)" = 19 ] &&
+     [ "$(sed -n "s/^Result: \([a-z-]*\):.*/\1/p" "$T/journal.txt" | tr "\n" ";")" = "switched;cc-active;" ]'
 
 # --- guards against unintended use ------------------------------------------------
 reset_root; mode on; prop 18

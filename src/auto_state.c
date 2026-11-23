@@ -217,6 +217,7 @@ const char *ff802_auto_event_kind_str(ff802_auto_event_kind k)
     case FF802_EVENT_CC_ACTIVE: return "cc-active";
     case FF802_EVENT_FAILED:    return "failed";
     case FF802_EVENT_MIXER_FAILED: return "mixer-failed";
+    case FF802_EVENT_RESET_FAILED: return "reset-failed";
     }
     return "failed";
 }
@@ -361,4 +362,28 @@ int ff802_auto_write_result(const ff802_auto_paths *p, const char *outcome,
     if (n < 0 || (size_t)n >= sizeof buf)
         return -1;
     return write_atomic(p->run_dir, "last-result", buf);
+}
+
+int ff802_auto_set_reset_blocked(const ff802_auto_paths *p,
+                                 const ff802_sysfs_dev *d, const char *why)
+{
+    char clean[160];
+    char buf[320];
+
+    sanitize(clean, sizeof clean, why);
+    int n = snprintf(buf, sizeof buf, "time=%lld\nport=%s\nbusnum=%u\ndevnum=%u\n"
+                     "reason=%s\n", (long long)time(NULL), d->kernel_name,
+                     (unsigned)d->bus, (unsigned)d->devnum, clean);
+    if (n < 0 || (size_t)n >= sizeof buf)
+        return -1;
+    return write_atomic(p->run_dir, "reset-blocked", buf);
+}
+
+int ff802_auto_reset_blocked(const ff802_auto_paths *p)
+{
+    char path[FF802_AUTO_PATH_MAX + 16u];
+    struct stat st;
+    if (join(path, sizeof path, p->run_dir, "reset-blocked") != 0)
+        return 1;            /* cannot even name it: treat as blocked */
+    return lstat(path, &st) == 0;
 }

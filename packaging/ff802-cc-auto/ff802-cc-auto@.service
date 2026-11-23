@@ -1,17 +1,21 @@
-# ff802-cc-auto (T4): handle one USB connection of the Fireface 802.
+
+# ff802-cc-auto (T4): one USB connection of the Fireface 802 in
+# class-compliant mode (0424:3fdd).
 # Instance: <kernel name>:<busnum>:<devnum>, wanted by 70-ff802-cc-auto.rules.
+# (Proprietary mode, 2a39:3fcd: ff802-cc-auto-enable@.service.)
 #
-# Does nothing while the automation is off. Otherwise, for a Fireface 802
-# in proprietary mode: validates the identity, records the connection
-# (at most one attempt per connection), re-validates right before the
-# write and sends the CC enable command 01 00 44 BD once. Never resets
-# the device, never retries, never switches back to proprietary mode.
+# If a switch was prepared for this port (pending marker of
+# ff802-cc-auto-enable@.service): the confirmation event "cc-active".
+# After an automatic port reset this instance (new devnum) waits for the
+# lock until the enable unit has finished; it never waits for that unit
+# otherwise.
 #
-# In class-compliant mode, only if 'ff802-cc-auto mixer-init on' (off by
-# default, independent of the automation): waits up to 15 s for the MIDI
-# port "Port 2" of this connection and sets the 24 fixed mixer registers
-# (Playback 1..12 -> Output 1..12 and the volumes of Output 1..12 at
-# 0 dB) through the ALSA sequencer; no USB access for that.
+# Only if 'ff802-cc-auto mixer-init on' (off by default, independent of
+# the automation): waits up to 15 s for the MIDI port "Port 2" of this
+# connection and sets the 26 fixed mixer registers (configuration
+# ff802-mixer-init-v2, checksum 0xC97A359C: Playback 1/2 -> Phones 9/10
+# off, Playback 1..12 -> Output 1..12 and the volumes of Output 1..12 at
+# 0 dB) through the ALSA sequencer. No USB access, no sysfs writes.
 # Log: journalctl -t ff802-cc-auto
 
 [Unit]
@@ -22,21 +26,22 @@ StartLimitIntervalSec=0
 [Service]
 Type=oneshot
 ExecStart=/usr/libexec/ff802-cc/ff802-cc-autoswitch --service %i
-TimeoutStartSec=30
+# up to ~20 s waiting for the lock of a running port reset + 15 s for the
+# MIDI port + sending
+TimeoutStartSec=60
 SyslogIdentifier=ff802-cc-auto
 RuntimeDirectory=ff802-cc-auto
 RuntimeDirectoryMode=0755
 RuntimeDirectoryPreserve=yes
 UMask=0022
 
-# Root without any capability: enough to open the root-owned usbfs node
-# of this device and the ALSA sequencer (/dev/snd/seq) for the mixer
-# initialisation; nothing else is writable.
+# Root without any capability: enough for the ALSA sequencer
+# (/dev/snd/seq) of the mixer initialisation; no USB device nodes,
+# nothing else is writable.
 CapabilityBoundingSet=
 AmbientCapabilities=
 NoNewPrivileges=yes
 DevicePolicy=closed
-DeviceAllow=char-usb_device rw
 DeviceAllow=char-alsa rw
 ProtectSystem=strict
 ProtectHome=yes

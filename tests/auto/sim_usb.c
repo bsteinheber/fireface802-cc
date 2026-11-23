@@ -9,6 +9,7 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <sys/stat.h>
 
 #include "ff802/auto_sysfs.h"
 
@@ -274,4 +275,106 @@ void sim_usb_close(ff802_usb_backend *be)
         free(s);
     }
     memset(be, 0, sizeof *be);
+}
+
+/* --- simulated port reset ------------------------------------------------- */
+typedef struct sim_port {
+    sim      s;              /* only paths and log_path are used */
+    char     name[FF802_SYSFS_NAME_MAX];
+    char     saved[FF802_AUTO_PATH_MAX + 32u];
+    char     port_dir[FF802_PORT_PATH_MAX];
+    unsigned calls;
+} sim_port;
+
+static sim_port g_port;
+
+static void read_port_disable(sim_port *sp, char *buf, size_t size)
+{
+    char path[FF802_PORT_PATH_MAX + 16u];
+    snprintf(buf, size, "?");
+    if (sp->port_dir[0] == '\0')
+        return;
+    snprintf(path, sizeof path, "%s/disable", sp->port_dir);
+    FILE *f = fopen(path, "r");
+    if (f == NULL)
+        return;
+    if (fgets(buf, (int)size, f) == NULL)
+        snprintf(buf, size, "?");
+    buf[strcspn(buf, "\n")] = '\0';
+    fclose(f);
+}
+
+static void port_sleep(void *user, unsigned ms)
+{
+    sim_port *sp = user;
+    char dev[FF802_AUTO_PATH_MAX + 96u];
+    char val[16];
+    snprintf(dev, sizeof dev, "%s/bus/usb/devices/%s", sp->s.paths.sysfs_root, sp->name);
+
+    sp->calls++;
+    if (sp->calls == 1u) {
+        /* off phase: the device disappears */
+        read_port_disable(sp, val, sizeof val);
+        slog(&sp->s, "port off %u ms disable=%s", ms, val);
+        if (rename(dev, sp->saved) != 0)
+            slog(&sp->s, "sim: %s was not there", sp->name);
+        if (env_is("FF802_SIM_PORT_STUCK", "1") && sp->port_dir[0] != '\0') {
+            /* "disable" can no longer be written: "0" fails (EISDIR) */
+            char attr[FF802_PORT_PATH_MAX + 16u];
+            snprintf(attr, sizeof attr, "%s/disable", sp->port_dir);
+            if (unlink(attr) != 0 || mkdir(attr, 0755) != 0)
+                slog(&sp->s, "sim: cannot break %s", attr);
+        }
+        return;
+    }
+    if (sp->calls == 2u) {
+        read_port_disable(sp, val, sizeof val);
+        slog(&sp->s, "port on disable=%s", val);
+    }
+    const char *mode = getenv("FF802_SIM_REENUM");
+    const char *after = getenv("FF802_SIM_REENUM_AFTER");
+    unsigned polls = after != NULL ? (unsigned)atoi(after) : 3u;
+    if (mode == NULL || strcmp(mode, "none") == 0 || sp->calls != polls + 2u)
+        return;
+    if (rename(sp->saved, dev) != 0) {
+        slog(&sp->s, "sim: cannot re-create %s", sp->name);
+        return;
+    }
+    char num[16];
+    FILE *f;
+    char path[FF802_AUTO_PATH_MAX + 128u];
+    snprintf(path, sizeof path, "%s/devnum", dev);
+    unsigned old = 0;
+    if ((f = fopen(path, "r")) != NULL) {
+        if (fscanf(f, "%u", &old) != 1)
+            old = 0;
+        fclose(f);
+    }
+    snprintf(num, sizeof num, "%u", old + 1u);
+    sysfs_attr(&sp->s, sp->name, "devnum", num);
+    if (strcmp(mode, "cc") == 0) {
+        sysfs_attr(&sp->s, sp->name, "idVendor", "0424");
+        sysfs_attr(&sp->s, sp->name, "idProduct", "3fdd");
+    }
+    slog(&sp->s, "sim: %s re-enumerated (%s) as devnum %s after %u polls", sp->name,
+         mode, num, polls);
+}
+
+const ff802_port_ops *sim_port_setup(const ff802_auto_paths *p, const char *kernel_name,
+                                     ff802_port_ops *ops)
+{
+    memset(&g_port, 0, sizeof g_port);
+    g_port.s.paths = *p;
+    const char *root = getenv("FF802_AUTO_ROOT");
+    snprintf(g_port.s.log_path, sizeof g_port.s.log_path, "%s/usb.log",
+             root ? root : "/nonexistent");
+    snprintf(g_port.name, sizeof g_port.name, "%s", kernel_name);
+    snprintf(g_port.saved, sizeof g_port.saved, "%s/sim-unplugged",
+             root ? root : "/nonexistent");
+    ff802_usb_port port;
+    if (ff802_port_resolve(p->sysfs_root, kernel_name, &port) == FF802_PORT_OK)
+        snprintf(g_port.port_dir, sizeof g_port.port_dir, "%s", port.dir);
+    ops->sleep_ms = port_sleep;
+    ops->user = &g_port;
+    return ops;
 }

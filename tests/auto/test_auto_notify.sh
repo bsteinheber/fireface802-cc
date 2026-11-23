@@ -87,9 +87,9 @@ event() { # event <seq> <kind> <devnum> [<age s>] [<detail>]
 # --- notifier -------------------------------------------------------------------------
 reset; dev 2a39 18; event 1 prepared 18
 rc=$(notify bin-full)
-ok "prepared: one critical notification with the proposed text" \
+ok "prepared (no automatic reset possible): one critical notification asking to reconnect" \
     '[ "$rc" = 0 ] && [ "$(shown notify-send)" = 1 ] &&
-     grep -qF "notify-send [--app-name=Fireface 802] [--icon=audio-card] [--urgency=critical] [Fireface 802 – Class-Compliant-Modus vorbereitet] [Bitte die USB-Verbindung des Fireface kurz trennen und wieder anschließen.]" "$CALLS"'
+     grep -qF "notify-send [--app-name=Fireface 802] [--icon=audio-card] [--urgency=critical] [Fireface 802 – Class-Compliant-Modus vorbereitet] [Der automatische USB-Neustart war nicht möglich. Bitte die USB-Verbindung des Fireface kurz trennen und wieder anschließen. Details: journalctl -t ff802-cc-auto]" "$CALLS"'
 for i in 1 2 3 4 5; do notify bin-full > /dev/null; done
 ok "no flood: the same event is shown once per session" '[ "$(shown notify-send)" = 1 ]'
 
@@ -114,6 +114,22 @@ reset; dev 2a39 18; event 1 prepared 18 1200
 rc=$(notify bin-full)
 ok "9: boot without a session, login 20 min later, device still not reconnected: shown at login" \
     '[ "$rc" = 0 ] && [ "$(shown notify-send)" = 1 ]'
+
+reset; dev 2a39 19; event 1 reset-failed 18 0 "command sent, port reset, device back as 2a39:3fcd, not in class-compliant mode; reconnect the USB cable"
+rc=$(notify bin-full)
+ok "reset-failed: critical notification with the reason and the manual recovery" \
+    '[ "$rc" = 0 ] && [ "$(shown notify-send)" = 1 ] &&
+     grep -qF "[--urgency=critical] [Fireface 802 – automatische Umschaltung nicht bestätigt] [command sent, port reset, device back as 2a39:3fcd, not in class-compliant mode; reconnect the USB cable. Bitte die USB-Verbindung des Fireface kurz trennen und wieder anschließen. Details: ff802-cc-auto status, journalctl -t ff802-cc-auto]" "$CALLS"'
+reset; event 1 reset-failed 18 0 "command sent, port reset, device not back within 15 s; reconnect the USB cable"
+rc=$(notify bin-full)
+ok "reset-failed, device not back at all: shown" '[ "$rc" = 0 ] && [ "$(shown notify-send)" = 1 ]'
+reset; dev 0424 20; event 1 reset-failed 18
+rc=$(notify bin-full)
+ok "reset-failed, but the device is in class-compliant mode by now: not shown" \
+    '[ "$rc" = 0 ] && [ "$(shown notify-send)" = 0 ]'
+ok "no success notification asks to reconnect: only prepared and reset-failed do" \
+    '[ "$(grep -c "trennen und wieder anschließen" "$SRC/packaging/ff802-cc-auto/ff802-cc-notify")" = 2 ] &&
+     [ "$(sed -n "/^        cc-active)\$/,/;;\$/p" "$SRC/packaging/ff802-cc-auto/ff802-cc-notify" | grep -c "trennen")" = 0 ]'
 
 reset; dev 2a39 18; event 1 failed 18 0 "transfer failed (bulk transfer timed out, 0 of 4 bytes); device state unknown"
 rc=$(notify bin-full)

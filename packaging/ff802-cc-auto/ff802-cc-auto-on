@@ -1,7 +1,10 @@
 #!/bin/sh
 # ff802-cc-auto-on (T4): turn the Fireface 802 automation on.
 # Runs as root: via pkexec (polkit action org.ff802cc.auto.on) or sudo.
-# Writes /var/lib/ff802-cc-auto/mode atomically; nothing else.
+# Writes /var/lib/ff802-cc-auto/mode atomically and removes
+# /run/ff802-cc-auto/reset-blocked (set after a failed automatic port
+# reset: turning the automation on again allows the next attempt);
+# nothing else.
 # Test override: FF802_AUTO_ROOT (prefix; pkexec and sudo clear it).
 set -eu
 umask 022
@@ -18,6 +21,7 @@ chmod 0755 "$DIR"
 printf 'on\n' > "$DIR/mode.tmp"
 chmod 0644 "$DIR/mode.tmp"
 mv -f "$DIR/mode.tmp" "$DIR/mode"
+rm -f -- "$ROOT/run/ff802-cc-auto/reset-blocked"
 who=${PKEXEC_UID:+uid $PKEXEC_UID via pkexec}
 who=${who:-${SUDO_USER:+$SUDO_USER via sudo}}
 msg="automation turned on${who:+ ($who)}"
@@ -25,4 +29,5 @@ msg="automation turned on${who:+ ($who)}"
 echo "ff802-cc-auto: $msg."
 echo "It applies from the next connection of the Fireface 802 (or the next boot)."
 echo "An already connected Fireface in proprietary mode: disconnect and reconnect"
-echo "it once; after the switch you will be asked to reconnect it again."
+echo "it once (or reboot). It is then switched to class-compliant mode and its USB"
+echo "port is reset automatically; no further reconnecting is needed."

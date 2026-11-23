@@ -1,19 +1,30 @@
 # ff802-cc-auto (T4): original RME Fireface 802, USB connection events.
 #
-# Nothing is executed by udev. On "add" the systemd unit
-# ff802-cc-auto@<kernel name>:<busnum>:<devnum>.service is wanted; it
+# Nothing is executed by udev. On "add" a systemd unit is wanted; it
 # checks whether the automation is on (ff802-cc-auto status) and handles
 # each connection at most once. Only the two USB IDs of the Fireface 802
-# match: 2a39:3fcd (proprietary mode) and 0424:3fdd (class-compliant mode).
-# No access rights are changed.
+# match. No access rights are changed.
+#
+#   2a39:3fcd (proprietary mode)      ff802-cc-auto-enable@<kernel name>
+#     enable command, then the port reset of exactly this hub port (the
+#     unit may write only <device>/port/disable, named by the kernel name)
+#   0424:3fdd (class-compliant mode)  ff802-cc-auto@<kernel name>:<busnum>:<devnum>
+#     confirmation and the optional mixer initialisation; a new devnum
+#     after the port reset is a new instance, so it is never merged with
+#     the running enable unit
 
 SUBSYSTEM!="usb", GOTO="ff802_cc_auto_end"
 ENV{DEVTYPE}!="usb_device", GOTO="ff802_cc_auto_end"
-ATTR{idVendor}=="2a39", ATTR{idProduct}=="3fcd", GOTO="ff802_cc_auto_match"
-ATTR{idVendor}=="0424", ATTR{idProduct}=="3fdd", GOTO="ff802_cc_auto_match"
+ATTR{idVendor}=="2a39", ATTR{idProduct}=="3fcd", GOTO="ff802_cc_auto_prop"
+ATTR{idVendor}=="0424", ATTR{idProduct}=="3fdd", GOTO="ff802_cc_auto_cc"
 GOTO="ff802_cc_auto_end"
 
-LABEL="ff802_cc_auto_match"
+LABEL="ff802_cc_auto_prop"
+TAG+="systemd"
+ACTION=="add", ENV{SYSTEMD_WANTS}+="ff802-cc-auto-enable@%k.service"
+GOTO="ff802_cc_auto_end"
+
+LABEL="ff802_cc_auto_cc"
 TAG+="systemd"
 ACTION=="add", ENV{SYSTEMD_WANTS}+="ff802-cc-auto@%k:$env{BUSNUM}:$env{DEVNUM}.service"
 

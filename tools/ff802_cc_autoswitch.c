@@ -1,8 +1,10 @@
 /*
  * ff802-cc-autoswitch: non-interactive CC enable for ONE USB connection,
- * started only by ff802-cc-auto@.service (T4).
+ * started only by ff802-cc-auto@.service or ff802-cc-auto-enable@.service
+ * (T4).
  *
  *   ff802-cc-autoswitch --service <kernel name>:<busnum>:<devnum>
+ *   ff802-cc-autoswitch --service <kernel name>
  *   ff802-cc-autoswitch --status | --mixer-status
  *   ff802-cc-autoswitch --help | --version
  *
@@ -74,27 +76,33 @@ static void usage(FILE *out)
 {
     fprintf(out,
         "Usage: ff802-cc-autoswitch --service <kernel name>:<busnum>:<devnum>\n"
+        "       ff802-cc-autoswitch --service <kernel name>\n"
         "       ff802-cc-autoswitch --status | --mixer-status\n"
         "       ff802-cc-autoswitch --help | --version\n"
         "\n"
         "Internal program of ff802-cc-auto (T4), started by\n"
-        "ff802-cc-auto@.service for one USB connection of an original\n"
-        "RME Fireface 802. Use 'ff802-cc-auto status' instead.\n"
+        "ff802-cc-auto@.service (class-compliant connection) or\n"
+        "ff802-cc-auto-enable@.service (proprietary connection) for one USB\n"
+        "connection of an original RME Fireface 802. Use 'ff802-cc-auto\n"
+        "status' instead.\n"
         "\n"
         "  --service       handle one connection: if the automation is on and\n"
         "                  the device is a Fireface 802 in proprietary mode,\n"
-        "                  send the class-compliant enable command once; in\n"
-        "                  class-compliant mode, initialise the mixer if\n"
+        "                  send the class-compliant enable command once, then\n"
+        "                  reset its USB hub port (as ff802-cc enable) and\n"
+        "                  check that it comes back in class-compliant mode;\n"
+        "                  in class-compliant mode, initialise the mixer if\n"
         "                  'ff802-cc-auto mixer-init on'. Only when started by\n"
         "                  systemd as root.\n"
         "  --status        read-only report (sysfs, state); no USB access.\n"
         "  --mixer-status  read-only report of the mixer initialisation.\n"
         "\n"
-        "Exit status (--service): 0 off/handled/CC mode/sent/mixer done,\n"
-        "2 usage or not started by systemd, 3 nothing sent (refused or failed\n"
-        "before the write; also a mixer initialisation that sent nothing),\n"
-        "4 write failed (device state unknown; also a mixer initialisation\n"
-        "that stopped while sending).\n");
+        "Exit status (--service): 0 off/handled/CC mode/sent/switched/mixer\n"
+        "done, 2 usage or not started by systemd, 3 nothing sent (refused or\n"
+        "failed before the write; also a mixer initialisation that sent\n"
+        "nothing), 4 write failed (device state unknown; also a mixer\n"
+        "initialisation that stopped while sending), 5 sent, but the port\n"
+        "reset did not end in class-compliant mode.\n");
 }
 
 static int get_paths(ff802_auto_paths *p)
@@ -196,7 +204,8 @@ static int run_status(const ff802_auto_paths *p)
                    mode != FF802_AUTO_MODE_ON ? "off, nothing will be sent" :
                    handled_before(p, &d) ? "this connection was handled already "
                                            "(reconnect for a new attempt)" :
-                   "would send the CC enable command on the next connection event");
+                   "would send the CC enable command and reset the USB port on the "
+                   "next connection event");
         else if (id == FF802_ID_CLASS_COMPLIANT)
             printf("  automation: nothing to do (class-compliant mode)\n"
                    "  mixer init: %s\n",
@@ -210,7 +219,9 @@ static int run_status(const ff802_auto_paths *p)
     closedir(dh);
     if (found == 0)
         printf("device: no Fireface 802 connected (2a39:3fcd or 0424:3fdd)\n");
-    print_file(p->run_dir, "pending", "pending switch (reconnect needed)");
+    print_file(p->run_dir, "pending", "pending switch (not yet seen in class-compliant mode)");
+    print_file(p->run_dir, "reset-blocked", "automatic port reset blocked until reboot or "
+               "ff802-cc-auto on");
     print_file(p->run_dir, "last-result", "last result");
     print_file(p->run_dir, "event", "last notification event");
     printf("mixer init: %s (%s/mixer-init)\n",
@@ -287,10 +298,13 @@ int main(int argc, char **argv)
 #endif
 
     ff802_auto_event ev;
-    if (ff802_auto_parse_instance(argv[2], &ev) != 0) {
+    /* ff802-cc-auto@<k>:<bus>:<devnum> or ff802-cc-auto-enable@<k> */
+    int parsed = strchr(argv[2], ':') != NULL ? ff802_auto_parse_instance(argv[2], &ev)
+                                              : ff802_auto_parse_port_instance(argv[2], &ev);
+    if (parsed != 0) {
         fprintf(stderr, "ff802-cc-autoswitch: invalid connection '%s' "
-                        "(expected <kernel name>:<busnum>:<devnum>); nothing done.\n",
-                argv[2]);
+                        "(expected <kernel name>:<busnum>:<devnum> or <kernel name>); "
+                        "nothing done.\n", argv[2]);
         return FF802_AUTO_EXIT_USAGE;
     }
     if (get_paths(&paths) != 0)
@@ -304,6 +318,8 @@ int main(int argc, char **argv)
     sim_midi_setup(&paths, &midi, &mopt);
     fac.midi = &midi;
     fac.mixer_opt = &mopt;
+    ff802_port_ops pops;
+    fac.port_ops = sim_port_setup(&paths, ev.kernel_name, &pops);
 #elif FF802_HAVE_MIXER_SEQ
     ff802_midi_factory midi = ff802_midi_seq_factory();
     fac.midi = &midi;

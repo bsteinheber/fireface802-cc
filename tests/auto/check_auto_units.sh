@@ -43,39 +43,69 @@ ok "udev rule changes no access rights (no MODE, OWNER, GROUP, uaccess)" \
 ok "udev rule matches exactly the two Fireface 802 USB IDs" \
     '[ "$(printf "%s\n" "$rules" | grep -o "ATTR{idVendor}==\"[0-9a-f]*\", ATTR{idProduct}==\"[0-9a-f]*\"" | tr "\n" ";")" = \
        "ATTR{idVendor}==\"2a39\", ATTR{idProduct}==\"3fcd\";ATTR{idVendor}==\"0424\", ATTR{idProduct}==\"3fdd\";" ]'
-ok "udev rule wants the unit only on add, per connection (kernel name, busnum, devnum)" \
-    '[ "$(printf "%s\n" "$rules" | grep -c SYSTEMD_WANTS)" = 1 ] &&
-     printf "%s\n" "$rules" | grep -qx "ACTION==\"add\", ENV{SYSTEMD_WANTS}+=\"ff802-cc-auto@%k:\$env{BUSNUM}:\$env{DEVNUM}.service\""'
+ok "udev rule: proprietary mode wants the enable unit per port, only on add" \
+    '[ "$(printf "%s\n" "$rules" | grep -c SYSTEMD_WANTS)" = 2 ] &&
+     [ "$(printf "%s\n" "$rules" | sed -n "/^LABEL=\"ff802_cc_auto_prop\"$/,/^LABEL=/p" | grep SYSTEMD_WANTS)" = "ACTION==\"add\", ENV{SYSTEMD_WANTS}+=\"ff802-cc-auto-enable@%k.service\"" ] &&
+     printf "%s\n" "$rules" | grep -qx "ATTR{idVendor}==\"2a39\", ATTR{idProduct}==\"3fcd\", GOTO=\"ff802_cc_auto_prop\""'
+ok "udev rule: class-compliant mode wants ff802-cc-auto@ per connection (kernel name, busnum, devnum)" \
+    '[ "$(printf "%s\n" "$rules" | sed -n "/^LABEL=\"ff802_cc_auto_cc\"$/,/^LABEL=/p" | grep SYSTEMD_WANTS)" = "ACTION==\"add\", ENV{SYSTEMD_WANTS}+=\"ff802-cc-auto@%k:\$env{BUSNUM}:\$env{DEVNUM}.service\"" ] &&
+     printf "%s\n" "$rules" | grep -qx "ATTR{idVendor}==\"0424\", ATTR{idProduct}==\"3fdd\", GOTO=\"ff802_cc_auto_cc\""'
 ok "udev rule only applies to USB devices (not interfaces)" \
     'printf "%s\n" "$rules" | head -n 2 | tr "\n" ";" | grep -qx "SUBSYSTEM!=\"usb\", GOTO=\"ff802_cc_auto_end\";ENV{DEVTYPE}!=\"usb_device\", GOTO=\"ff802_cc_auto_end\";"'
 
-# --- system service -----------------------------------------------------------
+# --- system services ----------------------------------------------------------
+ESVC=$P/ff802-cc-auto-enable@.service
 key() { grep -E "^$1=" "$SVC" | sed "s/^$1=//"; }
-ok "service: oneshot, one ExecStart with the instance, no other Exec*, no Restart" \
-    '[ "$(key Type)" = oneshot ] &&
-     [ "$(key ExecStart)" = "/usr/libexec/ff802-cc/ff802-cc-autoswitch --service %i" ] &&
-     [ "$(grep -cE "^Exec" "$SVC")" = 1 ] && ! grep -qE "^Restart" "$SVC"'
-ok "service: no capabilities, no new privileges, only usb_device and ALSA nodes, no network" \
-    '[ "$(key CapabilityBoundingSet)" = "" ] && grep -qx "CapabilityBoundingSet=" "$SVC" &&
-     [ "$(key NoNewPrivileges)" = yes ] && [ "$(key DevicePolicy)" = closed ] &&
-     [ "$(key DeviceAllow | tr "\n" ";")" = "char-usb_device rw;char-alsa rw;" ] && [ "$(key PrivateNetwork)" = yes ] &&
-     [ "$(key ProtectSystem)" = strict ] && [ "$(key ProtectHome)" = yes ]'
-ok "service: bounded run time, runtime directory /run/ff802-cc-auto kept across instances" \
-    '[ "$(key TimeoutStartSec)" = 30 ] && [ "$(key RuntimeDirectory)" = ff802-cc-auto ] &&
-     [ "$(key RuntimeDirectoryPreserve)" = yes ]'
+ekey() { grep -E "^$1=" "$ESVC" | sed "s/^$1=//"; }
+# the hardening lines both units must share, unchanged
+HARDEN="CapabilityBoundingSet AmbientCapabilities NoNewPrivileges DevicePolicy
+ProtectSystem ProtectHome PrivateTmp PrivateNetwork IPAddressDeny RestrictAddressFamilies
+ProtectKernelTunables ProtectKernelModules ProtectKernelLogs ProtectControlGroups
+ProtectClock ProtectHostname RestrictNamespaces RestrictRealtime RestrictSUIDSGID
+LockPersonality MemoryDenyWriteExecute SystemCallArchitectures SystemCallFilter"
+hard() { for k in $HARDEN; do grep -E "^$k=" "$1"; done; }
+for u in "$SVC" "$ESVC"; do
+    n=${u##*/}
+    ok "$n: oneshot, one ExecStart with the instance, no other Exec*, no Restart" \
+        '[ "$(grep -E "^Type=" "$u")" = Type=oneshot ] &&
+         [ "$(grep -E "^ExecStart=" "$u")" = "ExecStart=/usr/libexec/ff802-cc/ff802-cc-autoswitch --service %i" ] &&
+         [ "$(grep -cE "^Exec" "$u")" = 1 ] && ! grep -qE "^Restart" "$u"'
+    ok "$n: no capabilities, no new privileges, no network, kernel tunables read-only" \
+        'grep -qx "CapabilityBoundingSet=" "$u" && grep -qx "AmbientCapabilities=" "$u" &&
+         grep -qx "NoNewPrivileges=yes" "$u" && grep -qx "DevicePolicy=closed" "$u" &&
+         grep -qx "PrivateNetwork=yes" "$u" && grep -qx "IPAddressDeny=any" "$u" &&
+         grep -qx "ProtectSystem=strict" "$u" && grep -qx "ProtectHome=yes" "$u" &&
+         grep -qx "ProtectKernelTunables=yes" "$u" && grep -qx "ProtectKernelModules=yes" "$u" &&
+         grep -qx "SystemCallFilter=~@privileged" "$u" &&
+         ! grep -qE "^(User|Group|DynamicUser|PermissionsStartOnly|ExecStartPre|ExecStartPost|BindPaths|BindReadOnlyPaths|InaccessiblePaths|PrivateDevices|ReadOnlyPaths)=" "$u"'
+    ok "$n: bounded run time (60 s), runtime directory /run/ff802-cc-auto kept across instances" \
+        'grep -qx "TimeoutStartSec=60" "$u" && grep -qx "RuntimeDirectory=ff802-cc-auto" "$u" &&
+         grep -qx "RuntimeDirectoryPreserve=yes" "$u"'
+done
+ok "both services share exactly the same hardening settings" \
+    '[ "$(hard "$SVC")" = "$(hard "$ESVC")" ]'
+ok "ff802-cc-auto@: only ALSA device nodes, no USB device nodes, no writable paths" \
+    '[ "$(key DeviceAllow | tr "\n" ";")" = "char-alsa rw;" ] && ! grep -qE "^ReadWritePaths=" "$SVC"'
+ok "ff802-cc-auto-enable@: only USB device nodes, no ALSA" \
+    '[ "$(ekey DeviceAllow | tr "\n" ";")" = "char-usb_device rw;" ]'
+ok "ff802-cc-auto-enable@: writable is exactly the port disable attribute of the instance's device" \
+    '[ "$(ekey ReadWritePaths | tr "\n" ";")" = "-/sys/bus/usb/devices/%i/port/disable;" ]'
 
-# systemd-analyze on a copy whose ExecStart exists in the container
-inst="ff802-cc-auto@3-2.4.1.1.3:3:19.service"
+# systemd-analyze on copies whose ExecStart exists in the container
 sed 's|/usr/libexec/ff802-cc/ff802-cc-autoswitch|/bin/true|' "$SVC" > "$T/ff802-cc-auto@.service"
-(cd "$T" && systemd-analyze verify --man=no "$T/$inst") > "$T/verify.txt" 2>&1
-ok "systemd-analyze verify: no warning for the service" \
-    '! grep -q "ff802-cc-auto@" "$T/verify.txt"'
-[ -s "$T/verify.txt" ] && sed 's/^/    /' "$T/verify.txt"
-(cd "$T" && systemd-analyze security --offline=yes --no-pager "$T/$inst") > "$T/security.txt" 2>&1
-exposure=$(sed -n 's/.*Overall exposure level for .*: \([0-9.]*\) .*/\1/p' "$T/security.txt")
-echo "info systemd-analyze security: exposure $exposure"
-ok "systemd-analyze security: exposure <= 2.0" \
-    '[ -n "$exposure" ] && awk -v e="$exposure" "BEGIN { exit !(e <= 2.0) }"'
+sed 's|/usr/libexec/ff802-cc/ff802-cc-autoswitch|/bin/true|' "$ESVC" > "$T/ff802-cc-auto-enable@.service"
+for inst in "ff802-cc-auto@3-2.4.1.1.3:3:19.service" "ff802-cc-auto-enable@3-2.4.1.1.3.service"; do
+    base=${inst%%@*}
+    (cd "$T" && systemd-analyze verify --man=no "$T/$inst") > "$T/verify-$base.txt" 2>&1
+    ok "systemd-analyze verify: no warning for $inst" \
+        '! grep -q "$base@" "$T/verify-$base.txt"'
+    [ -s "$T/verify-$base.txt" ] && sed 's/^/    /' "$T/verify-$base.txt"
+    (cd "$T" && systemd-analyze security --offline=yes --no-pager "$T/$inst") > "$T/security-$base.txt" 2>&1
+    exposure=$(sed -n 's/.*Overall exposure level for .*: \([0-9.]*\) .*/\1/p' "$T/security-$base.txt")
+    echo "info systemd-analyze security $inst: exposure $exposure"
+    ok "systemd-analyze security $inst: exposure <= 2.0" \
+        '[ -n "$exposure" ] && awk -v e="$exposure" "BEGIN { exit !(e <= 2.0) }"'
+done
 
 # --- user units of the notification --------------------------------------------
 UPATH=$P/ff802-cc-notify.path

@@ -7,6 +7,7 @@
 
 #include "ff802/cc_mode.h"
 #include "ff802/mixer_init.h"
+#include "ff802/usb_port.h"
 
 static void logf_(FILE *log, const char *fmt, ...)
 {
@@ -25,6 +26,16 @@ static void set_detail(ff802_auto_result *res, const char *fmt, ...)
     va_list ap;
     va_start(ap, fmt);
     vsnprintf(res->detail, sizeof res->detail, fmt, ap);
+    va_end(ap);
+}
+
+/* Like snprintf, truncating silently (one-line messages). */
+__attribute__((format(printf, 3, 4)))
+static void fmt_to(char *dst, size_t size, const char *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(dst, size, fmt, ap);
     va_end(ap);
 }
 
@@ -78,6 +89,19 @@ int ff802_auto_parse_instance(const char *s, ff802_auto_event *ev)
     return 0;
 }
 
+int ff802_auto_parse_port_instance(const char *s, ff802_auto_event *ev)
+{
+    if (s == NULL || ev == NULL)
+        return -1;
+    memset(ev, 0, sizeof *ev);
+    size_t n = strlen(s);
+    if (n == 0 || n >= sizeof ev->kernel_name || strchr(s, ':') != NULL ||
+        strchr(s, '-') == NULL)
+        return -1;
+    memcpy(ev->kernel_name, s, n + 1u);
+    return ff802_sysfs_valid_name(ev->kernel_name) ? 0 : -1;
+}
+
 const char *ff802_auto_outcome_str(ff802_auto_outcome o)
 {
     switch (o) {
@@ -88,6 +112,10 @@ const char *ff802_auto_outcome_str(ff802_auto_outcome o)
     case FF802_AUTO_NOT_SENT:        return "not-sent";
     case FF802_AUTO_WRITE_FAILED:    return "write-failed";
     case FF802_AUTO_REFUSED:         return "refused";
+    case FF802_AUTO_SWITCHED:        return "switched";
+    case FF802_AUTO_RESET_FAILED:    return "reset-failed";
+    case FF802_AUTO_NOT_REENUMERATED: return "not-reenumerated";
+    case FF802_AUTO_REENUMERATED_NOT_CC: return "reenumerated-not-cc";
     case FF802_AUTO_ERROR:           break;
     }
     return "error";
@@ -100,7 +128,12 @@ int ff802_auto_exit_code(ff802_auto_outcome o)
     case FF802_AUTO_ALREADY_HANDLED:
     case FF802_AUTO_CC_ACTIVE:
     case FF802_AUTO_SENT:
+    case FF802_AUTO_SWITCHED:
         return FF802_AUTO_EXIT_OK;
+    case FF802_AUTO_RESET_FAILED:
+    case FF802_AUTO_NOT_REENUMERATED:
+    case FF802_AUTO_REENUMERATED_NOT_CC:
+        return FF802_AUTO_EXIT_UNCONFIRMED;
     case FF802_AUTO_WRITE_FAILED:
         return FF802_AUTO_EXIT_WRITE_FAILED;
     case FF802_AUTO_NOT_SENT:
@@ -228,6 +261,127 @@ static void mixer_init(const ff802_auto_paths *p, const ff802_sysfs_dev *d,
     }
 }
 
+/*
+ * Before the write: can the hub port of this connection be reset after
+ * it? Only the checks of ff802-cc enable (port resolved, its "device"
+ * link is this device, "disable" writable), plus the per-boot block after
+ * a failed automatic reset. If not, the command is still sent and the
+ * user reconnects the cable, as without the reset. Fills res->reset.port.
+ */
+static int plan_reset(const ff802_auto_paths *p, const ff802_sysfs_dev *d,
+                      ff802_auto_result *res, char *why, size_t size)
+{
+    if (ff802_auto_reset_blocked(p)) {
+        fmt_to(why, size, "an automatic port reset failed earlier on this boot "
+               "(reset-blocked)");
+        return 0;
+    }
+    ff802_port_status ps = ff802_port_resolve(p->sysfs_root, d->kernel_name,
+                                              &res->reset.port);
+    if (ps != FF802_PORT_OK) {
+        fmt_to(why, size, "%s", ff802_port_status_str(ps));
+        return 0;
+    }
+    if (!ff802_port_writable(&res->reset.port)) {
+        fmt_to(why, size, "hub port %s-port%u not writable for this service",
+               res->reset.port.hub, res->reset.port.number);
+        return 0;
+    }
+    return 1;
+}
+
+/*
+ * After a successful enable transfer: the port reset of ff802-cc enable
+ * (ff802_port_switch, same timing), then the result. A successful reset
+ * request alone is not reported as success: only the device back at the
+ * same port with the class-compliant USB ID is. The new connection has
+ * its own udev event (ff802-cc-auto@<k>:<bus>:<new devnum>), which waits
+ * for the lock held here and then confirms the identity and runs the
+ * mixer initialisation; nothing here waits for that run. Anything but
+ * success blocks further automatic resets on this boot.
+ */
+static ff802_auto_outcome port_reset(const ff802_auto_paths *p,
+                                     const ff802_sysfs_dev *d,
+                                     const ff802_auto_backend_factory *f,
+                                     FILE *log, ff802_auto_result *res)
+{
+    ff802_psw_result *r = &res->reset;
+    char dir[FF802_PORT_PATH_MAX];
+    memcpy(dir, r->port.dir, sizeof dir);
+
+    logf_(log, "Port reset triggered: %s/disable = 1, %u ms, = 0; waiting up to %u ms "
+               "for 0424:3fdd at %s.", dir, FF802_PORT_OFF_MS, FF802_PORT_WAIT_MS,
+          d->kernel_name);
+    ff802_psw_status st = ff802_port_switch(p->sysfs_root, d, FF802_PORT_OFF_MS,
+                                            FF802_PORT_WAIT_MS, FF802_MODE_CLASS_COMPLIANT,
+                                            f->port_ops, r);
+    res->reset_ran = 1;
+
+    ff802_auto_outcome o;
+    ff802_auto_event_kind ev = FF802_EVENT_RESET_FAILED;
+    switch (st) {
+    case FF802_PSW_OK:
+        logf_(log, "Re-enumerated in class-compliant mode: %s %04x:%04x bus %u devnum %u "
+                   "(was devnum %u). Its own connection event confirms it and runs the "
+                   "mixer initialisation if that is on.", r->found.kernel_name,
+              (unsigned)r->found.vid, (unsigned)r->found.pid, (unsigned)r->found.bus,
+              (unsigned)r->found.devnum, (unsigned)d->devnum);
+        set_detail(res, "switched %s: command sent, port reset, back as %04x:%04x "
+                   "devnum %u", d->kernel_name, (unsigned)r->found.vid,
+                   (unsigned)r->found.pid, (unsigned)r->found.devnum);
+        return FF802_AUTO_SWITCHED;
+    case FF802_PSW_NOT_REENABLED:
+        logf_(log, "Port reset failed: writing 0 to %s/disable failed (%s); the port may "
+                   "stay disabled. Re-enable it: echo 0 | sudo tee %s/disable >/dev/null",
+              dir, strerror(r->cycle.err_enable), dir);
+        set_detail(res, "port reset failed: %s/disable not set back to 0 (%s), port may stay "
+                   "disabled; see journalctl -t ff802-cc-auto", dir,
+                   strerror(r->cycle.err_enable));
+        o = FF802_AUTO_RESET_FAILED;
+        break;
+    case FF802_PSW_NOT_RESET:
+        logf_(log, "Port reset failed: writing 1 to %s/disable failed (%s); port not "
+                   "reset.", dir, strerror(r->cycle.err_disable));
+        set_detail(res, "command sent, port reset failed (%s); reconnect the USB cable",
+                   strerror(r->cycle.err_disable));
+        o = FF802_AUTO_RESET_FAILED;
+        break;
+    case FF802_PSW_CHANGED:
+    case FF802_PSW_PORT:
+        logf_(log, "Port reset failed: %s%s%s.", ff802_psw_status_str(st),
+              st == FF802_PSW_PORT ? ": " : "",
+              st == FF802_PSW_PORT ? ff802_port_status_str(r->port_status) : "");
+        set_detail(res, "command sent, port reset failed (%s); reconnect the USB cable",
+                   ff802_psw_status_str(st));
+        o = FF802_AUTO_RESET_FAILED;
+        break;
+    case FF802_PSW_NOT_BACK:
+        logf_(log, "Port reset done, device not re-enumerated at %s within %u ms.",
+              d->kernel_name, FF802_PORT_WAIT_MS);
+        set_detail(res, "command sent, port reset, device not back within %u s; "
+                   "reconnect the USB cable", FF802_PORT_WAIT_MS / 1000u);
+        o = FF802_AUTO_NOT_REENUMERATED;
+        break;
+    case FF802_PSW_OTHER_MODE:
+    default:
+        logf_(log, "Port reset done, re-enumerated at %s as %04x:%04x devnum %u: not "
+                   "class-compliant mode.", d->kernel_name, (unsigned)r->found.vid,
+              (unsigned)r->found.pid, (unsigned)r->found.devnum);
+        set_detail(res, "command sent, port reset, device back as %04x:%04x, not in "
+                   "class-compliant mode; reconnect the USB cable",
+                   (unsigned)r->found.vid, (unsigned)r->found.pid);
+        o = FF802_AUTO_REENUMERATED_NOT_CC;
+        break;
+    }
+    if (ff802_auto_set_reset_blocked(p, d, res->detail) != 0)
+        logf_(log, "Warning: could not write %s/reset-blocked.", p->run_dir);
+    else
+        logf_(log, "No further automatic port reset on this boot (%s/reset-blocked).",
+              p->run_dir);
+    write_event(p, res, ev, d, log);
+    return o;
+}
+
 /* Everything below the lock. */
 static ff802_auto_outcome handle_locked(const ff802_auto_paths *p,
                                         const ff802_auto_event *ev,
@@ -246,7 +400,9 @@ static ff802_auto_outcome handle_locked(const ff802_auto_paths *p,
                    ev->kernel_name);
         return FF802_AUTO_REFUSED;
     }
-    if (d.bus != ev->bus || d.devnum != ev->devnum) {
+    /* ff802-cc-auto-enable@<kernel name>: the connection at that port now */
+    const int port_run = ev->bus == 0;
+    if (!port_run && (d.bus != ev->bus || d.devnum != ev->devnum)) {
         set_detail(res, "%s was reconnected since the event (devnum %u, now %u); "
                    "nothing sent", ev->kernel_name, (unsigned)ev->devnum,
                    (unsigned)d.devnum);
@@ -260,6 +416,12 @@ static ff802_auto_outcome handle_locked(const ff802_auto_paths *p,
           (unsigned)d.devnum, (unsigned)d.vid, (unsigned)d.pid,
           d.manufacturer, d.product, d.speed, ff802_identity_str(res->identity));
 
+    if (port_run && res->identity == FF802_ID_CLASS_COMPLIANT) {
+        /* ff802-cc-auto@<k>:<bus>:<devnum> handles this connection */
+        set_detail(res, "Fireface 802 already in class-compliant mode at %s; "
+                   "nothing sent", d.kernel_name);
+        return FF802_AUTO_CC_ACTIVE;
+    }
     if (res->identity == FF802_ID_CLASS_COMPLIANT) {
         set_detail(res, "Fireface 802 in class-compliant mode at %s; nothing sent",
                    d.kernel_name);
@@ -306,6 +468,14 @@ static ff802_auto_outcome handle_locked(const ff802_auto_paths *p,
         return FF802_AUTO_REFUSED;
     }
 
+    char no_reset[160];
+    res->reset_planned = plan_reset(p, &d, res, no_reset, sizeof no_reset);
+    if (res->reset_planned)
+        logf_(log, "Port reset planned after the command: %s/disable.", res->reset.port.dir);
+    else
+        logf_(log, "No automatic port reset: %s. The command is sent anyway; the "
+                   "USB cable must then be reconnected by hand.", no_reset);
+
     ff802_usb_backend be;
     memset(&be, 0, sizeof be);
     ff802_usb_err e = f->open(f->ctx, &be);
@@ -333,13 +503,18 @@ static ff802_auto_outcome handle_locked(const ff802_auto_paths *p,
 
     const char *st = ff802_sw_status_str(res->sw.status);
     if (res->sw.status == FF802_SW_OK) {
-        set_detail(res, "enable command transferred to %s (%zu bytes); "
-                   "disconnect and reconnect the USB cable", d.kernel_name,
-                   res->sw.transferred);
+        logf_(log, "CC command sent: 01 00 44 BD to %s (bus %u, devnum %u), %zu bytes.",
+              d.kernel_name, (unsigned)d.bus, (unsigned)d.devnum, res->sw.transferred);
         if (ff802_auto_set_pending(p, &d) != 0)
             logf_(log, "Warning: could not write the pending marker.");
-        write_event(p, res, FF802_EVENT_PREPARED, &d, log);
-        return FF802_AUTO_SENT;
+        if (!res->reset_planned) {
+            set_detail(res, "enable command transferred to %s (%zu bytes); no automatic "
+                       "port reset (%s): reconnect the USB cable", d.kernel_name,
+                       res->sw.transferred, no_reset);
+            write_event(p, res, FF802_EVENT_PREPARED, &d, log);
+            return FF802_AUTO_SENT;
+        }
+        return port_reset(p, &d, f, log, res);
     }
     if (res->sw.write_attempted) {
         set_detail(res, "transfer failed (%s, %zu of 4 bytes); device state "

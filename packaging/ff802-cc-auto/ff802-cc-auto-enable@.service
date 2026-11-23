@@ -1,0 +1,67 @@
+# ff802-cc-auto (T4): switch one Fireface 802 connection in proprietary
+# mode (2a39:3fcd) to class-compliant mode.
+# Instance: <kernel name> (e.g. 3-2.4.1.1.3), wanted by
+# 70-ff802-cc-auto.rules.
+#
+# Does nothing while the automation is off. Otherwise: validates the
+# identity, records the connection (at most one attempt per connection),
+# re-validates right before the write and sends the CC enable command
+# 01 00 44 BD once. Then the port reset of "ff802-cc enable" (same code,
+# same timing): disable=1 on the hub port of this device, 2 s, disable=0,
+# and up to 15 s waiting for 0424:3fdd at the same port. The new
+# connection has its own udev event and instance of ff802-cc-auto@.service
+# (new devnum), which confirms the mode and runs the optional mixer
+# initialisation. Never retries; after a reset that did not end in CC
+# mode, no further automatic reset until reboot or "ff802-cc-auto on".
+# Log: journalctl -t ff802-cc-auto
+#
+# Differences to ff802-cc-auto@.service: write access to exactly one sysfs
+# file, <hub>-port<N>/disable of this device (found through the "port"
+# link of /sys/bus/usb/devices/<kernel name>; "-": no error if it does not
+# exist, the reset is then skipped); no ALSA devices.
+
+[Unit]
+Description=Fireface 802: class-compliant mode and port reset for USB device %i
+Documentation=file:/usr/share/doc/ff802-cc-auto/README.Debian
+StartLimitIntervalSec=0
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/ff802-cc/ff802-cc-autoswitch --service %i
+# command (< 2 s) + port off 2 s + up to 15 s for the re-enumeration
+TimeoutStartSec=60
+SyslogIdentifier=ff802-cc-auto
+RuntimeDirectory=ff802-cc-auto
+RuntimeDirectoryMode=0755
+RuntimeDirectoryPreserve=yes
+UMask=0022
+
+# Root without any capability: enough to open the root-owned usbfs node
+# of this device and to write the root-owned "disable" attribute of its
+# hub port; nothing else is writable.
+CapabilityBoundingSet=
+AmbientCapabilities=
+NoNewPrivileges=yes
+DevicePolicy=closed
+DeviceAllow=char-usb_device rw
+ProtectSystem=strict
+ReadWritePaths=-/sys/bus/usb/devices/%i/port/disable
+ProtectHome=yes
+PrivateTmp=yes
+PrivateNetwork=yes
+IPAddressDeny=any
+RestrictAddressFamilies=AF_UNIX AF_NETLINK
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged

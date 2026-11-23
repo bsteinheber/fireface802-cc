@@ -9,6 +9,8 @@
  *                           (<kernel name>_<bus>_<devnum>); /run is empty
  *                           after a reboot, devnum changes on reconnect
  *   <run_dir>/pending       a CC switch was prepared on this connection
+ *   <run_dir>/reset-blocked an automatic port reset failed on this boot:
+ *                           no further automatic reset (see below)
  *   <run_dir>/event         last event for the desktop notification
  *                           (seq, kind, time, port, busnum, devnum, detail)
  *   <run_dir>/seq           sequence number of the last event
@@ -97,10 +99,12 @@ int ff802_auto_claim_connection(const ff802_auto_paths *p,
                                 const ff802_sysfs_dev *d);
 
 typedef enum ff802_auto_event_kind {
-    FF802_EVENT_PREPARED = 0,   /* enable sent: reconnect needed */
+    FF802_EVENT_PREPARED = 0,   /* enable sent, no automatic reset: reconnect */
     FF802_EVENT_CC_ACTIVE,      /* device came back in CC mode */
     FF802_EVENT_FAILED,         /* switch not possible / state unknown */
-    FF802_EVENT_MIXER_FAILED    /* CC mode, mixer initialisation failed */
+    FF802_EVENT_MIXER_FAILED,   /* CC mode, mixer initialisation failed */
+    FF802_EVENT_RESET_FAILED    /* enable sent, automatic port reset did not
+                                   end in CC mode: reconnect by hand */
 } ff802_auto_event_kind;
 
 const char *ff802_auto_event_kind_str(ff802_auto_event_kind k);
@@ -142,6 +146,21 @@ int ff802_auto_set_pending(const ff802_auto_paths *p, const ff802_sysfs_dev *d);
 int ff802_auto_pending_for(const ff802_auto_paths *p, const char *kernel_name);
 
 int ff802_auto_clear_pending(const ff802_auto_paths *p);
+
+/*
+ * <run_dir>/reset-blocked: an automatic port reset on this boot did not
+ * end with the device in class-compliant mode (reset failed, device not
+ * re-enumerated, or back with another USB ID). While it exists, no
+ * further automatic port reset is made (the enable command is still sent
+ * once per connection, and the user is asked to reconnect the cable), so
+ * a failing reset can never repeat itself. Removed by a reboot (/run) or
+ * by "ff802-cc-auto on".
+ */
+int ff802_auto_set_reset_blocked(const ff802_auto_paths *p,
+                                 const ff802_sysfs_dev *d, const char *why);
+
+/* 1 if <run_dir>/reset-blocked exists. */
+int ff802_auto_reset_blocked(const ff802_auto_paths *p);
 
 /* <run_dir>/last-result: "outcome=<word>\nport=...\ndetail=...\n" */
 int ff802_auto_write_result(const ff802_auto_paths *p, const char *outcome,

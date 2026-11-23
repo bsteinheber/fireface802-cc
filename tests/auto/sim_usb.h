@@ -23,8 +23,24 @@
 
 #include "ff802/auto_state.h"
 #include "ff802/usb_backend.h"
+#include "ff802/usb_port.h"
 
 ff802_usb_err sim_usb_open(const ff802_auto_paths *p, ff802_usb_backend *be);
 void sim_usb_close(ff802_usb_backend *be);
+
+/*
+ * Port reset hook (ff802_port_ops) for ff802_port_switch: no real sleep.
+ * The first sleep is the "off" time: the device directory of kernel_name
+ * disappears ("port off <ms> disable=<v>" in usb.log, v read through the
+ * port found at setup). Then, by
+ *   FF802_SIM_REENUM=cc|prop|none   (unset: none)
+ *   FF802_SIM_REENUM_AFTER=<polls>  (default 3)
+ * it comes back after that many 100 ms polls with devnum + 1, as
+ * 0424:3fdd (cc) or unchanged 2a39:3fcd (prop), or not at all.
+ *   FF802_SIM_PORT_STUCK=1          "disable" becomes unwritable during the
+ *                                   off time (the "0" write fails)
+ */
+const ff802_port_ops *sim_port_setup(const ff802_auto_paths *p, const char *kernel_name,
+                                     ff802_port_ops *ops);
 
 #endif /* FF802_SIM_USB_H */

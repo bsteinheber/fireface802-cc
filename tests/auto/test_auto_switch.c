@@ -103,6 +103,35 @@ static void test_parse_instance(void)
     CHECK(ff802_auto_parse_instance(NULL, &ev) != 0);
 }
 
+
+static void test_parse_port_instance(void)
+{
+    ff802_auto_event ev;
+    CHECK(ff802_auto_parse_port_instance("3-2.4.1.1.3", &ev) == 0);
+    CHECK(strcmp(ev.kernel_name, "3-2.4.1.1.3") == 0 && ev.bus == 0 && ev.devnum == 0);
+    CHECK(ff802_auto_parse_port_instance("3-10", &ev) == 0);
+    CHECK(ff802_auto_parse_port_instance("3-2:003:019", &ev) != 0);
+    CHECK(ff802_auto_parse_port_instance("usb3", &ev) != 0);
+    CHECK(ff802_auto_parse_port_instance("3-2/../x", &ev) != 0);
+    CHECK(ff802_auto_parse_port_instance("3-2.4:1.0", &ev) != 0);
+    CHECK(ff802_auto_parse_port_instance("", &ev) != 0);
+    CHECK(ff802_auto_parse_port_instance(NULL, &ev) != 0);
+}
+
+static void test_reset_outcomes(void)
+{
+    CHECK(strcmp(ff802_auto_outcome_str(FF802_AUTO_SWITCHED), "switched") == 0);
+    CHECK(strcmp(ff802_auto_outcome_str(FF802_AUTO_RESET_FAILED), "reset-failed") == 0);
+    CHECK(strcmp(ff802_auto_outcome_str(FF802_AUTO_NOT_REENUMERATED), "not-reenumerated") == 0);
+    CHECK(strcmp(ff802_auto_outcome_str(FF802_AUTO_REENUMERATED_NOT_CC),
+                 "reenumerated-not-cc") == 0);
+    CHECK(ff802_auto_exit_code(FF802_AUTO_SWITCHED) == 0);
+    CHECK(ff802_auto_exit_code(FF802_AUTO_SENT) == 0);
+    CHECK(ff802_auto_exit_code(FF802_AUTO_RESET_FAILED) == 5);
+    CHECK(ff802_auto_exit_code(FF802_AUTO_NOT_REENUMERATED) == 5);
+    CHECK(ff802_auto_exit_code(FF802_AUTO_REENUMERATED_NOT_CC) == 5);
+    CHECK(strcmp(ff802_auto_event_kind_str(FF802_EVENT_RESET_FAILED), "reset-failed") == 0);
+}
 /* 1: already in CC mode -> nothing, not even the USB backend */
 static void test_cc_mode(void)
 {
@@ -432,6 +461,8 @@ static void test_mixer_in_cc_branch(void)
 int main(void)
 {
     test_parse_instance();
+    test_parse_port_instance();
+    test_reset_outcomes();
     test_cc_mode();
     test_mixer_in_cc_branch();
     test_enable_and_reconnect();

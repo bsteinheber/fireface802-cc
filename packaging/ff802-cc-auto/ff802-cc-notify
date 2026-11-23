@@ -3,8 +3,10 @@
 # Fireface 802 automation. Runs in the user's graphical session (systemd
 # user units ff802-cc-notify.path / .service), never as root.
 #
-# Reads two files written by ff802-cc-auto@.service:
-#   /run/ff802-cc-auto/event        mode switch: prepared, cc-active, failed
+# Reads two files written by ff802-cc-auto@.service and
+# ff802-cc-auto-enable@.service:
+#   /run/ff802-cc-auto/event        mode switch: cc-active, reset-failed,
+#                                   prepared (no automatic reset), failed
 #   /run/ff802-cc-auto/mixer-event  mixer initialisation: mixer-failed
 # and shows each event at most once per session; the last shown sequence
 # number of each file is kept in $XDG_RUNTIME_DIR. The two files are kept
@@ -116,12 +118,22 @@ handle() { # handle <event file> <seen file> <allowed kinds (|-separated)>
 
     case $kind in
         prepared)
+            # enable command sent, automatic port reset not possible
             if ! same_connection 2a39; then
                 log "event $seq (prepared) no longer relevant: device reconnected"
                 return 0
             fi
             summary="$APP – Class-Compliant-Modus vorbereitet"
-            body="Bitte die USB-Verbindung des Fireface kurz trennen und wieder anschließen."
+            body="Der automatische USB-Neustart war nicht möglich. Bitte die USB-Verbindung des Fireface kurz trennen und wieder anschließen. Details: journalctl -t ff802-cc-auto"
+            urgency=2 ;;
+        reset-failed)
+            # enable command sent, port reset did not end in CC mode
+            if [ "$(cat "$DEVS/$port/idVendor" 2>/dev/null)" = 0424 ]; then
+                log "event $seq (reset-failed) no longer relevant: device in class-compliant mode"
+                return 0
+            fi
+            summary="$APP – automatische Umschaltung nicht bestätigt"
+            body="$detail. Bitte die USB-Verbindung des Fireface kurz trennen und wieder anschließen. Details: ff802-cc-auto status, journalctl -t ff802-cc-auto"
             urgency=2 ;;
         failed)
             if ! same_connection 2a39; then
@@ -152,6 +164,6 @@ handle() { # handle <event file> <seen file> <allowed kinds (|-separated)>
     show
 }
 
-handle "$RUNDIR/event" "$XDG_RUNTIME_DIR/ff802-cc-notify.seen" "prepared|cc-active|failed"
+handle "$RUNDIR/event" "$XDG_RUNTIME_DIR/ff802-cc-notify.seen" "prepared|reset-failed|cc-active|failed"
 handle "$RUNDIR/mixer-event" "$XDG_RUNTIME_DIR/ff802-cc-notify.mixer-seen" "mixer-failed"
 exit 0
