@@ -1,6 +1,9 @@
 # Mixer-Initialisierung im Class-Compliant-Modus
 
-> **Stand 2026-11-23, Paket `ff802-cc-auto 0.2.0~dev3` (unveröffentlicht).**
+> **Stand 2026-11-23, Paket `ff802-cc-auto 0.2.0~dev6` (unveröffentlicht),
+> Konfiguration `ff802-mixer-init-v3` (38 Register, Prüfsumme `0xEC858A44`).**
+> Die Vorgängerkonfiguration `ff802-mixer-init-v2` (26 Register,
+> `0xC97A359C`, Paket 0.2.0~dev3/dev4) ist darin unverändert enthalten.
 > Betrifft nur das **ursprüngliche RME Fireface 802** (nicht das 802 FS)
 > im USB-Class-Compliant-Modus (`0424:3fdd`). Nach der Installation ist die
 > automatische Initialisierung **aus**.
@@ -19,14 +22,19 @@ Windows:
   (Hardwaretests D2/D3),
 - Playback 1…12 → Hardware Output 1…12 auf 0 dB,
 - Ausgangspegel der Hardware Outputs 1…12 auf 0 dB
-  (1–8 = Analog 1–8, 9–12 = Phones 9–12).
+  (1–8 = Analog 1–8, 9–12 = Phones 9–12),
+- Input 9 (Mic/Inst 9) → Hardware Output 1…12 mit 30 % linearer Amplitude
+  (`0x2666`, etwa −10,5 dB), auf beiden Kanälen jedes Ausgangspaars dasselbe
+  Monosignal (ab v3; Pegel am Gerät bestätigt im Hardwaretest E1,
+  [mixer_e1.md](mixer_e1.md)).
 
-Das sind **genau 26 Registerzugriffe** (bis 2026-11-23: 24, ohne die
+Das sind **genau 38 Registerzugriffe** (v3; v2: 26, v1: 24, ohne die
 beiden Kreuzverbindungen). Gesendet werden sie als RME-SysEx über den
 ALSA-Sequencer an den MIDI-Port „Port 2“ des Geräts.
 
 **Nicht verändert** werden alle **anderen** gekreuzten Playback-Routings
-(z. B. Playback 9 → Output 10), Eingangs-Routings, alle anderen
+(z. B. Playback 9 → Output 10), alle anderen Eingangs-Routings, die
+Eingangsverstärkung, alle anderen
 Mixerregister, Pan, Mute, Control Room, Eingangsempfindlichkeiten, Clock
 und sonstige Geräteeinstellungen. **Weitere Querverbindungen werden
 dadurch nicht gelöscht:** Steht etwa Playback 9 → Output 10 auf einem
@@ -44,7 +52,10 @@ gelesen; es gibt kein Rückgängig.
 | Wirkung eines einzelnen Routings ohne Stereokopplung | **am Gerät** (B.3: Playback 9 nur links, Playback 10 stumm) |
 | `0x0000` schaltet eine Matrixverbindung ab | **am Gerät**: D1 `0x4269` (aus und mit `0x9000` wieder an), D2 `0x4261`, D3 `0x4220` |
 | Die beiden neuen Einträge `0x4220`/`0x4261` = `0x0000` | **am Gerät** einzeln (D3, D2) mit denselben Bytes wie in der Liste |
-| **Folge von 26 Nachrichten** (neue Liste) | **nur simuliert**; Hardwaretest steht aus |
+| **Folge von 26 Nachrichten** (v2) | **am Gerät** (0.2.0~dev4, automatisch nach CC-Umschaltung und Port-Reset) |
+| `0x4088 = 0x2666` (Input 9 → Analog 3, 30 %) | **am Gerät** (E1, 2026-11-23: deutlich hörbar, Analog 4 still, mit `0x0000` wieder still) |
+| Input 9 → alle zwölf Ausgänge | **am Gerät** (Integrationstest v3, dev6: auf allen zwölf hörbar, Hörprüfung) |
+| **Folge von 38 Nachrichten** (v3) | **am Gerät**: dev5 mit einem Durchgang unvollständig wirksam (Playback → Phones), dev6 mit zwei Durchgängen bestanden ([mixer_v3_integration.md](mixer_v3_integration.md)) |
 | Lauf im systemd-Dienst (Härtung, `DeviceAllow=char-alsa`, Boot) | **nur simuliert** (Dienstaufruf mit Simulationsbuild, `systemd-analyze`) |
 | Wartezeiten, Sperre, gleichzeitige Ereignisse, Fehlerfälle, Benachrichtigung | **nur simuliert** |
 | Paketbau, Installation, Upgrade, Entfernung | in isolierter Wurzel getestet, nicht auf dem Host |
@@ -79,18 +90,34 @@ gelesen; es gibt kein Rückgängig.
 | 24 | `0x2700` | `0x0000` | Pegel Phones 10, 0 dB | `F0 00 20 0D 10 00 00 00 00 38 0A F7` |
 | 25 | `0x2800` | `0x0000` | Pegel Phones 11, 0 dB | `F0 00 20 0D 10 00 00 00 00 40 0A F7` |
 | 26 | `0x2900` | `0x0000` | Pegel Phones 12, 0 dB | `F0 00 20 0D 10 00 00 00 00 48 02 F7` |
+| 27 | `0x4008` | `0x2666` | Input 9 → Analog 1, 30 % | `F0 00 20 0D 10 00 66 4C 20 00 04 F7` |
+| 28 | `0x4048` | `0x2666` | Input 9 → Analog 2, 30 % | `F0 00 20 0D 10 00 66 4C 20 02 0C F7` |
+| 29 | `0x4088` | `0x2666` | Input 9 → Analog 3, 30 % | `F0 00 20 0D 10 00 66 4C 20 04 0C F7` |
+| 30 | `0x40C8` | `0x2666` | Input 9 → Analog 4, 30 % | `F0 00 20 0D 10 00 66 4C 20 06 04 F7` |
+| 31 | `0x4108` | `0x2666` | Input 9 → Analog 5, 30 % | `F0 00 20 0D 10 00 66 4C 20 08 0C F7` |
+| 32 | `0x4148` | `0x2666` | Input 9 → Analog 6, 30 % | `F0 00 20 0D 10 00 66 4C 20 0A 04 F7` |
+| 33 | `0x4188` | `0x2666` | Input 9 → Analog 7, 30 % | `F0 00 20 0D 10 00 66 4C 20 0C 04 F7` |
+| 34 | `0x41C8` | `0x2666` | Input 9 → Analog 8, 30 % | `F0 00 20 0D 10 00 66 4C 20 0E 0C F7` |
+| 35 | `0x4208` | `0x2666` | Input 9 → Phones 9, 30 % | `F0 00 20 0D 10 00 66 4C 20 10 0C F7` |
+| 36 | `0x4248` | `0x2666` | Input 9 → Phones 10, 30 % | `F0 00 20 0D 10 00 66 4C 20 12 04 F7` |
+| 37 | `0x4288` | `0x2666` | Input 9 → Phones 11, 30 % | `F0 00 20 0D 10 00 66 4C 20 14 04 F7` |
+| 38 | `0x42C8` | `0x2666` | Input 9 → Phones 12, 30 % | `F0 00 20 0D 10 00 66 4C 20 16 0C F7` |
 
-Die Einträge 3–26 sind die bisherige Liste, unverändert in Inhalt und
-Reihenfolge. Die Liste ist eine Konstante in
+Die Einträge 1–26 sind die Konfiguration v2, unverändert in Inhalt und
+Reihenfolge (eigene Prüfsumme `0xC97A359C`, ebenfalls vor jedem Lauf
+geprüft); 3–26 sind die ursprüngliche Liste v1. Die Einträge 27–38 haben
+die Adresse `0x4000 | (k−1) << 6 | 8` (Quellindex 8 = Mic/Inst 9) und den
+Wert `0x2666` = `lround(0,3 · 0x8000)`. Die Liste ist eine Konstante in
 [mixer_init.c](../src/mixer_init.c). Es wird zur Laufzeit keine Adresse
-berechnet; vor jedem Lauf werden die Einträge gegen die Formeln und eine
-Prüfsumme geprüft. `ff802-mixer-init --list` gibt genau diese Tabelle aus.
+berechnet; vor jedem Lauf werden die Einträge gegen die Formeln und beide
+Prüfsummen geprüft. `ff802-mixer-init --list` gibt genau diese Tabelle aus.
 
 **Reihenfolge:** zuerst die beiden Kreuzverbindungen aus (das senkt nur
 Pegel), dann die direkten Routings, zuletzt die Ausgangspegel. Bricht ein
 Lauf ab, bleiben die Ausgangspegel unverändert; ein Abbruch nach den
 ersten beiden Nachrichten lässt höchstens eine unerwünschte Verbindung
-weniger zurück.
+weniger zurück. Input 9 kommt zuletzt: Bricht ein Lauf nach 26 Nachrichten
+ab, ist der v2-Teil vollständig und Input 9 nicht (vollständig) geroutet.
 
 ## MIDI-Protokoll und Kodierung
 
@@ -119,7 +146,7 @@ weniger zurück.
 5. Verbindung erneut prüfen: gleiche Bus- und Gerätenummer, weiterhin
    CC-Modus, gleiche Karte.
 6. Mit dem Port verbinden.
-7. Die 26 Nachrichten in Tabellenreihenfolge senden, 10 ms Abstand, eine
+7. Die 38 Nachrichten in Tabellenreihenfolge senden, 10 ms Abstand, eine
    Protokollzeile je Register.
 8. 200 ms warten, dann die Verbindung trennen (der Kernel leert dabei den
    MIDI-Ausgang) und den Sequencer schließen.
@@ -140,18 +167,30 @@ unabhängig davon, ob die automatische Umschaltung an ist:
 | `ff802-cc enable` (Port-Reset) | neue Verbindung → „add“ → Initialisierung |
 | Rechnerneustart mit angeschlossenem Gerät | Coldplug-„add“ beim Booten → Initialisierung (kein angemeldeter Benutzer nötig) |
 | Veraltetes Ereignis (Gerät inzwischen neu verbunden) | abgelehnt, keine MIDI-Aktion; das Ereignis der neuen Verbindung initialisiert |
-| Mehrere oder gleichzeitige Ereignisse | über die Sperre `/run/ff802-cc-auto/lock` nacheinander; jeder Lauf setzt dieselben 26 Werte |
+| Mehrere oder gleichzeitige Ereignisse | über die Sperre `/run/ff802-cc-auto/lock` nacheinander; jeder Lauf setzt dieselben 38 Werte |
 
 Es gibt bewusst keinen Eintrag „schon initialisiert“ je Verbindung: Die
 Werte sind absolut, eine Wiederholung ändert nichts, und eine
 wiederverwendete USB-Gerätenummer kann eine nötige Initialisierung nie
 verhindern. Innerhalb eines Laufs wird nichts wiederholt.
 
+**Zwei Durchgänge im Dienst (ab 0.2.0~dev6):** Nach dem ersten
+vollständigen Durchgang wartet der Dienst 5 s, prüft die Verbindung
+erneut und sendet dieselben 38 Werte noch einmal über dieselbe
+Verbindung (Journal: `mixer: pass 2: set …`, Ergebnis „…, twice“). Grund:
+Im Integrationstest von dev5 blieb Playback 9–12 → Phones 9–12 nach dem
+Einschalten wiederholbar ohne Wirkung, obwohl alle Nachrichten ohne Fehler
+übergeben wurden; derselbe Satz später gesendet wirkte immer
+([mixer_v3_integration.md](mixer_v3_integration.md)). Der Mechanismus ist
+nicht belegt. Ein Fehler im zweiten Durchgang gilt als `incomplete`; ist
+das Gerät in der Pause verschwunden oder neu verbunden, entfällt der
+zweite Durchgang. Der Handlauf `ff802-mixer-init` sendet einmal.
+
 ## Fehlerbehandlung
 
 | Ergebnis | Bedeutung | Exit-Code des Dienstes |
 |---|---|---|
-| `done` | alle 26 Nachrichten an ALSA übergeben | 0 |
+| `done` | alle 38 Nachrichten an ALSA übergeben | 0 |
 | `no-port` | Karte oder Port nicht innerhalb von 15 s | 3 |
 | `refused` | Port nicht eindeutig, Name passt nicht, Verbindung geändert, Tabellenprüfung | 3 |
 | `not-sent` | Sequencer, Portliste oder Verbindung nicht möglich (z. B. belegt) | 3 |
@@ -159,10 +198,12 @@ verhindern. Innerhalb eines Laufs wird nichts wiederholt.
 | `incomplete` | Senden bei Nachricht n gescheitert; n−1 übergeben, Rest nicht | 4 |
 
 Vor dem Senden steht im Journal die Konfiguration
-(`mixer: configuration ff802-mixer-init-v2, 26 entries, checksum
-0xC97A359C (verified).`); `mixer-result` enthält dieselben Angaben
-(`config=`, `entries=`, `checksum=`). Die Kennung ändert sich mit jeder
-Änderung der Liste (v1: 24 Einträge, v2: 26).
+(`mixer: configuration ff802-mixer-init-v3, 38 entries, checksum
+0xEC858A44 (verified).` und `mixer: entries 1..26 are ff802-mixer-init-v2,
+checksum 0xC97A359C (verified).`); `mixer-result` enthält dieselben Angaben
+(`config=`, `entries=`, `checksum=`, `base=`, `base_entries=`,
+`base_checksum=`). Die Kennung ändert sich mit jeder
+Änderung der Liste (v1: 24 Einträge, v2: 26, v3: 38).
 
 Jeder Lauf schreibt `/run/ff802-cc-auto/mixer-result` und je Register eine
 Journalzeile (`journalctl -t ff802-cc-auto`). Ein Fehlschlag erzeugt

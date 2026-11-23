@@ -85,45 +85,59 @@ Independent of the automation, also for a unit that was switched with
   ff802-cc-auto mixer-init dry-run  find unit, sound card and MIDI port; send nothing
   ff802-cc-auto mixer-init apply    initialise once by hand (asks for SEND)
 
-The manual run is /usr/bin/ff802-mixer-init (--list shows the 26
+The manual run is /usr/bin/ff802-mixer-init (--list shows the 38
 messages); it works for a normal user of the desktop session, takes the
 lock of the service and does not depend on "mixer-init on".
 
 The state is kept in /var/lib/ff802-cc-auto/mixer-init. When it is on,
 the service sets on EVERY connection of the unit in class-compliant mode
-(reconnect, power cycle, boot) exactly these 26 registers of the internal
-mixer, in this order, through the ALSA sequencer (MIDI "Port 2" of that
-USB connection, found by its sound card; no fixed ALSA numbers):
+(reconnect, power cycle, boot) exactly these 38 registers of the internal
+mixer (configuration ff802-mixer-init-v3), in this order, through the
+ALSA sequencer (MIDI "Port 2" of that USB connection, found by its sound
+card; no fixed ALSA numbers):
 
   Playback 1 -> Phones 9, Playback 2 -> Phones 10   off (0x0000)
   Playback 1..12 -> Hardware Output 1..12           0 dB (0x9000)
   Volume of Hardware Output 1..12                   0 dB (0x0000)
+  Input 9 (Mic/Inst 9) -> Hardware Output 1..12     30 % linear (0x2666)
   (Output 1-8 = Analog 1-8, 9-12 = Phones 9-12)
 
-The class-compliant mode routes Playback 1/2 also to Phones 9/10; the
-first two writes switch exactly these two crossed routings off (found in
-the hardware tests D2/D3). Nothing else is changed: no other crossed
-routings, inputs, mute, pan, other outputs or stored setups. Nothing is
-read from the unit, so there is no undo: changes made to these 26 values
-with TotalMix FX or OSCMix are overwritten at the next connection.
+The first 26 are the previous configuration ff802-mixer-init-v2 (package
+0.2.0~dev3/dev4), unchanged and sent first. The class-compliant mode
+routes Playback 1/2 also to Phones 9/10; the first two writes switch
+exactly these two crossed routings off (found in the hardware tests
+D2/D3). The last twelve put Input 9 at 30 % amplitude (about -10.5 dB) on
+every output, the same mono signal on both channels of each pair; the
+value was confirmed on the unit for Analog 3 (hardware test E1). Nothing
+else is changed: no other crossed routings, other inputs, input gain,
+mute, pan, other outputs or stored setups. Nothing is read from the unit,
+so there is no undo: changes made to these 38 values with TotalMix FX or
+OSCMix are overwritten at the next connection.
 
 WARNING: 0 dB on the headphone outputs Phones 9-12 can be very loud. Take
 headphones off and turn amplifiers down before connecting the unit, and
-set the volume in the applications.
+set the volume in the applications. A signal at Input 9 is heard on all
+twelve outputs; a microphone there can feed back through speakers.
 
 Each register is logged (journalctl -t ff802-cc-auto), before them the
-configuration "ff802-mixer-init-v2, 26 entries, checksum 0xC97A359C
-(verified)". The result is in
-/run/ff802-cc-auto/mixer-result (outcome, connection, written=n/26,
-config, entries, checksum, MIDI port). If the initialisation fails (MIDI port
-not there within 15 s, port not unambiguous, ALSA error, stopped while
-sending), nothing is retried and a separate notification "Fireface 802 –
-Mixer-Initialisierung fehlgeschlagen" is shown; the class-compliant mode
-itself is not affected.
+configuration "ff802-mixer-init-v3, 38 entries, checksum 0xEC858A44
+(verified)" and "entries 1..26 are ff802-mixer-init-v2, checksum
+0xC97A359C (verified)". The result is in /run/ff802-cc-auto/mixer-result
+(outcome, connection, written=n/38, config, entries, checksum, base,
+base_entries, base_checksum, MIDI port). If the initialisation fails
+(MIDI port not there within 15 s, port not unambiguous, ALSA error,
+stopped while sending), nothing is retried and a separate notification
+"Fireface 802 – Mixer-Initialisierung fehlgeschlagen" is shown; the
+class-compliant mode itself is not affected. Stopped after 26 messages
+means the v2 part is complete and Input 9 is not (fully) routed.
 
-Other crossed routings (e.g. Playback 9 -> Output 10) and input
-routings are NOT cleared by the initialisation; only the 26 values above
-are set. The messages are sent 10 ms apart over one subscription, then
+Other crossed routings (e.g. Playback 9 -> Output 10) and other input
+routings are NOT cleared by the initialisation; only the 38 values above
+are set. The messages are sent 10 ms apart over one subscription. The
+service sends the whole list twice, 5 s apart (right after power-on a
+single pass was seen to leave Playback 9..12 -> Phones 9..12 without
+effect; the values are absolute, so the second pass is harmless); the
+manual ff802-mixer-init sends it once. Then
 the program waits 200 ms before closing it.
 
 Verification: play a test signal on one channel of a sink, e.g.

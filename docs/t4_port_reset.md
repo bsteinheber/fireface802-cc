@@ -1,9 +1,13 @@
 # T4: Automatischer Port-Reset nach dem CC-Befehl
 
-> **Stand 2026-11-23: implementiert und automatisch getestet (ohne
-> Hardware), am Gerät noch nicht geprüft.** Paket `ff802-cc-auto`
-> 0.2.0~dev4 (unveröffentlicht). Betrifft nur das ursprüngliche RME
+> **Stand 2026-11-23: am Gerät erfolgreich getestet (vom Anwender
+> gemeldet: Umschaltung, Port-Reset, Wiedererkennung, Initialisierung).**
+> Paket `ff802-cc-auto` 0.2.0~dev4 (unveröffentlicht). Betrifft nur das ursprüngliche RME
 > Fireface 802 (nicht das 802 FS).
+>
+> **Nachtrag:** Ab 0.2.0~dev5 umfasst die Mixer-Initialisierung 38 Register
+> (`ff802-mixer-init-v3`, [mixer_init.md](mixer_init.md)); Angaben zu 26
+> Registern unten beziehen sich auf dev4.
 
 ## Ziel
 

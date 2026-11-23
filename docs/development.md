@@ -310,4 +310,6 @@ Versionen dann ebenfalls anzupassen sind.
 - [mixer_b4.md](mixer_b4.md): Hardwaretest B.4, Routing Playback 2 → Phones 10 abschalten
 - [mixer_d1.md](mixer_d1.md): Diagnose D1, Wirkung von `0x0000` an `0x4269`
 - [mixer_d3.md](mixer_d3.md): Diagnose D3, Playback 1 → Phones 9 abschalten
+- [mixer_e1.md](mixer_e1.md): Hardwaretest E1, Input 9 → Analog 3 mit 30 % linear (`0x4088 = 0x2666`), geführt, mit Wiederherstellung
+- [mixer_v3_integration.md](mixer_v3_integration.md): Integrationstest der Mixer-Initialisierung v3 (38 Register)
 - [development.md](development.md): dieses Dokument

@@ -1,3 +1,39 @@
+ff802-cc-auto (0.2.0~dev6) UNRELEASED; urgency=medium
+
+  * Development build, not released; for the integration test on the unit.
+  * The service sends the mixer list twice: after the first complete
+    pass it waits 5 s, checks the connection again and sends the same 38
+    values once more over the same subscription. Integration test of dev5
+    on the unit (2026-11-23): right after power-on Playback 9..12 ->
+    Phones 9..12 had no effect, reproducibly, although all 38 messages
+    were passed to ALSA without error; the same list sent later by hand
+    always worked. Both recorded runs coincided with the host setting up
+    the freshly enumerated unit (WirePlumber); the mechanism is not
+    known. ALSA state restore and a WirePlumber restart in normal
+    operation did not change the routing.
+  * A failure in pass 2 is reported as incomplete (notification); a unit
+    gone or reconnected during the pause skips pass 2. Nothing is retried.
+    The manual ff802-mixer-init keeps one pass. The 38 values are
+    unchanged (ff802-mixer-init-v3, 0xEC858A44).
+
+ -- Bernhard Steinheber <bernhard@steinheber.info>  Mon, 23 Nov 2026 22:00:00 +0100
+
+ff802-cc-auto (0.2.0~dev5) UNRELEASED; urgency=medium
+
+  * Development build, not released; for the integration test on the unit.
+  * Mixer initialisation ff802-mixer-init-v3 with 38 register writes
+    (checksum 0xEC858A44): the 26 writes of ff802-mixer-init-v2 unchanged
+    and first (their own checksum 0xC97A359C is checked too), then
+    Input 9 (Mic/Inst 9) -> Hardware Output 1..12 at 30 % linear
+    (0x2666, registers 0x4000 | (k-1) << 6 | 8), the same mono signal on
+    both channels of each output pair. 0x2666 on 0x4088 (Analog 3) was
+    confirmed on the unit in the hardware test E1. Input gain and all
+    other routings are not changed.
+  * mixer-result and the journal also name the v2 part (base=,
+    base_entries=, base_checksum=).
+
+ -- Bernhard Steinheber <bernhard@steinheber.info>  Mon, 23 Nov 2026 20:00:00 +0100
+
 ff802-cc-auto (0.2.0~dev4) UNRELEASED; urgency=medium
 
   * Development build, not released; for the practical test on the unit.
