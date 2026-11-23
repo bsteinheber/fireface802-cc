@@ -63,7 +63,7 @@ Musik, moderater Pegel; Gain-Regler nicht verändern; kein Mikrofon vor
 Lautsprechern. Analog Out 3 ist der **linke** Kanal des Paars 3/4.
 
 ```sh
-cd /home/bernhard/Develop/fireface802-cc
+cd <Projektverzeichnis>    # der lokale Klon von fireface802-cc
 build-e1/ff802-mixer-e1                 # Probelauf: findet Gerät, Karte, Port; sendet nichts
 build-e1/ff802-mixer-e1 --apply         # der Test, ein Aufruf
 ```

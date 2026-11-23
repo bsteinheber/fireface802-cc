@@ -90,7 +90,7 @@ gelöscht).
 Vorbereitung (nur lesend):
 
 ```sh
-cd /home/bernhard/Develop/fireface802-cc
+cd <Projektverzeichnis>    # der lokale Klon von fireface802-cc
 sha256sum build-b4/ff802-mixer-b4
 ./build-b4/ff802-mixer-b4            # Dry-Run (Standard), sendet nichts
 ```

@@ -91,7 +91,7 @@ CC-Umschaltung und Port-Reset sind unverändert.
 
 0. Paket prüfen und installieren (nach Freigabe):
    ```sh
-   cd /home/bernhard/Develop/fireface802-cc
+   cd <Projektverzeichnis>    # der lokale Klon von fireface802-cc
    tools/hw-test/ff802-v3-check.sh pre    # beide Pakete, SHA-256, Zustand (nur lesend)
    sudo dpkg -i build-deb-dev6/ff802-cc-auto_0.2.0~dev6_amd64.deb   # nur dieses Paket
    ff802-cc-auto status                 # Automatik: on (bleibt erhalten)
