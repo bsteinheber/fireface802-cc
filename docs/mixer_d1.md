@@ -1,7 +1,8 @@
 # Diagnose D1: Schaltet `0x0000` eine Matrixverbindung ab?
 
-> **Stand 2026-11-23: vorbereitet, nicht ausgeführt.** Es wurde keine
-> MIDI-Nachricht an das Gerät gesendet. Betrifft nur das ursprüngliche
+> **Stand 2026-11-23: am Gerät ausgeführt, erfolgreich (vom Anwender
+> gemeldet):** `--apply` schaltete Playback 10 → Phones 10 ab, `--restore`
+> stellte die Verbindung wieder her. Betrifft nur das ursprüngliche
 > RME Fireface 802 im Class-Compliant-Modus.
 
 ## Zweck
