@@ -201,13 +201,16 @@ Port 2“.
 
 ## Mixer-Initialisierung im CC-Modus
 
-**Stand 2026-11-22:** vollständig implementiert und in der Simulation
-getestet; Beschreibung, Registerliste, Bedienung, Installation und
+**Stand 2026-11-23:** vollständig implementiert und in der Simulation
+getestet, jetzt mit **26** Registern (zusätzlich Playback 1/2 → Phones 9/10
+aus, siehe D1–D3 unten); Beschreibung, Registerliste, Bedienung, Installation und
 Einschränkungen in **[mixer_init.md](mixer_init.md)**. Das Paket
-`ff802-cc-auto 0.2.0~dev2` (unveröffentlicht) enthält die Schreibfunktion
+`ff802-cc-auto 0.2.0~dev3` (unveröffentlicht) enthält die Schreibfunktion
 (`FF802_ENABLE_MIXER_WRITE=ON` nur im Paketbau); die automatische
-Initialisierung ist nach der Installation aus. Am Gerät getestet ist der
-Sendeweg mit einer und zwei Nachrichten (B.2, B.3), nicht die Folge von 24.
+Initialisierung ist nach der Installation aus. Am Gerät getestet sind der
+Sendeweg mit einzelnen und zwei Nachrichten, die bisherige Folge von 24
+(`ff802-mixer-init --apply`, 2026-11-22) und die beiden neuen Einträge
+einzeln (D2, D3); die Folge von 26 steht noch aus.
 Der folgende Überblick ist der Stand der ersten Implementierung; wo er
 abweicht (Abstände, Wartezeit), gilt mixer_init.md.
 
@@ -380,7 +383,7 @@ schaltet sie mit genau einer Nachricht `0x4261 = 0x0000` ab
 (`F0 00 20 0D 10 00 00 00 04 13 04 F7`). Der vorherige Wert ist nicht
 wiederherstellbar. Einzelheiten: [mixer_b4.md](mixer_b4.md).
 
-### Diagnose D1 und D2 (2026-11-23): `0x0000` schaltet ab
+### Diagnose D1–D3 (2026-11-23): `0x0000` schaltet ab
 
 Prüft, ob `0x0000` eine Matrixverbindung abschaltet, an der nachweislich
 hörbaren Verbindung Playback 10 → Phones 10: `0x4269 = 0x0000`
@@ -391,8 +394,17 @@ Ergebnis (vom Anwender gemeldet): D1 `0x4269 = 0x0000` schaltete Playback
 10 → Phones 10 ab, `0x4269 = 0x9000` stellte es wieder her. D2
 `0x4261 = 0x0000` (mit `ff802-mixer-b4`) schaltete Playback 2 → Phones 10 ab;
 die Ausgabe von „Analog Output 1/2“ auf den Kopfhörern sind also
-Matrixeinträge. Vorbereitet ist D3 `0x4220 = 0x0000` für Playback 1 →
-Phones 9: [mixer_d3.md](mixer_d3.md).
+Matrixeinträge. D3 `0x4220 = 0x0000` (mit `ff802-mixer-d3`,
+[mixer_d3.md](mixer_d3.md)) schaltete Playback 1 → Phones 9 ab: Danach war
+bei Auswahl von „Analog Output 1/2“ auf Phones 9/10 nichts mehr zu hören,
+bei „Headphones 9/10“ weiterhin beide Kanäle.
+
+**Ursache damit geklärt:** Der Class-Compliant-Modus legt Playback 1/2
+zusätzlich auf Phones 9/10, als Matrixeinträge `0x4220` und `0x4261`
+(unter Windows zeigt TotalMix FX diese Verbindungen nicht). Die
+Mixer-Initialisierung schaltet beide ab sofort als erste Schritte ab
+(26 Register, [mixer_init.md](mixer_init.md)). Die Wirkung der vollständigen
+Folge von 26 Nachrichten ist am Gerät noch nicht geprüft.
 
 ## Weitere Quellen
 

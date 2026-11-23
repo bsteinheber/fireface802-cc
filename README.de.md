@@ -198,8 +198,9 @@ ein anderes, als TotalMix FX zuvor angezeigt hatte.
 
 **In der veröffentlichten Version 0.4.1 ist keine Einrichtung des internen
 Mixer-Routings enthalten.** In Entwicklung (Paket `ff802-cc-auto`
-0.2.0~dev2, noch nicht veröffentlicht und noch nicht vollständig am Gerät
-getestet) ist eine optionale Mixer-Initialisierung: Sie setzt Playback
+0.2.0~dev3, noch nicht veröffentlicht und noch nicht vollständig am Gerät
+getestet) ist eine optionale Mixer-Initialisierung: Sie schaltet die vom CC-Modus
+gesetzten Verbindungen Playback 1/2 → Phones 9/10 ab und setzt Playback
 1…12 → Hardware Output 1…12 und die zwölf Ausgangspegel auf 0 dB, nach der
 Installation ausgeschaltet. Siehe [docs/mixer_init.md](docs/mixer_init.md).
 

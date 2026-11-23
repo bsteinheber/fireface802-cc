@@ -1,8 +1,10 @@
 # Diagnose D3: Playback 1 → Phones 9 abschalten
 
-> **Stand 2026-11-23: vorbereitet, nicht ausgeführt.** Es wurde keine
-> MIDI-Nachricht an das Gerät gesendet. Betrifft nur das ursprüngliche
-> RME Fireface 802 im Class-Compliant-Modus.
+> **Stand 2026-11-23: am Gerät ausgeführt, erfolgreich (vom Anwender
+> gemeldet):** Danach war bei „Analog Output 1/2“ auf Phones 9/10 nichts
+> mehr zu hören, bei „Headphones 9/10“ weiterhin beide Kanäle. Der Eintrag
+> ist jetzt Teil der Mixer-Initialisierung ([mixer_init.md](mixer_init.md)).
+> Betrifft nur das ursprüngliche RME Fireface 802 im Class-Compliant-Modus.
 
 ## Ausgangslage (vom Anwender gemeldet)
 

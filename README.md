@@ -196,10 +196,11 @@ in between, the routing in CC mode differed from what TotalMix FX had
 shown before.
 
 **The released version 0.4.1 does not set up the internal mixer routing.**
-In development (package `ff802-cc-auto` 0.2.0~dev2, not yet released and
+In development (package `ff802-cc-auto` 0.2.0~dev3, not yet released and
 not yet fully tested on the unit) is an optional mixer initialisation: it
-sets Playback 1..12 -> Hardware Output 1..12 and the twelve output levels
-to 0 dB and is off after installation. See
+switches off the routings Playback 1/2 -> Phones 9/10 that the CC mode
+sets, sets Playback 1..12 -> Hardware Output 1..12 and the twelve output
+levels to 0 dB, and is off after installation. See
 [docs/mixer_init.md](docs/mixer_init.md) (German).
 
 Observations, conclusions and open questions in detail:

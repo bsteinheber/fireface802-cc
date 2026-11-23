@@ -80,8 +80,8 @@ The class-compliant mode routes Playback 1/2 also to Phones 9/10; the
 first two writes switch exactly these two crossed routings off (found in
 the hardware tests D2/D3). Nothing else is changed: no other crossed
 routings, inputs, mute, pan, other outputs or stored setups. Nothing is
-read from the unit, so there is no undo: changes made to these 26 values with TotalMix FX or OSCMix are
-overwritten at the next connection.
+read from the unit, so there is no undo: changes made to these 26 values
+with TotalMix FX or OSCMix are overwritten at the next connection.
 
 WARNING: 0 dB on the headphone outputs Phones 9-12 can be very loud. Take
 headphones off and turn amplifiers down before connecting the unit, and
