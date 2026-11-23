@@ -10,8 +10,10 @@ Priority: optional
 Description: automatic class-compliant mode for the RME Fireface 802
  Switches an original RME Fireface 802 (not the 802 FS) that is connected
  in proprietary USB mode (2a39:3fcd) to class-compliant mode by sending
- the CC enable command (01 00 44 BD) once per USB connection, and asks the
- user in the Plasma session to reconnect the USB cable. After that the
+ the CC enable command (01 00 44 BD) once per USB connection and then
+ resetting the USB hub port of exactly this unit, as "ff802-cc enable" does
+ (no reconnecting needed). If the port cannot be reset, it asks the
+ user in the Plasma session to reconnect the USB cable. Afterwards the
  unit appears as 0424:3fdd and uses the ff802-ucm-profile configuration.
  .
  The automation is off after installation: ff802-cc-auto on (administrator)

@@ -1,3 +1,31 @@
+ff802-cc-auto (0.2.0~dev4) UNRELEASED; urgency=medium
+
+  * Development build, not released; for the practical test on the unit.
+  * Automatic port reset after the CC enable command: the same code and
+    timing as "ff802-cc enable" (usb_port: disable=1, 2 s, disable=0, up
+    to 15 s waiting for 0424:3fdd at the same port). No reconnecting of
+    the USB cable is needed when it succeeds; the new connection confirms
+    the mode and runs the optional mixer initialisation.
+  * New unit ff802-cc-auto-enable@<kernel name>.service for proprietary
+    connections (udev: 2a39:3fcd); same hardening as ff802-cc-auto@,
+    ProtectKernelTunables kept, write access only to
+    /sys/bus/usb/devices/<kernel name>/port/disable, USB device nodes
+    only. ff802-cc-auto@<k>:<bus>:<devnum>.service handles class-compliant
+    connections only and no longer has access to USB device nodes. Both
+    TimeoutStartSec=60.
+  * Results switched, reset-failed, not-reenumerated, reenumerated-not-cc
+    (exit 5 for the last three); notification "reset-failed" with the
+    manual recovery. After a reset that did not end in class-compliant
+    mode no further automatic reset until reboot or "ff802-cc-auto on"
+    (/run/ff802-cc-auto/reset-blocked); the command is still sent once
+    per connection. If the port cannot be reset, as before: command sent,
+    please reconnect.
+  * Mixer initialisation: journal and mixer-result name the configuration
+    (ff802-mixer-init-v2), the 26 entries and the checksum 0xC97A359C.
+    The 26 registers are unchanged.
+
+ -- Bernhard Steinheber <bernhard@steinheber.info>  Mon, 23 Nov 2026 18:00:00 +0100
+
 ff802-cc-auto (0.2.0~dev3) UNRELEASED; urgency=medium
 
   * Development build, not released; for the practical test on the unit.

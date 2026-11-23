@@ -78,6 +78,7 @@ put 0755 "$PKGSRC/ff802-cc-notify"          $LX/ff802-cc-notify
 put 0755 "$PKGSRC/ff802-cc-auto"            usr/bin/ff802-cc-auto
 put 0644 "$PKGSRC/70-ff802-cc-auto.rules"   usr/lib/udev/rules.d/70-ff802-cc-auto.rules
 put 0644 "$PKGSRC/ff802-cc-auto@.service"   usr/lib/systemd/system/ff802-cc-auto@.service
+put 0644 "$PKGSRC/ff802-cc-auto-enable@.service" usr/lib/systemd/system/ff802-cc-auto-enable@.service
 put 0644 "$PKGSRC/ff802-cc-notify.path"     usr/lib/systemd/user/ff802-cc-notify.path
 put 0644 "$PKGSRC/ff802-cc-notify.service"  usr/lib/systemd/user/ff802-cc-notify.service
 W=$STAGE/usr/lib/systemd/user/graphical-session.target.wants
