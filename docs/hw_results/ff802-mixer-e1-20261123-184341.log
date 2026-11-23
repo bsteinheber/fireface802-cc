@@ -1,0 +1,71 @@
+ff802-mixer-e1 0.4.1: apply (guided test), 2026-11-23 18:43:41.009
+log file: ff802-mixer-e1-20261123-184341.log
+route: Input 9 (Mic/Inst 9) -> Hardware Output 3 (Analog 3)
+message OFF:  register 0x4088 = 0x0000  off          word 0x40880000  SysEx F0 00 20 0D 10 00 00 00 20 04 04 F7
+message TEST: register 0x4088 = 0x2666  30 % linear word 0xC0882666  SysEx F0 00 20 0D 10 00 66 4C 20 04 0C F7
+note: 0x2666 = 30 % linear per OSCMix (setmixlevel); not verified on the unit
+note: the previous value of 0x4088 is not read; the defined state is off (0x0000)
+mixer writes in this program: compiled in
+connection 3-2.4.1.1.3: bus 3 devnum 30 ID 0424:3fdd 'RME' 'Fireface 802 (24047128)' speed 480
+identity: Fireface 802, class-compliant mode
+sound card (sysfs): found, card 1
+sequencer ports of card 1:
+   20:0 kernel w 'Fireface 802 (24047128) Port 1'
+   20:1 kernel w 'Fireface 802 (24047128) Port 2'
+selected port: 20:1 'Fireface 802 (24047128) Port 2'
+
+Plan (port 20:1, 3-2.4.1.1.3, card 1), each message once, no retry:
+  1. OFF   0x4088 = 0x0000  defined initial state
+  2. TEST  0x4088 = 0x2666  then listening check (up to 600 s)
+  3. OFF   0x4088 = 0x0000  restore (also after abort or error)
+Nothing else is changed: no other matrix register, no input gain, no
+output volume, no refresh.
+
+Before you continue:
+  - turn the monitoring volume (amplifier/speakers at Analog Out 3/4)
+    DOWN; headphones off;
+  - feed a steady signal into Input 9 (Mic/Inst 9), e.g. a tone or
+    music from a line source at a moderate level; do not change the
+    gain knob of Input 9; no microphone in front of the speakers
+    (feedback);
+  - Analog Out 3 is the LEFT channel of the pair 3/4, Analog Out 4
+    the right one (check: Input 9 must stay silent on Out 4).
+Volume down and signal on Input 9? Type SEND to start the test: SEND
+[2026-11-23 18:44:22.753] approved by the user (SEND)
+
+BEFORE any write: is Input 9 audible on Analog Out 3 now?
+  1 no, silent   2 yes, audible   3 cannot tell
+answer: 1
+[2026-11-23 18:44:45.025] before the test: Input 9 on Out 3 silent
+[2026-11-23 18:44:45.026] subscribed to 20:1
+[2026-11-23 18:44:45.026] step 1 OFF: 0x4088 = 0x0000  SysEx F0 00 20 0D 10 00 00 00 20 04 04 F7  transferred to ALSA (12 bytes)
+[2026-11-23 18:44:45.036] step 2 TEST: 0x4088 = 0x2666  SysEx F0 00 20 0D 10 00 66 4C 20 04 0C F7  transferred to ALSA (12 bytes)
+
+LISTEN NOW (up to 600 s; Ctrl-C restores and ends): Input 9 should be on
+Analog Out 3 at about -10.5 dB (30 % amplitude), Out 4 silent.
+What do you hear on Analog Out 3?
+  1 Input 9 clearly audible (moderately quieter than direct)
+  2 Input 9 only very faintly audible
+  3 nothing
+  4 unexpectedly loud or distorted
+answer: 1
+Is Analog Out 4 (right channel) silent?
+  1 yes, silent   2 no, Input 9 audible   3 cannot tell
+answer: 1
+[2026-11-23 18:46:12.043] listening check: Out 3 clearly audible; Out 4 silent
+[2026-11-23 18:46:12.053] step 3 RESTORE OFF: 0x4088 = 0x0000  SysEx F0 00 20 0D 10 00 00 00 20 04 04 F7  transferred to ALSA (12 bytes)
+
+AFTER the restore: is Analog Out 3 silent again?
+  1 yes, silent   2 no, still audible   3 cannot tell
+answer: 1
+[2026-11-23 18:46:22.819] after the restore: Out 3 silent
+
+summary:
+  MIDI: OFF, TEST and RESTORE transferred to ALSA (no reply from the unit;
+        no readback)
+  before:   silent
+  test:     Out 3 clearly audible, Out 4 silent
+  restore:  Out 3 silent
+result: PASSED - 0x2666 routes Input 9 to Analog Out 3 only, audibly and
+        below full level (user check, not a measurement); restored to off
+[2026-11-23 18:46:22.832] closed (exit 0)
