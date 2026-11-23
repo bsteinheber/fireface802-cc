@@ -126,6 +126,25 @@ add_test(NAME mixer_b4
             ${PROJECT_SOURCE_DIR} $<TARGET_FILE:ff802-mixer-b4-sim> ${b4_real}
             ${CMAKE_NM} ${CMAKE_CURRENT_BINARY_DIR}/b4-scratch)
 
+# Diagnosis D1 (one routing write, off or 0 dB), same scheme as B.4.
+add_executable(ff802-mixer-d1-sim
+    ${PROJECT_SOURCE_DIR}/tools/hw-test/ff802_mixer_d1.c sim_midi.c)
+target_include_directories(ff802-mixer-d1-sim PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(ff802-mixer-d1-sim PRIVATE ff802_auto)
+target_compile_definitions(ff802-mixer-d1-sim PRIVATE
+    FF802_D1_SIM=1 FF802_VERSION="${PROJECT_VERSION}")
+set_target_properties(ff802-mixer-d1-sim PROPERTIES C_EXTENSIONS ON)
+ff802_set_warnings(ff802-mixer-d1-sim)
+if(FF802_HAVE_MIXER_D1)
+    set(d1_real $<TARGET_FILE:ff802-mixer-d1>)
+else()
+    set(d1_real "-")
+endif()
+add_test(NAME mixer_d1
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/test_mixer_d1.sh
+            ${PROJECT_SOURCE_DIR} $<TARGET_FILE:ff802-mixer-d1-sim> ${d1_real}
+            ${CMAKE_NM} ${CMAKE_CURRENT_BINARY_DIR}/d1-scratch)
+
 # Manual mixer initialisation with the simulated MIDI backend.
 add_executable(ff802-mixer-init-sim
     ${PROJECT_SOURCE_DIR}/tools/ff802_mixer_init.c sim_midi.c)

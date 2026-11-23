@@ -248,6 +248,28 @@ if(FF802_BUILD_MIXER_B4)
     set(FF802_HAVE_MIXER_B4 ON)
 endif()
 
+# Diagnosis D1 (tools/hw-test/ff802_mixer_d1.c): does 0x0000 switch off a
+# routing? ONE write of 0x4269 = 0x0000 (--apply) or 0x4269 = 0x9000
+# (--restore) per call. Same rules as B.2-B.4: default OFF, writes only in
+# this target, never installed.
+option(FF802_BUILD_MIXER_D1 "Build the diagnosis program ff802-mixer-d1 (one MIDI routing write)" OFF)
+set(FF802_HAVE_MIXER_D1 OFF)
+if(FF802_BUILD_MIXER_D1)
+    if(NOT ALSA_FOUND)
+        message(FATAL_ERROR "FF802_BUILD_MIXER_D1 needs alsa-lib (libasound2-dev)")
+    endif()
+    message(WARNING "FF802_BUILD_MIXER_D1=ON: ff802-mixer-d1 can send one mixer register to the device")
+    add_executable(ff802-mixer-d1 tools/hw-test/ff802_mixer_d1.c src/midi_seq_alsa.c)
+    target_link_libraries(ff802-mixer-d1 PRIVATE ff802_auto PkgConfig::ALSA)
+    target_compile_definitions(ff802-mixer-d1 PRIVATE
+        FF802_ENABLE_MIXER_WRITE=1 FF802_VERSION="${PROJECT_VERSION}")
+    set_target_properties(ff802-mixer-d1 PROPERTIES
+        C_EXTENSIONS ON
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+    ff802_set_warnings(ff802-mixer-d1)
+    set(FF802_HAVE_MIXER_D1 ON)
+endif()
+
 # Command-line tools need libusb. Without it, only the pure libraries and
 # their tests are built.
 option(FF802_BUILD_TOOLS "Build the libusb based command-line tools" ON)
