@@ -1,5 +1,12 @@
 # T4: USB-Modusverwaltung des Fireface 802 unter Kubuntu
 
+> **Nachtrag 2026-11-23 (0.2.0~dev4, am Gerät noch nicht geprüft):** Die
+> Automatik setzt nach dem Befehl den USB-Port des Geräts zurück (derselbe
+> Code wie `ff802-cc enable`); proprietäre Verbindungen behandelt die neue
+> Unit `ff802-cc-auto-enable@.service`. Ablauf, Rechte und Tests:
+> [t4_port_reset.md](t4_port_reset.md). Die folgenden Abschnitte beschreiben
+> den Stand 0.1.0 ohne Port-Reset.
+>
 > **Stand:** Im Dev-Container vollständig entwickelt und getestet
 > (Simulation von sysfs, USB, udev/systemd-Aufrufen und Desktop). Auf dem
 > Host ist `ff802-cc-auto` 0.1.0 **installiert und aktiviert**. Die

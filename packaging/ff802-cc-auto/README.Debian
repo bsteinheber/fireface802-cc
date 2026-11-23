@@ -18,27 +18,51 @@ What happens when the automation is on
 --------------------------------------
 
 1. udev (70-ff802-cc-auto.rules) sees the unit at boot or when it is
-   connected and starts ff802-cc-auto@<port>:<bus>:<devnum>.service.
+   connected. In proprietary mode (2a39:3fcd) it starts
+   ff802-cc-auto-enable@<port>.service, in class-compliant mode
+   (0424:3fdd) ff802-cc-auto@<port>:<bus>:<devnum>.service.
    udev itself executes nothing.
-2. The service (root without capabilities, only USB device nodes, no
-   network) reads the cached sysfs attributes: USB ID 2a39:3fcd,
-   manufacturer "RME", product "Fireface 802 (<serial>)", high speed.
-   Anything else is refused. 0424:3fdd (already CC mode): nothing to do.
+2. The service (root without capabilities, no network) reads the cached
+   sysfs attributes: USB ID 2a39:3fcd, manufacturer "RME", product
+   "Fireface 802 (<serial>)", high speed. Anything else is refused.
 3. The connection is recorded in /run/ff802-cc-auto/attempts: at most one
    attempt per connection, also after errors. A reboot or a reconnection
    is a new connection.
 4. Right before the write everything is checked again (same connection,
    same device, automation still on). Then the CC enable command
    01 00 44 BD is sent once to interface 1, bulk OUT endpoint 0x0C.
-   No reset, no retry, never the other direction.
-5. A notification in the Plasma session asks you to disconnect the USB
-   cable briefly and reconnect it ("Fireface 802 - Class-Compliant-Modus
-   vorbereitet"). After reconnecting, the unit appears as 0424:3fdd; a
-   short confirmation follows. The audio configuration of
+5. Then the USB hub port of exactly this unit is reset, with the same
+   code and timing as "ff802-cc enable": disable=1, 2 s, disable=0, and
+   up to 15 s waiting until the unit is back at the same port as
+   0424:3fdd. The unit gets a new device number; its own udev event
+   (ff802-cc-auto@...) confirms the mode ("Fireface 802 -
+   Class-Compliant-Modus aktiv") and runs the optional mixer
+   initialisation. No reconnecting is needed. The audio configuration of
    ff802-ucm-profile is used unchanged.
 
-A physical USB disconnection is required: the command only sets the
-TotalMix option "Activate CC mode on disconnect" in the unit.
+The command only sets the TotalMix option "Activate CC mode on
+disconnect"; the port reset is that disconnection.
+
+The enable unit may write exactly one file below /sys: the "disable"
+attribute of the hub port of this unit
+(/sys/bus/usb/devices/<port>/port/disable, ReadWritePaths=); /sys stays
+read-only otherwise (ProtectKernelTunables=yes). It has access to USB
+device nodes only; ff802-cc-auto@ has access to the ALSA sequencer only.
+
+If the port cannot be reset (port not found, not this unit's, not
+writable), the command is still sent and a notification asks you to
+disconnect the USB cable briefly and reconnect it ("Class-Compliant-Modus
+vorbereitet").
+
+If the reset does not end with the unit back in class-compliant mode
+(the port could not be disabled or re-enabled, the unit did not come back
+within 15 s, or it came back with another USB ID), nothing is retried:
+the notification "automatische Umschaltung nicht bestätigt" asks you to
+reconnect the cable, and /run/ff802-cc-auto/reset-blocked stops any
+further automatic port reset until the next boot or "ff802-cc-auto on".
+The command itself is still sent once per new connection, so a failing
+reset can never repeat itself. If the hub port was left disabled, the
+journal shows the command to enable it again.
 
 Notifications
 -------------
@@ -87,8 +111,11 @@ WARNING: 0 dB on the headphone outputs Phones 9-12 can be very loud. Take
 headphones off and turn amplifiers down before connecting the unit, and
 set the volume in the applications.
 
-Each register is logged (journalctl -t ff802-cc-auto). The result is in
-/run/ff802-cc-auto/mixer-result. If the initialisation fails (MIDI port
+Each register is logged (journalctl -t ff802-cc-auto), before them the
+configuration "ff802-mixer-init-v2, 26 entries, checksum 0xC97A359C
+(verified)". The result is in
+/run/ff802-cc-auto/mixer-result (outcome, connection, written=n/26,
+config, entries, checksum, MIDI port). If the initialisation fails (MIDI port
 not there within 15 s, port not unambiguous, ALSA error, stopped while
 sending), nothing is retried and a separate notification "Fireface 802 –
 Mixer-Initialisierung fehlgeschlagen" is shown; the class-compliant mode
@@ -109,8 +136,8 @@ Automatic and manual switching
 
 Automatic (this package, ff802-cc-auto): only proprietary -> class-
 compliant, when the unit is connected or present at boot and the
-automation is on. It never switches back, never resets a USB port, and
-asks you to reconnect the cable.
+automation is on. It never switches back; after the command it resets the
+USB hub port of the unit like "ff802-cc enable" (see above).
 
 Manual (package ff802-cc, NOT part of this package and not required by
 it; run with sudo):
@@ -133,13 +160,15 @@ Diagnosis
   ff802-cc-auto status
   journalctl -t ff802-cc-auto -b             system service
   journalctl --user -t ff802-cc-notify -b    notifications
-  systemctl list-units 'ff802-cc-auto@*'
+  systemctl list-units --all 'ff802-cc-auto@*' 'ff802-cc-auto-enable@*'
 
-Exit codes of the service: 0 off / handled / CC mode / sent / mixer done,
-3 nothing sent (refused or failed before the write; also a mixer
+Exit codes of the service: 0 off / handled / CC mode / sent / switched /
+mixer done, 3 nothing sent (refused or failed before the write; also a mixer
 initialisation that sent nothing), 4 the write failed (device state
 unknown: power-cycle the unit and check with "ff802-cc-auto status"; also
-a mixer initialisation that stopped while sending).
+a mixer initialisation that stopped while sending), 5 the command was
+sent, but the port reset did not end in class-compliant mode (reconnect
+the cable; see the journal).
 
 Removal
 -------

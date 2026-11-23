@@ -136,7 +136,7 @@ unabhängig davon, ob die automatische Umschaltung an ist:
 | Situation | Ablauf |
 |---|---|
 | Gerät startet im CC-Modus oder wird im CC-Modus angesteckt | udev „add“ → Dienst → Initialisierung |
-| Gerät im proprietären Modus, Automatik an | Dienst sendet den CC-Befehl; nach dem Umstecken neue Verbindung → „add“ → Initialisierung |
+| Gerät im proprietären Modus, Automatik an | `ff802-cc-auto-enable@` sendet den CC-Befehl und setzt den Port zurück (ab 0.2.0~dev4, [t4_port_reset.md](t4_port_reset.md)); neue Verbindung → „add“ → Initialisierung, nach dem Ende des Resets (Sperre) |
 | `ff802-cc enable` (Port-Reset) | neue Verbindung → „add“ → Initialisierung |
 | Rechnerneustart mit angeschlossenem Gerät | Coldplug-„add“ beim Booten → Initialisierung (kein angemeldeter Benutzer nötig) |
 | Veraltetes Ereignis (Gerät inzwischen neu verbunden) | abgelehnt, keine MIDI-Aktion; das Ereignis der neuen Verbindung initialisiert |
@@ -157,6 +157,12 @@ verhindern. Innerhalb eines Laufs wird nichts wiederholt.
 | `not-sent` | Sequencer, Portliste oder Verbindung nicht möglich (z. B. belegt) | 3 |
 | `disabled-build` | Programm ohne `FF802_ENABLE_MIXER_WRITE` gebaut | 3 |
 | `incomplete` | Senden bei Nachricht n gescheitert; n−1 übergeben, Rest nicht | 4 |
+
+Vor dem Senden steht im Journal die Konfiguration
+(`mixer: configuration ff802-mixer-init-v2, 26 entries, checksum
+0xC97A359C (verified).`); `mixer-result` enthält dieselben Angaben
+(`config=`, `entries=`, `checksum=`). Die Kennung ändert sich mit jeder
+Änderung der Liste (v1: 24 Einträge, v2: 26).
 
 Jeder Lauf schreibt `/run/ff802-cc-auto/mixer-result` und je Register eine
 Journalzeile (`journalctl -t ff802-cc-auto`). Ein Fehlschlag erzeugt
@@ -274,6 +280,7 @@ sudo apt purge ff802-cc-auto                     # entfernt auch /var/lib/ff802-
 | `/usr/libexec/ff802-cc/ff802-cc-autoswitch` | Dienstprogramm, jetzt mit Mixer-Initialisierung |
 | `/usr/libexec/ff802-cc/ff802-cc-auto-mixer-on`, `-mixer-off` | Root-Hilfsprogramme für `mixer-init on/off` |
 | `/usr/lib/systemd/system/ff802-cc-auto@.service` | Dienst (`DeviceAllow=char-alsa rw`) |
+| `/usr/lib/systemd/system/ff802-cc-auto-enable@.service` | CC-Befehl und Port-Reset (proprietärer Modus, ab 0.2.0~dev4) |
 | `/usr/lib/systemd/user/ff802-cc-notify.path` | beobachtet auch `mixer-event` |
 | `/usr/share/polkit-1/actions/org.ff802cc.auto.policy` | Aktionen `mixer-on` (Administrator), `mixer-off` (aktiver Benutzer) |
 | `/var/lib/ff802-cc-auto/mixer-init` | Laufzeitschalter (zur Laufzeit angelegt) |

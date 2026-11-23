@@ -239,11 +239,16 @@ Beobachtungen, Schlussfolgerungen und offene Fragen im Einzelnen:
   Zustand: `ff802-cc-auto status`.
 - Ist sie an und wird das Gerät im proprietären Modus angeschlossen (oder
   ist es beim Systemstart so angeschlossen), sendet ein Systemdienst
-  einmal den Umschaltbefehl. Eine Desktop-Benachrichtigung bittet dann,
-  das USB-Kabel **kurz zu trennen und wieder einzustecken**; danach meldet
-  sich das Gerät im CC-Modus.
+  einmal den Umschaltbefehl und setzt danach den USB-Anschluss des Geräts
+  zurück, genau wie `ff802-cc enable`; das Gerät meldet sich ohne
+  Umstecken im CC-Modus (Entwicklungsstand 0.2.0~dev4, am Gerät noch nicht
+  geprüft; siehe [docs/t4_port_reset.md](docs/t4_port_reset.md)). Nur wenn
+  der Anschluss nicht zurückgesetzt werden kann oder das Gerät nicht im
+  CC-Modus zurückkommt, bittet eine Desktop-Benachrichtigung, das USB-Kabel
+  **kurz zu trennen und wieder einzustecken**.
 - Sie schaltet **nur** in Richtung CC, nie zurück, und setzt keinen
-  USB-Anschluss zurück.
+  anderen USB-Anschluss zurück. Ein fehlgeschlagener Reset wird bis zum
+  nächsten Neustart oder `ff802-cc-auto on` nicht wiederholt.
 - Zusammenspiel mit `ff802-cc`: Wer das Gerät unter Linux im proprietären
   Modus haben will, schaltet zuerst die Automatik aus und dann
   `ff802-cc disable`. Sonst würde die Automatik beim nächsten Anschließen
@@ -595,7 +600,7 @@ automatische Umschaltungen; es ändert den Modus des Geräts nicht.
 | Beobachtung | wahrscheinliche Ursache | was tun |
 |---|---|---|
 | `ff802-detect` zeigt `mode=proprietary`, kein Ton | Gerät nicht im CC-Modus | `sudo ff802-cc enable` oder Automatik |
-| Automatik an, aber Gerät bleibt proprietär | Kabel nach der Benachrichtigung nicht getrennt | Kabel kurz trennen; `ff802-cc-auto status`, `journalctl -t ff802-cc-auto -b` |
+| Automatik an, aber Gerät bleibt proprietär | Port-Reset nicht möglich oder nicht bestätigt (Benachrichtigung), oder Kabel danach nicht getrennt | Kabel kurz trennen; `ff802-cc-auto status`, `journalctl -t ff802-cc-auto -b` |
 | Fireface in Plasma als eine Karte ohne die sechs Ausgänge | Profil nicht zugeordnet | `sudo ff802-ucm-bind status`, `journalctl -b -t ff802-ucm-bind`; ggf. `sudo ff802-ucm-bind bind` und Gerät neu anschließen |
 | Ausgang sichtbar, Pegel läuft, aber **nichts zu hören** | Routing/Fader im internen Mixer | Routing und Fader im Gerät prüfen (TotalMix FX bzw. oscmix), siehe [docs/mixer_routing.md](docs/mixer_routing.md) |
 | Ton am falschen Ausgang | Routing im internen Mixer | wie oben |
@@ -615,7 +620,7 @@ Rückgabewerte von `ff802-cc`:
 | 5 | nicht gesendet (abgebrochen, Schreiben im Build gesperrt) |
 | 6 | gesendet, aber neuer Modus nicht erkannt |
 
-Weitere Diagnose der Automatik: `systemctl list-units 'ff802-cc-auto@*'`,
+Weitere Diagnose der Automatik: `systemctl list-units --all 'ff802-cc-auto@*' 'ff802-cc-auto-enable@*'`,
 `journalctl --user -t ff802-cc-notify -b` (Benachrichtigungen).
 
 ---

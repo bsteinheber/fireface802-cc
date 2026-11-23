@@ -301,6 +301,7 @@ Versionen dann ebenfalls anzupassen sind.
 - [audio_t3.md](audio_t3.md): T3, Integration in PipeWire/WirePlumber/Plasma, Lautstärkesicherheit, Host-Test
 - [audio_t3_usb_port.md](audio_t3_usb_port.md): T3 0.3.0, automatische UCM-Bindung an jedem USB-Port (udev-Hook), Annahmen, Host-Testplan
 - [t4_usb_mode.md](t4_usb_mode.md): T4, automatischer CC-Moduswechsel: Architektur, Sicherheit, Installation, Aktivierung, Diagnose, Rollback, Tests
+- [t4_port_reset.md](t4_port_reset.md): T4, automatischer Port-Reset nach dem CC-Befehl (0.2.0~dev4)
 - [t4_disable.md](t4_disable.md): T4, Untersuchung `ff802-cc disable` (Rückweg in den proprietären Modus)
 - [cc_disable_port_reset.md](cc_disable_port_reset.md): `ff802-cc disable` (USB-MIDI-SysEx) und USB-Hub-Port-Reset nach `enable`
 - [packages.md](packages.md): die drei Debian-Pakete, Projekt- und Paketversion, Bau, Installation, Aktualisierung, Rückbau

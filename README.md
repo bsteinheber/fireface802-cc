@@ -238,10 +238,15 @@ Observations, conclusions and open questions in detail:
   `ff802-cc-auto status`.
 - When it is on and the unit is connected in proprietary mode (or is
   connected like that at boot), a system service sends the switch command
-  once. A desktop notification then asks you to **briefly unplug and
-  replug** the USB cable; after that the unit appears in CC mode.
-- It switches **only** towards CC, never back, and does not reset any USB
-  port.
+  once and then resets the USB port of the unit, exactly like
+  `ff802-cc enable`; the unit appears in CC mode without unplugging
+  (development build 0.2.0~dev4, not yet tested on the unit; see
+  [docs/t4_port_reset.md](docs/t4_port_reset.md)). Only if the port cannot
+  be reset, or the unit does not come back in CC mode, a desktop
+  notification asks you to **briefly unplug and replug** the USB cable.
+- It switches **only** towards CC, never back, and resets no other USB
+  port. A failed reset is not repeated until the next boot or
+  `ff802-cc-auto on`.
 - Working together with `ff802-cc`: if you want the unit in proprietary
   mode on Linux, first turn the automation off, then run
   `ff802-cc disable`. Otherwise the automation would switch it again at
@@ -595,7 +600,7 @@ switches; it does not change the mode of the unit.
 | Observation | likely cause | what to do |
 |---|---|---|
 | `ff802-detect` shows `mode=proprietary`, no sound | unit not in CC mode | `sudo ff802-cc enable` or the automation |
-| automation on, but the unit stays proprietary | cable not unplugged after the notification | briefly unplug the cable; `ff802-cc-auto status`, `journalctl -t ff802-cc-auto -b` |
+| automation on, but the unit stays proprietary | port reset not possible or not confirmed (notification), or cable not unplugged after it | briefly unplug the cable; `ff802-cc-auto status`, `journalctl -t ff802-cc-auto -b` |
 | Fireface in Plasma as one card without the six outputs | profile not bound | `sudo ff802-ucm-bind status`, `journalctl -b -t ff802-ucm-bind`; if needed `sudo ff802-ucm-bind bind` and reconnect the unit |
 | output visible, level meter moves, but **nothing audible** | routing/faders in the internal mixer | check routing and faders in the unit (TotalMix FX or oscmix), see [docs/mixer_routing.md](docs/mixer_routing.md) |
 | sound at the wrong output | routing in the internal mixer | as above |
@@ -615,7 +620,7 @@ Exit status of `ff802-cc`:
 | 5 | not sent (aborted, writing disabled in the build) |
 | 6 | sent, but new mode not detected |
 
-Further diagnosis of the automation: `systemctl list-units 'ff802-cc-auto@*'`,
+Further diagnosis of the automation: `systemctl list-units --all 'ff802-cc-auto@*' 'ff802-cc-auto-enable@*'`,
 `journalctl --user -t ff802-cc-notify -b` (notifications).
 
 ---
