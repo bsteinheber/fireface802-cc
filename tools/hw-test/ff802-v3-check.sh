@@ -1,6 +1,7 @@
 #!/bin/sh
 # ff802-v3-check.sh: read-only checks for the integration test of the
-# mixer initialisation ff802-mixer-init-v3 (docs/mixer_v3_integration.md).
+# mixer initialisation (configuration ff802-mixer-init-v4, 168 registers;
+# docs/mixer_v4.md, formerly v3: docs/mixer_v3_integration.md).
 #
 #   tools/hw-test/ff802-v3-check.sh pre [<dir>]    before the installation:
 #                                                  <dir> with the release
@@ -40,7 +41,7 @@ pre)
         dir=$2
         ok "SHA256SUMS in $dir matches every listed package" \
             '[ -s "$dir/SHA256SUMS" ] && (cd "$dir" && sha256sum --quiet -c SHA256SUMS)'
-        for p in ff802-cc-auto_0.2.0_amd64.deb ff802-cc_0.5.0_amd64.deb ff802-ucm-profile_0.3.1_all.deb; do
+        for p in $(cd "$dir" && ls *.deb 2>/dev/null); do
             ok "$p present and listed in SHA256SUMS" \
                 '[ -f "$dir/$p" ] && grep -q "  $p\$" "$dir/SHA256SUMS"'
         done
@@ -71,24 +72,31 @@ post)
     else
         info "no CC command in the journal: the unit started in class-compliant mode (no switch needed)"
     fi
-    ok "mixer: configuration v3 verified (38 entries, 0xEC858A44)" \
-        'has "^mixer: configuration ff802-mixer-init-v3, 38 entries, checksum 0xEC858A44 (verified)\.$"'
-    ok "mixer: entries 1..26 are v2 (0xC97A359C)" \
-        'has "^mixer: entries 1\.\.26 are ff802-mixer-init-v2, checksum 0xC97A359C (verified)\.$"'
-    ok "mixer: 38 registers set in the last run, the last one Input 9 -> Phones 12" \
-        '[ "$(cnt "^mixer: set 0x.*\[[0-9]*/38\]$")" -ge 38 ] && has "^mixer: set 0x42C8 = 0x2666 (Input 9 -> Phones 12, 30 %) \[38/38\]$"'
+    ok "mixer: configuration v4 verified (168 entries, 0xC43D2879)" \
+        'has "^mixer: configuration ff802-mixer-init-v4, 168 entries, checksum 0xC43D2879 (verified)\.$"'
+    ok "mixer: entries 1..38 are v3 (0xEC858A44), 1..26 are v2 (0xC97A359C)" \
+        'has "^mixer: entries 1\.\.38 are ff802-mixer-init-v3, checksum 0xEC858A44 (verified)\.$" &&
+         has "^mixer: entries 1\.\.26 are ff802-mixer-init-v2, checksum 0xC97A359C (verified)\.$"'
+    ok "mixer: 168 registers set in pass 1, the last one Playback 11 -> Phones 12 off" \
+        '[ "$(cnt "^mixer: set 0x.*\[[0-9]*/168\]$")" -ge 168 ] &&
+         has "^mixer: set 0x42EA = 0x0000 (Playback 11 -> Phones 12, off) \[168/168\]$"'
     ok "mixer: the twelve Input 9 registers at 0x2666" \
         '[ "$(grep "^mixer: set 0x4[0-2][0-9A-F]8 = 0x2666 (Input 9 -> " "$J" | sed "s/ \[.*//" | sort -u | wc -l)" = 12 ]'
-    ok "mixer: pass 2 sent: the same 38 values again (Playback -> Phones included)" \
-        'has "^mixer: pass 1 of 2 complete; pass 2 (the same 38 values) in 5000 ms\.$" &&
-         has "^mixer: pass 2: set 0x4228 = 0x9000 (Playback 9 -> Phones 9, 0 dB) \[11/38\]$" &&
-         has "^mixer: pass 2: set 0x42C8 = 0x2666 (Input 9 -> Phones 12, 30 %) \[38/38\]$"'
-    ok "mixer: result done (38 of 38), no FAILED line" \
-        'has "^mixer: result done (38 of 38 registers): .*, twice$" && ! has "^mixer: \(pass 2: \)\{0,1\}FAILED"'
+    ok "mixer: the 12 x 12 playback matrix: 12 routings at 0 dB, 132 off (incl. Playback 3/4 -> Phones 11/12)" \
+        '[ "$(grep "^mixer: set 0x4[0-2][0-9A-F][0-9A-F] = 0x9000 (Playback " "$J" | sed "s/ \[.*//" | sort -u | wc -l)" = 12 ] &&
+         [ "$(grep "^mixer: set 0x4[0-2][0-9A-F][0-9A-F] = 0x0000 (Playback .*, off)" "$J" | sed "s/ \[.*//" | sort -u | wc -l)" = 132 ] &&
+         has "^mixer: set 0x42A2 = 0x0000 (Playback 3 -> Phones 11, off) " &&
+         has "^mixer: set 0x42E3 = 0x0000 (Playback 4 -> Phones 12, off) "'
+    ok "mixer: pass 2 sent: the same 168 values again" \
+        'has "^mixer: pass 1 of 2 complete; pass 2 (the same 168 values) in 5000 ms\.$" &&
+         has "^mixer: pass 2: set 0x4228 = 0x9000 (Playback 9 -> Phones 9, 0 dB) \[11/168\]$" &&
+         has "^mixer: pass 2: set 0x42EA = 0x0000 (Playback 11 -> Phones 12, off) \[168/168\]$"'
+    ok "mixer: result done (168 of 168, twice), no FAILED line" \
+        'has "^mixer: result done (168 of 168 registers): .*, twice$" && ! has "^mixer: \(pass 2: \)\{0,1\}FAILED"'
     m() { sed -n "s/^$1=//p" "$RUN/mixer-result" 2>/dev/null; }
-    ok "mixer-result: done, 38/38, v3 0xEC858A44, base v2 0xC97A359C" \
-        '[ "$(m outcome)" = done ] && [ "$(m written)" = 38/38 ] && [ "$(m config)" = ff802-mixer-init-v3 ] &&
-         [ "$(m checksum)" = 0xEC858A44 ] && [ "$(m base)" = ff802-mixer-init-v2 ] && [ "$(m base_checksum)" = 0xC97A359C ]'
+    ok "mixer-result: done, 168/168, v4 0xC43D2879, base v3 0xEC858A44" \
+        '[ "$(m outcome)" = done ] && [ "$(m written)" = 168/168 ] && [ "$(m config)" = ff802-mixer-init-v4 ] &&
+         [ "$(m checksum)" = 0xC43D2879 ] && [ "$(m base)" = ff802-mixer-init-v3 ] && [ "$(m base_checksum)" = 0xEC858A44 ]'
     port=$(m port)
     ok "unit now in class-compliant mode at $port (0424:3fdd)" \
         '[ -n "$port" ] && [ "$(cat "$ROOT/sys/bus/usb/devices/$port/idVendor" 2>/dev/null):$(cat "$ROOT/sys/bus/usb/devices/$port/idProduct" 2>/dev/null)" = 0424:3fdd ]'
@@ -96,7 +104,7 @@ post)
     rm -f "$J"
     ;;
 *)
-    sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'
     exit 2
     ;;
 esac

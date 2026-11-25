@@ -9,10 +9,10 @@
 #                          may do this without a password)
 #   ff802-cc-auto mixer-init status|on|off
 #                          mixer initialisation in class-compliant mode:
-#                          on every connection: Playback 1/2 -> Phones
-#                          9/10 off, Playback k -> Output k and Output
-#                          volumes 1..12 at 0 dB, Input 9 -> Output 1..12
-#                          at 30 % (on: administrator; off: local user)
+#                          on every connection: Playback k -> Output k
+#                          at 0 dB, every other Playback -> Output of
+#                          1..12 off, volumes 0 dB, Input 9 -> Output
+#                          1..12 at 30 % (on: administrator; off: user)
 #   ff802-cc-auto mixer-init dry-run|apply
 #                          run the mixer initialisation once by hand
 #                          (ff802-mixer-init; dry-run sends nothing, apply
@@ -49,17 +49,18 @@ mixer_warning() {
     cat <<'EOF'
 WARNING: with the mixer initialisation on, every connection of the
 Fireface 802 in class-compliant mode (reconnect, power cycle, boot) sets
-  - Playback 1/2 -> Phones 9/10 (set by the class-compliant mode) off,
+  - every crossed Playback p -> Hardware Output o (p, o = 1..12, p != o)
+    off, including Playback 1/2 -> Phones 9/10 set by the class-compliant mode,
   - Playback 1..12 -> Hardware Output 1..12 to 0 dB and
   - the volumes of all twelve Hardware Outputs (Analog 1-8 and the
     headphone outputs Phones 9-12) to 0 dB, and
   - Input 9 (Mic/Inst 9) -> Hardware Output 1..12 to 30 % (about -10.5 dB),
-overwriting changes made to these 38 values with TotalMix FX or OSCMix.
+overwriting changes made to these 168 values with TotalMix FX or OSCMix.
 0 dB on the headphone outputs can be very loud: take headphones off and
 turn amplifiers down before connecting the unit, and set the volume in
 the applications. A signal at Input 9 is heard on all outputs (a
 microphone there can feed back through speakers). Other routings, mute,
-pan and the input gain are not changed.
+pan, the input gain, Playback 13..30 and Outputs 13..30 are not changed.
 EOF
 }
 

@@ -53,7 +53,7 @@ calls() { cat "$TW/calls.log" 2>/dev/null; }
 # --- build -----------------------------------------------------------------------
 DEB=$(sh "$SRC/packaging/build-deb-auto.sh" "$T/deb" 2> "$T/build.err")
 DEB2=$(sh "$SRC/packaging/build-deb-auto.sh" "$T/deb2" 2>> "$T/build.err")
-ok "package builds" '[ -f "$DEB" ] && [ "${DEB##*/}" = "ff802-cc-auto_0.2.0_${ARCH}.deb" ]'
+ok "package builds" '[ -f "$DEB" ] && [ "${DEB##*/}" = "ff802-cc-auto_0.2.1~dev1_${ARCH}.deb" ]'
 [ -f "$DEB" ] || { cat "$T/build.err"; exit 1; }
 ok "build is reproducible (identical bytes in another directory)" 'cmp -s "$DEB" "$DEB2"'
 ok "19: building the package called no tripwire (nothing executed, no system access)" '[ -z "$(calls)" ]'
@@ -198,7 +198,7 @@ ok "packaged units: enable unit writes only the port disable attribute, CC unit 
      [ "$(grep -E "^(DeviceAllow|ReadWritePaths|CapabilityBoundingSet|ProtectKernelTunables|TimeoutStartSec)=" "$PU/ff802-cc-auto@.service" | tr "\n" ";")" = "TimeoutStartSec=60;CapabilityBoundingSet=;DeviceAllow=char-alsa rw;ProtectKernelTunables=yes;" ] &&
      grep -qx "ACTION==\"add\", ENV{SYSTEMD_WANTS}+=\"ff802-cc-auto-enable@%k.service\"" "$X/usr/lib/udev/rules.d/70-ff802-cc-auto.rules"'
 
-# the 38 entries (ff802-mixer-init-v3), from the register formulas (not from
+# the 168 entries (ff802-mixer-init-v4), from the register formulas (not from
 # the C table): 2 crossed routings off, Playback k -> Output k at 0 dB,
 # Output k volume 0 dB (entries 1..26 = v2), Input 9 -> Output k at 0x2666
 mix_entries() { # <addr> <value> <channel> <kind> <source>, decimal
@@ -209,6 +209,9 @@ mix_entries() { # <addr> <value> <channel> <kind> <source>, decimal
         echo "$(( 0x1E00 + ((k - 1) << 8) )) 0 $k 1 0"; k=$((k + 1)); done
     k=1; while [ $k -le 12 ]; do
         echo "$(( 0x4000 | ((k - 1) << 6) | 8 )) $((0x2666)) $k 3 9"; k=$((k + 1)); done
+    for o in 1 2 3 4 5 6 7 8 9 10 11 12; do for p in 1 2 3 4 5 6 7 8 9 10 11 12; do
+        [ $p = $o ] && continue; [ "$p-$o" = 1-9 ] && continue; [ "$p-$o" = 2-10 ] && continue
+        echo "$(( 0x4000 | ((o - 1) << 6) | (0x20 + p - 1) )) 0 $o 2 $p"; done; done
 }
 mix_list() { mix_entries | while read -r a v c kd s; do printf '0x%04X=0x%04X ' "$a" "$v"; done; }
 le16() { printf '%02x%02x' $(($1 & 255)) $(($1 >> 8)); }
@@ -228,16 +231,19 @@ hexof() { od -An -v -tx1 "$1" | tr -d " \n"; }
 TABLE_HEX=$(mix_table_hex)
 V2_LIST="0x4220=0x0000 0x4261=0x0000 0x4020=0x9000 0x4061=0x9000 0x40A2=0x9000 0x40E3=0x9000 0x4124=0x9000 0x4165=0x9000 0x41A6=0x9000 0x41E7=0x9000 0x4228=0x9000 0x4269=0x9000 0x42AA=0x9000 0x42EB=0x9000 0x1E00=0x0000 0x1F00=0x0000 0x2000=0x0000 0x2100=0x0000 0x2200=0x0000 0x2300=0x0000 0x2400=0x0000 0x2500=0x0000 0x2600=0x0000 0x2700=0x0000 0x2800=0x0000 0x2900=0x0000 "
 IN9_LIST="0x4008=0x2666 0x4048=0x2666 0x4088=0x2666 0x40C8=0x2666 0x4108=0x2666 0x4148=0x2666 0x4188=0x2666 0x41C8=0x2666 0x4208=0x2666 0x4248=0x2666 0x4288=0x2666 0x42C8=0x2666 "
-ok "the 38 registers: the 26 of v2 unchanged and in order, then Input 9 -> Output 1..12 at 0x2666" \
-    '[ "$(mix_entries | wc -l)" = 38 ] && [ "$(mix_list)" = "$V2_LIST$IN9_LIST" ]'
-ok "checksums computed here: all 38 = 0xEC858A44 (v3), first 26 = 0xC97A359C (v2), as in the sources" \
-    '[ "$(mix_fnv 38)" = 0xEC858A44 ] && [ "$(mix_fnv 26)" = 0xC97A359C ] &&
-     grep -q "^#define FF802_MIXER_INIT_CHECKSUM    0xEC858A44u$" "$SRC/include/ff802/mixer_init.h" &&
+X130_LIST="0x4021=0x0000 0x4022=0x0000 0x4023=0x0000 0x4024=0x0000 0x4025=0x0000 0x4026=0x0000 0x4027=0x0000 0x4028=0x0000 0x4029=0x0000 0x402A=0x0000 0x402B=0x0000 0x4060=0x0000 0x4062=0x0000 0x4063=0x0000 0x4064=0x0000 0x4065=0x0000 0x4066=0x0000 0x4067=0x0000 0x4068=0x0000 0x4069=0x0000 0x406A=0x0000 0x406B=0x0000 0x40A0=0x0000 0x40A1=0x0000 0x40A3=0x0000 0x40A4=0x0000 0x40A5=0x0000 0x40A6=0x0000 0x40A7=0x0000 0x40A8=0x0000 0x40A9=0x0000 0x40AA=0x0000 0x40AB=0x0000 0x40E0=0x0000 0x40E1=0x0000 0x40E2=0x0000 0x40E4=0x0000 0x40E5=0x0000 0x40E6=0x0000 0x40E7=0x0000 0x40E8=0x0000 0x40E9=0x0000 0x40EA=0x0000 0x40EB=0x0000 0x4120=0x0000 0x4121=0x0000 0x4122=0x0000 0x4123=0x0000 0x4125=0x0000 0x4126=0x0000 0x4127=0x0000 0x4128=0x0000 0x4129=0x0000 0x412A=0x0000 0x412B=0x0000 0x4160=0x0000 0x4161=0x0000 0x4162=0x0000 0x4163=0x0000 0x4164=0x0000 0x4166=0x0000 0x4167=0x0000 0x4168=0x0000 0x4169=0x0000 0x416A=0x0000 0x416B=0x0000 0x41A0=0x0000 0x41A1=0x0000 0x41A2=0x0000 0x41A3=0x0000 0x41A4=0x0000 0x41A5=0x0000 0x41A7=0x0000 0x41A8=0x0000 0x41A9=0x0000 0x41AA=0x0000 0x41AB=0x0000 0x41E0=0x0000 0x41E1=0x0000 0x41E2=0x0000 0x41E3=0x0000 0x41E4=0x0000 0x41E5=0x0000 0x41E6=0x0000 0x41E8=0x0000 0x41E9=0x0000 0x41EA=0x0000 0x41EB=0x0000 0x4221=0x0000 0x4222=0x0000 0x4223=0x0000 0x4224=0x0000 0x4225=0x0000 0x4226=0x0000 0x4227=0x0000 0x4229=0x0000 0x422A=0x0000 0x422B=0x0000 0x4260=0x0000 0x4262=0x0000 0x4263=0x0000 0x4264=0x0000 0x4265=0x0000 0x4266=0x0000 0x4267=0x0000 0x4268=0x0000 0x426A=0x0000 0x426B=0x0000 0x42A0=0x0000 0x42A1=0x0000 0x42A2=0x0000 0x42A3=0x0000 0x42A4=0x0000 0x42A5=0x0000 0x42A6=0x0000 0x42A7=0x0000 0x42A8=0x0000 0x42A9=0x0000 0x42AB=0x0000 0x42E0=0x0000 0x42E1=0x0000 0x42E2=0x0000 0x42E3=0x0000 0x42E4=0x0000 0x42E5=0x0000 0x42E6=0x0000 0x42E7=0x0000 0x42E8=0x0000 0x42E9=0x0000 0x42EA=0x0000 "
+ok "the 168 registers: v2 (26), Input 9 (12) = v3, then the 130 other crossed playback routings off" \
+    '[ "$(mix_entries | wc -l)" = 168 ] && [ "$(mix_list)" = "$V2_LIST$IN9_LIST$X130_LIST" ]'
+ok "checksums computed here: all 168 = 0xC43D2879 (v4), first 38 = 0xEC858A44 (v3), first 26 = 0xC97A359C (v2)" \
+    '[ "$(mix_fnv 168)" = 0xC43D2879 ] && [ "$(mix_fnv 38)" = 0xEC858A44 ] && [ "$(mix_fnv 26)" = 0xC97A359C ] &&
+     grep -q "^#define FF802_MIXER_INIT_CHECKSUM    0xC43D2879u$" "$SRC/include/ff802/mixer_init.h" &&
+     grep -q "^#define FF802_MIXER_INIT_V3_CHECKSUM 0xEC858A44u$" "$SRC/include/ff802/mixer_init.h" &&
      grep -q "^#define FF802_MIXER_INIT_V2_CHECKSUM 0xC97A359Cu$" "$SRC/include/ff802/mixer_init.h"'
 ok "packaged service and ff802-mixer-init contain exactly this table, once each (same list, automatic and manual)" \
-    '[ "${#TABLE_HEX}" = 1216 ] &&
+    '[ "${#TABLE_HEX}" = 5376 ] &&
      [ "$(hexof "$EBIN" | grep -o "$TABLE_HEX" | wc -l)" = 1 ] &&
      [ "$(hexof "$MI" | grep -o "$TABLE_HEX" | wc -l)" = 1 ] &&
+     grep -aq "ff802-mixer-init-v4" "$EBIN" && grep -aq "ff802-mixer-init-v4" "$MI" &&
      grep -aq "ff802-mixer-init-v3" "$EBIN" && grep -aq "ff802-mixer-init-v3" "$MI" &&
      grep -aq "ff802-mixer-init-v2" "$EBIN" && grep -aq "ff802-mixer-init-v2" "$MI"'
 ok "packaged notification texts: success without reconnecting, reconnect only as recovery" \
@@ -248,7 +254,7 @@ ok "packaged notification texts: success without reconnecting, reconnect only as
      ! grep -q "after the switch you will be asked to reconnect" "$X/usr/libexec/ff802-cc/ff802-cc-auto-on" &&
      grep -q "port is reset automatically; no further reconnecting is needed" "$X/usr/libexec/ff802-cc/ff802-cc-auto-on"'
 ok "control: name, version, architecture, dependencies, off after installation" \
-    'grep -qx "Package: ff802-cc-auto" "$X/DEBIAN/control" && grep -qx "Version: 0.2.0" "$X/DEBIAN/control" &&
+    'grep -qx "Package: ff802-cc-auto" "$X/DEBIAN/control" && grep -qx "Version: 0.2.1~dev1" "$X/DEBIAN/control" &&
      grep -qx "Architecture: $ARCH" "$X/DEBIAN/control" &&
      grep -qx "Depends: libc6 (>= 2.34), libusb-1.0-0 (>= 2:1.0.22), libasound2t64 (>= 1.2.10), systemd, udev" "$X/DEBIAN/control" &&
      grep -q "The automation is off after installation" "$X/DEBIAN/control"'
@@ -304,7 +310,7 @@ FF802_AUTO_ROOT=$R sh "$R/usr/libexec/ff802-cc/ff802-cc-auto-mixer-on" > "$T/mon
 ok "installed mixer helper writes only the mixer-init state" \
     '[ "$(cat "$R/var/lib/ff802-cc-auto/mixer-init")" = on ] && [ "$(cat "$R/var/lib/ff802-cc-auto/mode")" = on ] &&
      [ "$(ls "$R/var/lib/ff802-cc-auto" | tr "\n" " ")" = "mixer-init mode " ]'
-DEBUP=$(sh "$SRC/packaging/build-deb-auto.sh" "$T/deb-up" 0.2.1 2>> "$T/build.err")
+DEBUP=$(sh "$SRC/packaging/build-deb-auto.sh" "$T/deb-up" 0.2.1~dev2 2>> "$T/build.err")
 rc=$(run upgrade.txt dpkg_r -i "$DEBUP")
 ok "upgrade keeps the automation state (on) and the mixer-init state (on) and reports them" \
     '[ "$rc" = 0 ] && [ "$(cat "$R/var/lib/ff802-cc-auto/mode")" = on ] && [ "$(cat "$R/var/lib/ff802-cc-auto/mixer-init")" = on ] &&

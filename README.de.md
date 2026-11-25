@@ -15,7 +15,7 @@ Stereo-Eingang für PipeWire.
 > zurück) und sorgt dafür, dass die Ausgänge in der Desktop-Audioverwaltung
 > sinnvoll benannt und einzeln nutzbar sind. Auf Wunsch setzt es bei
 > jeder Verbindung einen festen Grundzustand des internen Mixers
-> (38 Register); es liest den Mixer nicht aus und ersetzt TotalMix FX nicht.
+> (168 Register); es liest den Mixer nicht aus und ersetzt TotalMix FX nicht.
 
 Getestet mit **einem** Gerät (ursprüngliches Fireface 802, nicht 802 FS)
 unter Kubuntu 26.04.1 LTS. Kein Projekt von RME, siehe
@@ -201,10 +201,12 @@ ein anderes, als TotalMix FX zuvor angezeigt hatte.
 
 **Optionale Mixer-Initialisierung (ab Version 0.5.0, Paket
 `ff802-cc-auto` 0.2.0, nach der Installation ausgeschaltet):** Bei jeder
-Verbindung im CC-Modus setzt sie genau 38 Register des internen Mixers
-(Konfiguration `ff802-mixer-init-v3`, am Gerät getestet):
+Verbindung im CC-Modus setzt sie genau 168 Register des internen Mixers
+(Konfiguration `ff802-mixer-init-v4`; v3 mit 38 davon am Gerät getestet, v4 im Test):
 
-- Playback 1/2 → Phones 9/10 aus (diese Verbindungen setzt der CC-Modus),
+- jede Verbindung Playback p → Hardware Output o mit p ≠ o (p, o = 1…12)
+  aus, 132 Verbindungen, darunter Playback 1/2 → Phones 9/10, die der
+  CC-Modus setzt, und jede von TotalMix FX übrig gebliebene Querverbindung,
 - Playback 1…12 → Hardware Output 1…12 auf 0 dB,
 - die zwölf Ausgangspegel auf 0 dB,
 - Input 9 (Mic/Inst 9) → alle zwölf Ausgänge mit 30 % (etwa −10,5 dB),
@@ -327,6 +329,7 @@ Kubuntu 26.04.1 durchgeführt.
 | `ff802-cc disable` (CC → proprietär) | ja | ja, 2026-11-19 ¹ |
 | automatische Umschaltung `ff802-cc-auto` mit Port-Reset | ja | ja, 2026-11-23 (ohne Umstecken) |
 | Mixer-Initialisierung, 38 Register (`ff802-mixer-init-v3`) | ja | ja, 2026-11-23, zweimal aus- und eingeschaltet ⁴ |
+| vollständige 12×12-Playback-Matrix, 168 Register (`ff802-mixer-init-v4`) | ja | ausstehend ⁵ |
 | Input 9 mit 30 % auf allen zwölf Ausgängen | ja | ja, Hörtest (E1 für Analog 3, dann alle zwölf) ⁴ |
 | UCM-Profil wird von alsa-lib mit der echten Karte geladen (T1) | ja | ja, 29/29 Prüfungen |
 | sechs Ausgänge und ein Eingang in PipeWire/Plasma (T3) | ja | ja |
@@ -355,6 +358,10 @@ Gerät eingestellt waren.
 sendet die Liste deshalb zweimal im Abstand von 5 s. Die Ursache ist
 nicht bekannt. Einzelheiten:
 [docs/mixer_v3_integration.md](docs/mixer_v3_integration.md).
+⁵ Der Release-Kandidat mit v3 ließ Playback 3/4 zusätzlich auf Phones
+11/12 hören (eine Querverbindung im Mixer, nicht in PipeWire); v4
+schaltet alle Playback-Querverbindungen ab. Hardwaretest von v4
+ausstehend: [docs/mixer_v4.md](docs/mixer_v4.md).
 
 ---
 
@@ -363,7 +370,7 @@ nicht bekannt. Einzelheiten:
 ### Nachgewiesen
 
 - **Mixer nur als fester Grundzustand:** Der interne Mixer des Fireface
-  wird nie gelesen; die optionale Initialisierung schreibt 38 feste Werte
+  wird nie gelesen; die optionale Initialisierung schreibt 168 feste Werte
   und sonst nichts. Dieses Projekt ist **kein Ersatz für TotalMix FX**.
 - **Ohne Mixer-Initialisierung kein Routing:** Ein Ausgang kann in Plasma
   erscheinen und Ton bekommen, ohne dass an der Buchse etwas zu hören ist
@@ -678,8 +685,8 @@ Die Dokumente unter `docs/` sind auf Deutsch.
 | Profilzuordnung an jedem USB-Anschluss | [docs/audio_t3_usb_port.md](docs/audio_t3_usb_port.md) |
 | Pakete, Versionen, Installationsstand | [docs/packages.md](docs/packages.md) |
 | Interner Mixer, Software-Playback-Fader, Beobachtungen | [docs/mixer_routing.md](docs/mixer_routing.md) |
-| Mixer-Initialisierung (38 Register), Registerliste | [docs/mixer_init.md](docs/mixer_init.md) |
-| Hardwaretests B.4, D1, D3, E1; Integrationstest v3 | [docs/mixer_b4.md](docs/mixer_b4.md), [docs/mixer_d1.md](docs/mixer_d1.md), [docs/mixer_d3.md](docs/mixer_d3.md), [docs/mixer_e1.md](docs/mixer_e1.md), [docs/mixer_v3_integration.md](docs/mixer_v3_integration.md) |
+| Mixer-Initialisierung (168 Register), Registerliste | [docs/mixer_init.md](docs/mixer_init.md) |
+| Hardwaretests B.4, D1, D3, E1; Integrationstest v3 | [docs/mixer_b4.md](docs/mixer_b4.md), [docs/mixer_d1.md](docs/mixer_d1.md), [docs/mixer_d3.md](docs/mixer_d3.md), [docs/mixer_e1.md](docs/mixer_e1.md), [docs/mixer_v3_integration.md](docs/mixer_v3_integration.md), [docs/mixer_v4.md](docs/mixer_v4.md) |
 | Release-Notizen v0.5.0 | [docs/release-notes-v0.5.0.md](docs/release-notes-v0.5.0.md) |
 | Aufbau des Quellcodes, Build-Optionen, Tests, Entwicklungsphasen | [docs/development.md](docs/development.md) |
 

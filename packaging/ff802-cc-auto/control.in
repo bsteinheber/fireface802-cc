@@ -24,11 +24,11 @@ Description: automatic class-compliant mode for the RME Fireface 802
  .
  Optional, also off after installation and independent of the automation:
  ff802-cc-auto mixer-init on sets, on every connection in class-compliant
- mode, the routings Playback 1/2 -> Phones 9/10 (set by the class-compliant
- mode) off, the routings Playback 1..12 -> Output 1..12 and the volumes
+ mode, the 12 x 12 matrix of Playback 1..12 -> Hardware Output 1..12
+ (Playback k -> Output k at 0 dB, all 132 other combinations off) and the volumes
  of the twelve hardware outputs to 0 dB, and Input 9 (Mic/Inst 9) to all
  twelve outputs at 30 % linear, through the ALSA sequencer (MIDI port 2
- of the unit): 38 register writes (ff802-mixer-init-v3, the 26 of v2
- unchanged first). Other crossed routings, other input routings and the
+ of the unit): 168 register writes (ff802-mixer-init-v4, the 38 of v3
+ unchanged first). Other input routings, Playback/Outputs 13..30 and the
  input gain are not changed. ff802-mixer-init --dry-run|--apply runs
  the same initialisation once by hand.

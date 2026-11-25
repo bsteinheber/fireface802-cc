@@ -1,11 +1,13 @@
 # Pakete: Übersicht, Versionen, Bau, Installation, Rückbau
 
-> **Stand 2026-11-23, Projektversion 0.5.0 (Release `v0.5.0` in
-> Vorbereitung):** Pakete `ff802-cc` 0.5.0, `ff802-cc-auto` 0.2.0 und
-> `ff802-ucm-profile` 0.3.1. Auf dem Entwicklungsrechner ist
-> `ff802-cc-auto` 0.2.0~dev6 installiert (Integrationstest bestanden,
-> [mixer_v3_integration.md](mixer_v3_integration.md)); 0.2.0 ist
-> inhaltlich derselbe Stand mit Release-Versionsnummern.
+> **Stand 2026-11-25, Projektversion 0.5.0 (Release `v0.5.0` in
+> Vorbereitung):** Pakete `ff802-cc` 0.5.0, `ff802-cc-auto` 0.2.x und
+> `ff802-ucm-profile` 0.3.1. Der Release-Kandidat `ff802-cc-auto` 0.2.0
+> (Mixer v3) zeigte am Gerät eine verbliebene Querverbindung; im
+> Hardwaretest ist jetzt `0.2.1~dev1` mit Mixer v4 (vollständige
+> 12×12-Playback-Matrix, [mixer_v4.md](mixer_v4.md)). Die endgültige
+> Version von `ff802-cc-auto` für das Release wird nach diesem Test
+> festgelegt.
 
 ## Release v0.5.0
 

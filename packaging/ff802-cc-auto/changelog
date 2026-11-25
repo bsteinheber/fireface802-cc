@@ -1,3 +1,24 @@
+ff802-cc-auto (0.2.1~dev1) UNRELEASED; urgency=medium
+
+  * Development build, not released; for the hardware test of the mixer
+    configuration v4.
+  * Mixer initialisation ff802-mixer-init-v4 with 168 register writes
+    (checksum 0xC43D2879): the 38 writes of ff802-mixer-init-v3 unchanged
+    and first (checksum 0xEC858A44 checked as well), then the other 130
+    crossed routings Playback p -> Hardware Output o (p, o = 1..12,
+    p != o) off (0x0000). The 12 x 12 playback matrix is now completely
+    defined: 12 routings at 0 dB, 132 off. Hardware test of 0.2.0
+    (release candidate) on the unit: Playback 3/4 was also heard on
+    Phones 11/12 (no such link in PipeWire), i.e. a crossed routing left
+    in the mixer by an earlier state; v4 switches every such routing
+    within the 12 x 12 matrix off. Playback 13..30, Outputs 13..30 and
+    input routings other than Input 9 are not touched.
+  * One pass takes about 1.7 s (168 messages, 10 ms apart); the service
+    still sends the list twice, 5 s apart; the manual ff802-mixer-init
+    once. mixer-result: base= is now ff802-mixer-init-v3.
+
+ -- Bernhard Steinheber <bernhard@steinheber.info>  Wed, 25 Nov 2026 12:00:00 +0100
+
 ff802-cc-auto (0.2.0) unstable; urgency=medium
 
   * Release v0.5.0 of fireface802-cc. Same function as the development

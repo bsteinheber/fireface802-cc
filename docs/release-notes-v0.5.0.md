@@ -27,11 +27,13 @@ replug the cable; a failed reset is not repeated until the next boot or
 `ff802-cc-auto on`.
 
 **Optional mixer initialisation (off after installation).** At every
-connection in class-compliant mode it writes exactly 38 registers of the
+connection in class-compliant mode it writes exactly 168 registers of the
 internal mixer through the ALSA sequencer (configuration
-`ff802-mixer-init-v3`):
+`ff802-mixer-init-v4`):
 
-- Playback 1/2 -> Phones 9/10 off (set by the class-compliant mode),
+- every Playback p -> Hardware Output o with p != o (p, o = 1..12) off
+  (132 routings, including Playback 1/2 -> Phones 9/10 set by the
+  class-compliant mode),
 - Playback 1..12 -> Hardware Output 1..12 at 0 dB,
 - the twelve output levels at 0 dB,
 - Input 9 (Mic/Inst 9) -> all twelve outputs at 30 % (about -10.5 dB),
@@ -47,7 +49,7 @@ The service sends the list twice, 5 s apart. Turn it on with
   USB, sysfs, ALSA sequencer, PipeWire; package installation in an
   isolated root; reproducible package builds).
 - On the unit (2026-11-23): automatic switch with port reset; mixer
-  initialisation with 38 registers after power-on, twice; playback on all
+  initialisation with 38 registers (v3) after power-on, twice; playback on all
   output pairs and Input 9 on all twelve outputs (listening tests).
 
 ## Known limitations

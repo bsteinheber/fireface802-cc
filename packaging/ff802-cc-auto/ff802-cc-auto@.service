@@ -12,10 +12,11 @@
 #
 # Only if 'ff802-cc-auto mixer-init on' (off by default, independent of
 # the automation): waits up to 15 s for the MIDI port "Port 2" of this
-# connection and sets the 38 fixed mixer registers (configuration
-# ff802-mixer-init-v3, checksum 0xEC858A44: Playback 1/2 -> Phones 9/10
-# off, Playback 1..12 -> Output 1..12 and the volumes of Output 1..12 at
-# 0 dB, Input 9 -> Output 1..12 at 30 %; entries 1..26 = v2, 0xC97A359C)
+# connection and sets the 168 fixed mixer registers (configuration
+# ff802-mixer-init-v4, checksum 0xC43D2879: the 12 x 12 matrix Playback
+# 1..12 -> Output 1..12 with Playback k -> Output k at 0 dB and all other
+# 132 off, output volumes 1..12 at 0 dB, Input 9 -> Output 1..12 at 30 %;
+# entries 1..38 = v3, 0xEC858A44)
 # through the ALSA sequencer, the whole list twice, 5 s apart. No USB
 # access, no sysfs writes.
 # Log: journalctl -t ff802-cc-auto
