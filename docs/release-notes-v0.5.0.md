@@ -7,7 +7,7 @@ with one unit on Kubuntu 26.04.1 LTS.
 
 | Package | Version | Changes since v0.4.1 |
 |---|---|---|
-| `ff802-cc-auto` | **0.2.0** | automatic USB port reset after the switch command (no replugging); optional mixer initialisation (38 registers); new program `ff802-mixer-init` |
+| `ff802-cc-auto` | **0.2.1** | automatic USB port reset after the switch command (no replugging); optional mixer initialisation (168 registers, the complete 12 x 12 playback matrix); new program `ff802-mixer-init` |
 | `ff802-cc` | **0.5.0** | no functional change (shared port reset timing, new project version) |
 | `ff802-ucm-profile` | 0.3.1 | unchanged |
 
@@ -49,8 +49,23 @@ The service sends the list twice, 5 s apart. Turn it on with
   USB, sysfs, ALSA sequencer, PipeWire; package installation in an
   isolated root; reproducible package builds).
 - On the unit (2026-11-23): automatic switch with port reset; mixer
-  initialisation with 38 registers (v3) after power-on, twice; playback on all
-  output pairs and Input 9 on all twelve outputs (listening tests).
+  initialisation with the first 38 registers (v3) after power-on,
+  twice; playback on all output pairs and Input 9 on all twelve outputs
+  (listening tests).
+- On the unit (2026-11-25): mixer initialisation with all 168 registers
+  (v4) after power-on, checked with the hardware check script and by
+  listening: each playback pair only on its own output.
+
+## Fixed before the release
+
+The first release candidate (`ff802-cc-auto` 0.2.0, configuration v3,
+not published) left Playback 3/4 also on Phones 11/12, with no such link
+in PipeWire. The unit keeps its mixer settings across power cycles, and
+v3 switched off only Playback 1/2 -> Phones 9/10, so a crossed routing
+still set in the mixer stayed in effect. v4 sets every routing of the
+12 x 12 playback matrix, whatever the previous state was. Where the
+left-over routing came from (a default of the class-compliant mode or an
+earlier TotalMix FX setting) is not known.
 
 ## Known limitations
 
@@ -68,4 +83,5 @@ The service sends the list twice, 5 s apart. Turn it on with
 Details (German): [mixer_init.md](mixer_init.md),
 [t4_port_reset.md](t4_port_reset.md),
 [mixer_v3_integration.md](mixer_v3_integration.md),
+[mixer_v4.md](mixer_v4.md),
 [packages.md](packages.md).

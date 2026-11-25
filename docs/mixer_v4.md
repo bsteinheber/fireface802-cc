@@ -1,8 +1,9 @@
 # Mixer-Konfiguration v4: vollständige 12×12-Playback-Matrix
 
-> **Stand 2026-11-25: implementiert und automatisch getestet, am Gerät
-> noch nicht geprüft.** Entwicklungspaket `ff802-cc-auto 0.2.1~dev1`.
-> Betrifft nur das ursprüngliche RME Fireface 802 im CC-Modus.
+> **Stand 2026-11-25: am Gerät getestet und bestanden** mit dem
+> Entwicklungspaket `ff802-cc-auto 0.2.1~dev1`; unverändert im
+> Release-Paket `ff802-cc-auto` 0.2.1 (v0.5.0). Betrifft nur das
+> ursprüngliche RME Fireface 802 im CC-Modus.
 
 ## Anlass
 
@@ -67,7 +68,8 @@ Eingangs-Routings außer Input 9, Eingangsverstärkung, Mute, Pan.
   n−1 übergebenen Nachrichten, Benachrichtigung, keine Wiederholung; ein
   Fehler im zweiten Durchgang → `incomplete` („pass 2: … failed; pass 1
   complete“). Bricht ein Lauf nach Nachricht 38 ab, ist genau v3 gesetzt.
-- Ungeprüft: ob das Gerät 168 Nachrichten in Folge vollständig übernimmt.
+- Am Gerät bestätigt (2026-11-25): Das Gerät übernimmt 168 Nachrichten in
+  Folge; siehe Hardwaretest unten.
 
 ## Automatisch geprüft
 
@@ -88,22 +90,55 @@ Gesamtsuite 85/85 (Build `build-v4-test`), darunter:
 - `deb_auto_package`: die 168 Einträge aus den Formeln als Bytes in Dienst
   und `ff802-mixer-init`, drei Prüfsummen in der Shell.
 
-## Hardwaretest (noch auszuführen)
+## Ursache und Behebung
 
-Siehe den Bericht zur Bereitstellung bzw. die Befehle unten; Auswertung
-mit `tools/hw-test/ff802-v3-check.sh post` (prüft jetzt v4).
+**Ursache:** Der interne Mixer des Fireface behält seine Einstellungen
+über das Aus- und Einschalten hinweg. Konfiguration v3 schrieb von der
+12×12-Playback-Matrix nur die zwölf Verbindungen p = o und die beiden
+Kreuzverbindungen Playback 1/2 → Phones 9/10; die übrigen 130
+Kreuzverbindungen blieben auf dem Wert, den das Gerät schon hatte. Eine
+davon war eingeschaltet, mit hoher Wahrscheinlichkeit Playback 3 →
+Phones 11 (`0x42A2`) und/oder Playback 4 → Phones 12 (`0x42E3`), denn
+genau Playback 3/4 war auf Phones 11/12 zu hören. PipeWire war nicht
+beteiligt (`pw-link -l`).
 
-1. Paket installieren, Fireface aus- und einschalten.
-2. Prüfskript: v4-Konfiguration, 168 Register in beiden Durchgängen,
-   132 Verbindungen aus (einschließlich `0x42A2`, `0x42E3`).
-3. Hörprüfung: Playback 3/4 nur auf Analog 3/4, **nicht** mehr auf
-   Phones 11/12; jedes Paar nur auf seinem Ausgang, links und rechts
-   getrennt; Input 9 auf allen zwölf Ausgängen.
-4. Zweites Aus- und Einschalten, Hörprüfung wiederholen.
+**Behebung:** v4 schreibt alle 144 Verbindungen der Matrix mit festen
+Werten, unabhängig vom vorherigen Zustand. Damit ist das Ergebnis nicht
+mehr davon abhängig, was TotalMix FX, OSCMix oder der CC-Modus zuvor
+eingestellt haben.
+
+**Nicht geklärt** (für die Behebung ohne Bedeutung):
+
+- Welche der 130 Kreuzverbindungen tatsächlich eingeschaltet waren: Das
+  Gerät wird nie ausgelesen, und v4 schreibt alle auf einmal.
+- Woher die Einstellung stammte: eine Grundeinstellung des CC-Modus
+  (wie Playback 1/2 → Phones 9/10) oder ein Rest früherer Einstellungen
+  mit TotalMix FX bzw. der OSCMix-Versuche.
+
+## Hardwaretest (2026-11-25, bestanden)
+
+Mit `ff802-cc-auto 0.2.1~dev1` (SHA-256
+`777de490c630ad32b5061fffa7e9be8683bcbe82e8516b28ba346509fd835721`), vom
+Anwender ausgeführt und gemeldet:
+
+1. Paket installiert, Fireface aus- und eingeschaltet.
+2. Prüfskript `tools/hw-test/ff802-v3-check.sh post`: bestanden
+   (v4-Konfiguration, 168 Register in beiden Durchgängen, 132
+   Verbindungen aus, einschließlich `0x42A2`, `0x42E3`).
+3. Hörprüfung: Playback 3/4 nur noch auf Analog 3/4, nicht mehr auf
+   Phones 11/12; die Ausgänge wie erwartet.
+
+Damit ist auch belegt, dass das Gerät 168 Nachrichten in Folge (zweimal,
+5 s Abstand) übernimmt. Pegel wurden gehört, nicht gemessen; ob `0x0000`
+exakt −∞ dB ist, bleibt ungemessen (hörbar aus).
 
 ## Rückweg
 
-- Release-Kandidat (v3): `build-release-v0.5.0/ff802-cc-auto_0.2.0_amd64.deb`
-  mit `dpkg -i`. Die von v4 ausgeschalteten 130 Verbindungen bleiben aus
-  (v3 schreibt sie nicht); das ist der gewünschte Zustand.
-- Ältere Stände: `build-deb-dev6`, `build-deb-dev4`.
+- Kein veröffentlichter Vorgänger mit v4. Der erste Release-Kandidat
+  (v3, nicht veröffentlicht) liegt in
+  `build-release-v0.5.0/ff802-cc-auto_0.2.0_amd64.deb` und lässt sich mit
+  `dpkg -i` installieren. Die von v4 ausgeschalteten 130 Verbindungen
+  bleiben dabei aus (v3 schreibt sie nicht); das ist der gewünschte
+  Zustand.
+- Ältere Stände: `build-deb-v4-dev1`, `build-deb-dev6`, `build-deb-dev4`
+  (bis zur Freigabe des Releases aufbewahrt).

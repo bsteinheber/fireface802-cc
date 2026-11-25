@@ -110,9 +110,10 @@ ff802-mixer-init-v2. Together the 12 x 12 matrix of Playback 1..12 ->
 Hardware Output 1..12 is completely defined: each playback channel only
 on its own output at 0 dB, all 132 other combinations off, also inside
 the stereo pairs, whatever TotalMix FX or the class-compliant mode left
-there. Input 9 is at 30 % amplitude (about -10.5 dB) on every output,
-the same mono signal on both channels of each pair (confirmed on the
-unit for Analog 3, hardware test E1). Nothing else is changed: no
+there (tested on the unit with 0.2.1~dev1, 2026-11-25). Input 9 is at
+30 % amplitude (about -10.5 dB) on every output, the same mono signal
+on both channels of each pair (confirmed on the unit for Analog 3,
+hardware test E1). Nothing else is changed: no
 Playback 13..30, no Outputs 13..30 (AES, ADAT), no other inputs, no
 input gain, mute, pan or stored setups. Nothing is read from the unit,
 so there is no undo: changes made to these 168 values with TotalMix FX

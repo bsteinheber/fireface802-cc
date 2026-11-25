@@ -198,9 +198,9 @@ in between, the routing in CC mode differed from what TotalMix FX had
 shown before.
 
 **Optional mixer initialisation (from version 0.5.0, package
-`ff802-cc-auto` 0.2.0, off after installation):** at every connection in
+`ff802-cc-auto` 0.2.1, off after installation):** at every connection in
 CC mode it sets exactly 168 registers of the internal mixer (configuration
-`ff802-mixer-init-v4`; v3 with 38 of them tested on the unit, v4 in test):
+`ff802-mixer-init-v4`, tested on the unit):
 
 - every Playback p -> Hardware Output o with p != o (p, o = 1..12) off,
   132 routings, including Playback 1/2 -> Phones 9/10 that the CC mode
@@ -326,7 +326,7 @@ They never access USB hardware or a real sound card.
 | `ff802-cc disable` (CC → proprietary) | yes | yes, 2026-11-19 ¹ |
 | automatic switching `ff802-cc-auto` with port reset | yes | yes, 2026-11-23 (no replugging) |
 | mixer initialisation, 38 registers (`ff802-mixer-init-v3`) | yes | yes, 2026-11-23, two power cycles ⁴ |
-| full 12 x 12 playback matrix, 168 registers (`ff802-mixer-init-v4`) | yes | pending ⁵ |
+| full 12 x 12 playback matrix, 168 registers (`ff802-mixer-init-v4`) | yes | yes, 2026-11-25, check script and listening test ⁵ |
 | Input 9 at 30 % on all twelve outputs | yes | yes, listening test (E1 for Analog 3, then all twelve) ⁴ |
 | UCM profile is loaded by alsa-lib with the real card (T1) | yes | yes, 29/29 checks |
 | six outputs and one input in PipeWire/Plasma (T3) | yes | yes |
@@ -354,10 +354,14 @@ Playback faders in the unit had been set.
 therefore sends the list twice, 5 s apart. The cause is not known.
 Details: [docs/mixer_v3_integration.md](docs/mixer_v3_integration.md)
 (German).
-⁵ The release candidate with v3 left Playback 3/4 also on Phones 11/12 (a
-crossed routing in the mixer, not in PipeWire); v4 switches all crossed
-playback routings off. Hardware test of v4 pending:
-[docs/mixer_v4.md](docs/mixer_v4.md) (German).
+⁵ Cause of a crossed routing found with the release candidate (v3):
+Playback 3/4 was also heard on Phones 11/12, with no such link in
+PipeWire. The unit keeps its mixer settings across power cycles, and v3
+switched off only Playback 1/2 -> Phones 9/10, so a crossed routing still
+set in the mixer stayed in effect. v4 sets all 144 routings of the
+12 x 12 matrix, whatever the previous state was; with it Playback 3/4 is
+heard only on Analog 3/4. Details: [docs/mixer_v4.md](docs/mixer_v4.md)
+(German).
 
 ---
 
@@ -483,7 +487,7 @@ the GitHub release **v0.5.0**:
 
 ```
 ff802-cc_0.5.0_amd64.deb
-ff802-cc-auto_0.2.0_amd64.deb
+ff802-cc-auto_0.2.1_amd64.deb
 ff802-ucm-profile_0.3.1_all.deb
 SHA256SUMS
 ```
@@ -523,7 +527,7 @@ ff802-cc --version
 **3. Automation** (optional):
 
 ```sh
-sudo apt install ./ff802-cc-auto_0.2.0_amd64.deb
+sudo apt install ./ff802-cc-auto_0.2.1_amd64.deb
 ff802-cc-auto status       # after installation: off
 ff802-cc-auto on           # turn on (asks for the administrator password)
 ff802-cc-auto mixer-init status   # optional mixer initialisation: off after installation

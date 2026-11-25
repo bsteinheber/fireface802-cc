@@ -25,10 +25,10 @@ T3 Integration in PipeWire/WirePlumber/Plasma, T4 USB-Modusverwaltung.
 | 3 | ALSA-UCM-Profil mit sechs Stereo-Ausgängen für den CC-Modus, Debian-Paket `ff802-ucm-profile` (T1, T3) | T1 bestanden, T3 funktional erfolgreich getestet (sechs Stereo-Ausgänge, ein Stereo-Eingang; Analog 3/4, Kopfhörer 9/10 und 11/12 mit realer Wiedergabe); Version **0.3.0 auf dem Host installiert**, automatischer USB-Portwechsel erfolgreich getestet (2026-11-18, [audio_t3_usb_port.md](audio_t3_usb_port.md)) |
 | 4 | Messwerkzeug `ff802-chanmap` für die Kanalzuordnung (Hardwaretest T2) | Werkzeug fertig; T2 am 2026-11-17 ausgeführt, **nur Analog Out 1 und 2 nachgewiesen** (Out 3, 5, 7 ohne erkanntes Signal, Out 4 abgebrochen, Rest nicht gemessen; kein Nachweis eines Fehlers). Protokolle und Auswertung: [audio_t2_results/](audio_t2_results/README.md). Die Markierung `FF802-CHANNEL-MAP: UNVERIFIED` im Profil bleibt |
 | T4 | Automatischer Wechsel in den CC-Modus beim Anschließen/Systemstart, Debian-Paket `ff802-cc-auto`; Untersuchung `ff802-cc disable` | 0.1.x: Umschaltung mit Umstecken, am Gerät getestet; 0.2.0: automatischer Port-Reset (wie `ff802-cc enable`), am Gerät getestet 2026-11-23 ([t4_port_reset.md](t4_port_reset.md)); `disable` ist Teil von `ff802-cc` |
-| M | Mixer-Initialisierung im CC-Modus über den ALSA-Sequencer (Paket `ff802-cc-auto` 0.2.0, `ff802-mixer-init`) | Hardwaretests B.2–B.4, D1–D3, E1; Konfiguration `ff802-mixer-init-v3` mit 38 Registern, Integrationstest mit dev6 bestanden (2026-11-23, [mixer_v3_integration.md](mixer_v3_integration.md)); v4 mit vollständiger 12×12-Playback-Matrix (168 Register, `0.2.1~dev1`) im Hardwaretest ([mixer_v4.md](mixer_v4.md)) |
+| M | Mixer-Initialisierung im CC-Modus über den ALSA-Sequencer (Paket `ff802-cc-auto` 0.2.1, `ff802-mixer-init`) | Hardwaretests B.2–B.4, D1–D3, E1; Konfiguration `ff802-mixer-init-v3` mit 38 Registern, Integrationstest mit dev6 bestanden (2026-11-23, [mixer_v3_integration.md](mixer_v3_integration.md)); v4 mit vollständiger 12×12-Playback-Matrix (168 Register), Hardwaretest mit `0.2.1~dev1` bestanden (2026-11-25, [mixer_v4.md](mixer_v4.md)) |
 
 Release v0.5.0 (in Vorbereitung): Pakete `ff802-cc` 0.5.0,
-`ff802-cc-auto` 0.2.0 und `ff802-ucm-profile` 0.3.1 (unverändert seit
+`ff802-cc-auto` 0.2.1 und `ff802-ucm-profile` 0.3.1 (unverändert seit
 v0.4.1); Einzelheiten und frühere Releases in [packages.md](packages.md),
 Änderungen in [release-notes-v0.5.0.md](release-notes-v0.5.0.md).
 

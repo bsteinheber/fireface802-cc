@@ -1,8 +1,8 @@
 # Mixer-Initialisierung im Class-Compliant-Modus
 
 > **Stand 2026-11-25: Konfiguration `ff802-mixer-init-v4` (168 Register,
-> Prüfsumme `0xC43D2879`), Entwicklungspaket `ff802-cc-auto 0.2.1~dev1`,
-> am Gerät noch nicht geprüft ([mixer_v4.md](mixer_v4.md)).** Darin
+> Prüfsumme `0xC43D2879`), Paket `ff802-cc-auto` 0.2.1 (Release v0.5.0),
+> am Gerät getestet 2026-11-25 mit 0.2.1~dev1 ([mixer_v4.md](mixer_v4.md)).** Darin
 > unverändert enthalten: `ff802-mixer-init-v3` (Einträge 1–38,
 > `0xEC858A44`, am Gerät getestet mit 0.2.0~dev6/0.2.0) und
 > `ff802-mixer-init-v2` (1–26, `0xC97A359C`).
@@ -61,7 +61,7 @@ es gibt kein Rückgängig.
 | `0x4088 = 0x2666` (Input 9 → Analog 3, 30 %) | **am Gerät** (E1, 2026-11-23: deutlich hörbar, Analog 4 still, mit `0x0000` wieder still) |
 | Input 9 → alle zwölf Ausgänge | **am Gerät** (Integrationstest v3, dev6: auf allen zwölf hörbar, Hörprüfung) |
 | **Folge von 38 Nachrichten** (v3) | **am Gerät**: dev5 mit einem Durchgang unvollständig wirksam (Playback → Phones), dev6 mit zwei Durchgängen bestanden ([mixer_v3_integration.md](mixer_v3_integration.md)) |
-| **Folge von 168 Nachrichten** (v4, vollständige 12×12-Matrix) | **nur simuliert**; Hardwaretest steht aus ([mixer_v4.md](mixer_v4.md)) |
+| **Folge von 168 Nachrichten** (v4, vollständige 12×12-Matrix) | **am Gerät** (2026-11-25, `0.2.1~dev1`, zwei Durchgänge): Prüfskript bestanden, Playback 3/4 nur noch auf Analog 3/4 ([mixer_v4.md](mixer_v4.md)) |
 | Lauf im systemd-Dienst (Härtung, `DeviceAllow=char-alsa`, Boot) | **nur simuliert** (Dienstaufruf mit Simulationsbuild, `systemd-analyze`) |
 | Wartezeiten, Sperre, gleichzeitige Ereignisse, Fehlerfälle, Benachrichtigung | **nur simuliert** |
 | Paketbau, Installation, Upgrade, Entfernung | in isolierter Wurzel getestet, nicht auf dem Host |
@@ -291,7 +291,7 @@ normaler Benutzer der Sitzung, unabhängig von `mixer-init on`.
 
 ```sh
 cmake -S . -B build
-cmake --build build --target deb-auto      # build/deb/ff802-cc-auto_0.2.0~dev3_amd64.deb
+cmake --build build --target deb-auto      # build/deb/ff802-cc-auto_0.2.1_amd64.deb
 ```
 
 Der Paketbau ist reproduzierbar und führt keines der Programme aus.
@@ -299,7 +299,7 @@ Der Paketbau ist reproduzierbar und führt keines der Programme aus.
 **Installieren und aktivieren** (auf dem Host, erst nach Freigabe):
 
 ```sh
-sudo apt install ./build/deb/ff802-cc-auto_0.2.0~dev3_amd64.deb
+sudo apt install ./build/deb/ff802-cc-auto_0.2.1_amd64.deb
 ff802-cc-auto mixer-init dry-run
 ff802-cc-auto mixer-init on
 ```

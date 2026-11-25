@@ -1,20 +1,19 @@
 # Pakete: Übersicht, Versionen, Bau, Installation, Rückbau
 
 > **Stand 2026-11-25, Projektversion 0.5.0 (Release `v0.5.0` in
-> Vorbereitung):** Pakete `ff802-cc` 0.5.0, `ff802-cc-auto` 0.2.x und
-> `ff802-ucm-profile` 0.3.1. Der Release-Kandidat `ff802-cc-auto` 0.2.0
-> (Mixer v3) zeigte am Gerät eine verbliebene Querverbindung; im
-> Hardwaretest ist jetzt `0.2.1~dev1` mit Mixer v4 (vollständige
-> 12×12-Playback-Matrix, [mixer_v4.md](mixer_v4.md)). Die endgültige
-> Version von `ff802-cc-auto` für das Release wird nach diesem Test
-> festgelegt.
+> Vorbereitung):** Pakete `ff802-cc` 0.5.0, `ff802-cc-auto` 0.2.1 und
+> `ff802-ucm-profile` 0.3.1. `ff802-cc-auto` 0.2.1 ersetzt den nicht
+> veröffentlichten ersten Release-Kandidaten 0.2.0 (Mixer v3), der am
+> Gerät eine verbliebene Querverbindung zeigte; 0.2.1 enthält Mixer v4
+> (vollständige 12×12-Playback-Matrix, [mixer_v4.md](mixer_v4.md)), am
+> Gerät getestet als `0.2.1~dev1` (2026-11-25).
 
 ## Release v0.5.0
 
 | Paket | Version | gegenüber v0.4.1 |
 |---|---|---|
 | `ff802-cc` | 0.5.0 | Funktion unverändert; die Zeitwerte des Port-Resets (2 s aus, bis 15 s Warten) stehen jetzt mit denselben Werten in `usb_port.h` und werden mit der Automatik geteilt; neue Projektversion in `--version` |
-| `ff802-cc-auto` | 0.2.0 | automatischer Port-Reset nach dem CC-Befehl (eigene Unit `ff802-cc-auto-enable@.service`), optionale Mixer-Initialisierung mit 38 Registern (`ff802-mixer-init-v3`, zwei Durchgänge im Dienst), Programm `ff802-mixer-init`, Abhängigkeit `libasound2t64` |
+| `ff802-cc-auto` | 0.2.1 | automatischer Port-Reset nach dem CC-Befehl (eigene Unit `ff802-cc-auto-enable@.service`), optionale Mixer-Initialisierung mit 168 Registern (`ff802-mixer-init-v4`, vollständige 12×12-Playback-Matrix, zwei Durchgänge im Dienst), Programm `ff802-mixer-init`, Abhängigkeit `libasound2t64` |
 | `ff802-ucm-profile` | 0.3.1 | unverändert (gleiche Quellen wie in v0.4.1) |
 
 Die Pakete werden aus dem getaggten Commit gebaut; ihre SHA-256 stehen
@@ -43,18 +42,20 @@ Tag `v0.4.0` (`c0acd9a`); der einzige Unterschied ist das historische
 Referenzskript `tools/hw-test/ff802-disable-test.py` (in keinem Paket).
 `--version` und `BUILDINFO` dieser Pakete zeigen deshalb `e12a1d0`.
 
-### Entwicklungsstände 0.2.0~dev1 … dev6 von `ff802-cc-auto`
+### Nicht veröffentlichte Stände von `ff802-cc-auto`: 0.2.0~dev1 … dev6, 0.2.0, 0.2.1~dev1
 
 Nur für Hardwaretests auf dem Entwicklungsrechner gebaut, nie
 veröffentlicht; ihr Verlauf steht im Changelog des Pakets. dev6 ist der
-am Gerät getestete Stand, aus dem 0.2.0 hervorgeht.
+am Gerät getestete Stand mit Mixer v3, aus dem 0.2.0 hervorging. 0.2.0 war
+der erste Release-Kandidat (Mixer v3, nicht veröffentlicht); 0.2.1~dev1
+ist der am Gerät getestete Stand mit Mixer v4, aus dem 0.2.1 hervorgeht.
 
 ## Die drei Pakete
 
 | Paket | Version | Inhalt | hängt ab von |
 |---|---|---|---|
 | `ff802-ucm-profile` | 0.3.1 | UCM-Profil (sechs Stereo-Ausgänge, ein Eingang), `ff802-ucm-bind`, udev-Regel für die Bindung an jedem Port | `alsa-ucm-conf`, `libasound2t64` |
-| `ff802-cc-auto` | 0.2.0 | **automatische** Umschaltung proprietär → CC beim Anschließen mit Port-Reset (T4), optionale Mixer-Initialisierung, `ff802-mixer-init` | `libc6`, `libusb-1.0-0`, `libasound2t64`, `systemd`, `udev` |
+| `ff802-cc-auto` | 0.2.1 | **automatische** Umschaltung proprietär → CC beim Anschließen mit Port-Reset (T4), optionale Mixer-Initialisierung, `ff802-mixer-init` | `libc6`, `libusb-1.0-0`, `libasound2t64`, `systemd`, `udev` |
 | `ff802-cc` | 0.5.0 | **manuelle** Umschaltung: `ff802-cc enable` (mit USB-Hub-Port-Reset) und `ff802-cc disable`, dazu `ff802-detect` | `libc6`, `libusb-1.0-0` |
 
 Die Pakete hängen nicht voneinander ab, und keine Datei gehört zu zwei
@@ -69,10 +70,10 @@ aus. `ff802-cc disable` wird abgelehnt, solange die Automatik an ist.
 |---|---|---|---|
 | **Projektversion** | `project(VERSION …)` in `CMakeLists.txt` | `--version` aller Programme | `0.5.0` |
 | **Git-Revision** | ermittelt von CMake beim Konfigurieren (12 Hexziffern, „+dirty“ bei uncommitteten Änderungen an versionierten Dateien, „unknown“ ohne Git) | `--version` von `ff802-cc` und `ff802-detect`, `BUILDINFO` | `e12a1d0201ea` |
-| **Paketversion** | erste Zeile von `packaging/<paket>/changelog` | `dpkg -l`, Dateiname der `.deb` | `ff802-cc 0.5.0`, `ff802-cc-auto 0.2.0` |
+| **Paketversion** | erste Zeile von `packaging/<paket>/changelog` | `dpkg -l`, Dateiname der `.deb` | `ff802-cc 0.5.0`, `ff802-cc-auto 0.2.1` |
 
 Die Paketversion kann von der Projektversion abweichen:
-- `ff802-cc-auto` 0.2.0 enthält Programme mit Projektversion 0.5.0.
+- `ff802-cc-auto` 0.2.1 enthält Programme mit Projektversion 0.5.0.
 - Eine reine Paketänderung bekäme zum Beispiel `0.5.0-2`.
 - Der Override der Bauskripte ändert nur die Paketversion, etwa für
   Upgrade-Tests.
@@ -95,7 +96,7 @@ frisch aus einem sauberen Checkout konfiguriert.
 ```sh
 cmake -S . -B build && cmake --build build
 cmake --build build --target deb       # build/deb/ff802-ucm-profile_0.3.1_all.deb
-cmake --build build --target deb-auto  # build/deb/ff802-cc-auto_0.2.0_amd64.deb
+cmake --build build --target deb-auto  # build/deb/ff802-cc-auto_0.2.1_amd64.deb
 cmake --build build --target deb-cc    # build/deb/ff802-cc_0.5.0_amd64.deb
 ctest --test-dir build                 # u. a. deb_package, deb_auto_package, deb_cc_package
 ```
@@ -130,7 +131,7 @@ vorher `sha256sum -c SHA256SUMS`.
 
 ```sh
 sudo apt install ./ff802-cc_0.5.0_amd64.deb            # Upgrade von 0.4.x
-sudo apt install ./ff802-cc-auto_0.2.0_amd64.deb       # Upgrade von 0.1.x oder 0.2.0~devN
+sudo apt install ./ff802-cc-auto_0.2.1_amd64.deb       # Upgrade von 0.1.x, 0.2.0~devN, 0.2.0 oder 0.2.1~dev1
 sudo apt install ./ff802-ucm-profile_0.3.1_all.deb     # Upgrade von 0.3.0
 ff802-cc --version
 ff802-cc-auto status

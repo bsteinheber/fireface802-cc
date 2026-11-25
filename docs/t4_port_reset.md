@@ -2,11 +2,11 @@
 
 > **Stand 2026-11-23: am Gerät erfolgreich getestet (vom Anwender
 > gemeldet: Umschaltung, Port-Reset, Wiedererkennung, Initialisierung).**
-> Paket `ff802-cc-auto` 0.2.0~dev4, unverändert in 0.2.0 (Release v0.5.0). Betrifft nur das ursprüngliche RME
+> Paket `ff802-cc-auto` 0.2.0~dev4, unverändert in 0.2.1 (Release v0.5.0). Betrifft nur das ursprüngliche RME
 > Fireface 802 (nicht das 802 FS).
 >
-> **Nachtrag:** Ab 0.2.0~dev5 umfasst die Mixer-Initialisierung 38 Register
-> (`ff802-mixer-init-v3`, [mixer_init.md](mixer_init.md)); Angaben zu 26
+> **Nachtrag:** Ab 0.2.0~dev5 umfasst die Mixer-Initialisierung 38 Register,
+> ab 0.2.1~dev1 168 (`ff802-mixer-init-v4`, [mixer_init.md](mixer_init.md)); Angaben zu 26
 > Registern unten beziehen sich auf dev4.
 
 ## Ziel

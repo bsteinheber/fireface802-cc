@@ -1,3 +1,20 @@
+ff802-cc-auto (0.2.1) unstable; urgency=medium
+
+  * Release v0.5.0 of fireface802-cc (replaces the release candidate
+    0.2.0, which was never published). Same function as the development
+    build 0.2.1~dev1, which passed the hardware test on the unit
+    (2026-11-25): mixer initialisation ff802-mixer-init-v4 with 168
+    register writes (checksum 0xC43D2879), the complete 12 x 12 playback
+    matrix (Playback 1..12 -> Hardware Output 1..12 at 0 dB, the other
+    132 routings off), sent twice by the service, 5 s apart.
+  * Cause of the fix: the mixer of the unit keeps its settings across
+    power cycles. Configuration v3 switched off only Playback 1/2 ->
+    Phones 9/10; a crossed routing Playback 3/4 -> Phones 11/12 that was
+    still set in the mixer stayed in effect. v4 sets every routing of the
+    12 x 12 matrix, whatever the previous state was.
+
+ -- Bernhard Steinheber <bernhard@steinheber.info>  Wed, 25 Nov 2026 18:00:00 +0100
+
 ff802-cc-auto (0.2.1~dev1) UNRELEASED; urgency=medium
 
   * Development build, not released; for the hardware test of the mixer

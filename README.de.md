@@ -200,9 +200,9 @@ ist: Nach zwischenzeitlichem Windows-Betrieb war das Routing im CC-Modus
 ein anderes, als TotalMix FX zuvor angezeigt hatte.
 
 **Optionale Mixer-Initialisierung (ab Version 0.5.0, Paket
-`ff802-cc-auto` 0.2.0, nach der Installation ausgeschaltet):** Bei jeder
+`ff802-cc-auto` 0.2.1, nach der Installation ausgeschaltet):** Bei jeder
 Verbindung im CC-Modus setzt sie genau 168 Register des internen Mixers
-(Konfiguration `ff802-mixer-init-v4`; v3 mit 38 davon am Gerät getestet, v4 im Test):
+(Konfiguration `ff802-mixer-init-v4`, am Gerät getestet):
 
 - jede Verbindung Playback p → Hardware Output o mit p ≠ o (p, o = 1…12)
   aus, 132 Verbindungen, darunter Playback 1/2 → Phones 9/10, die der
@@ -329,7 +329,7 @@ Kubuntu 26.04.1 durchgeführt.
 | `ff802-cc disable` (CC → proprietär) | ja | ja, 2026-11-19 ¹ |
 | automatische Umschaltung `ff802-cc-auto` mit Port-Reset | ja | ja, 2026-11-23 (ohne Umstecken) |
 | Mixer-Initialisierung, 38 Register (`ff802-mixer-init-v3`) | ja | ja, 2026-11-23, zweimal aus- und eingeschaltet ⁴ |
-| vollständige 12×12-Playback-Matrix, 168 Register (`ff802-mixer-init-v4`) | ja | ausstehend ⁵ |
+| vollständige 12×12-Playback-Matrix, 168 Register (`ff802-mixer-init-v4`) | ja | ja, 2026-11-25, Prüfskript und Hörprüfung ⁵ |
 | Input 9 mit 30 % auf allen zwölf Ausgängen | ja | ja, Hörtest (E1 für Analog 3, dann alle zwölf) ⁴ |
 | UCM-Profil wird von alsa-lib mit der echten Karte geladen (T1) | ja | ja, 29/29 Prüfungen |
 | sechs Ausgänge und ein Eingang in PipeWire/Plasma (T3) | ja | ja |
@@ -358,10 +358,15 @@ Gerät eingestellt waren.
 sendet die Liste deshalb zweimal im Abstand von 5 s. Die Ursache ist
 nicht bekannt. Einzelheiten:
 [docs/mixer_v3_integration.md](docs/mixer_v3_integration.md).
-⁵ Der Release-Kandidat mit v3 ließ Playback 3/4 zusätzlich auf Phones
-11/12 hören (eine Querverbindung im Mixer, nicht in PipeWire); v4
-schaltet alle Playback-Querverbindungen ab. Hardwaretest von v4
-ausstehend: [docs/mixer_v4.md](docs/mixer_v4.md).
+⁵ Ursache einer Querverbindung, die beim Release-Kandidaten (v3)
+auffiel: Playback 3/4 war zusätzlich auf Phones 11/12 zu hören, ohne
+entsprechende Verbindung in PipeWire. Das Gerät behält seine
+Mixereinstellungen über das Aus- und Einschalten hinweg, und v3 schaltete
+nur Playback 1/2 → Phones 9/10 ab; eine im Mixer noch gesetzte
+Querverbindung blieb daher wirksam. v4 setzt alle 144 Verbindungen der
+12×12-Matrix unabhängig vom vorherigen Zustand; damit ist Playback 3/4
+nur noch auf Analog 3/4 zu hören. Einzelheiten:
+[docs/mixer_v4.md](docs/mixer_v4.md).
 
 ---
 
@@ -484,7 +489,7 @@ GitHub-Releases **v0.5.0** veröffentlicht:
 
 ```
 ff802-cc_0.5.0_amd64.deb
-ff802-cc-auto_0.2.0_amd64.deb
+ff802-cc-auto_0.2.1_amd64.deb
 ff802-ucm-profile_0.3.1_all.deb
 SHA256SUMS
 ```
@@ -524,7 +529,7 @@ ff802-cc --version
 **3. Automatik** (optional):
 
 ```sh
-sudo apt install ./ff802-cc-auto_0.2.0_amd64.deb
+sudo apt install ./ff802-cc-auto_0.2.1_amd64.deb
 ff802-cc-auto status       # nach der Installation: aus
 ff802-cc-auto on           # einschalten (fragt nach dem Administratorpasswort)
 ff802-cc-auto mixer-init status   # optionale Mixer-Initialisierung: nach der Installation aus
