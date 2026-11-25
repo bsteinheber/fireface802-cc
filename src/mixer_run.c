@@ -265,6 +265,9 @@ ff802_mixer_outcome ff802_mixer_run(const char *sysfs_root,
     logf_(log, "mixer: configuration %s, %u entries, checksum 0x%08X (verified).",
           FF802_MIXER_INIT_ID, FF802_MIXER_INIT_COUNT, (unsigned)ff802_mixer_init_checksum());
     logf_(log, "mixer: entries 1..%u are %s, checksum 0x%08X (verified).",
+          FF802_MIXER_INIT_V3_COUNT, FF802_MIXER_INIT_V3_ID,
+          (unsigned)ff802_mixer_init_v3_checksum());
+    logf_(log, "mixer: entries 1..%u are %s, checksum 0x%08X (verified).",
           FF802_MIXER_INIT_V2_COUNT, FF802_MIXER_INIT_V2_ID,
           (unsigned)ff802_mixer_init_v2_checksum());
     if (f == NULL || f->open == NULL || f->close == NULL || f->sleep_ms == NULL)

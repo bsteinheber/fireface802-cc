@@ -229,7 +229,7 @@ ok "service with mixer init and no MIDI port: mixer-event written, shown as mixe
     '[ "$src" = 3 ] && [ "$rc" = 0 ] && [ ! -e "$R/run/ff802-cc-auto/event" ] &&
      [ "$(stat -c %a "$R/run/ff802-cc-auto/mixer-event")" = 644 ] &&
      grep -qF "[Fireface 802 – Mixer-Initialisierung fehlgeschlagen]" "$CALLS" &&
-     grep -qF "no sound card with MIDI device for the connection after 0 ms; nothing sent (0 of 38 registers)" "$CALLS"'
+     grep -qF "no sound card with MIDI device for the connection after 0 ms; nothing sent (0 of 168 registers)" "$CALLS"'
 
 reset; mkdir -p "$R/var/lib/ff802-cc-auto"; echo on > "$R/var/lib/ff802-cc-auto/mode"
 d=$DEVS/$PORT; mkdir -p "$d"

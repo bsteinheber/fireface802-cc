@@ -52,22 +52,22 @@ static void test_done(void)
     fake_midi_init(&m, 1, 20);
 
     CHECK(run(&fx, &m, &r) == FF802_MIXER_DONE);
-    CHECK(r.outcome == FF802_MIXER_DONE && r.written == 38 && r.card == 1);
+    CHECK(r.outcome == FF802_MIXER_DONE && r.written == 168 && r.card == 1);
     CHECK(r.client == 20 && r.port == 1);
     CHECK(strcmp(r.port_name, "Fireface 802 (24047128) Port 2") == 0);
     CHECK(m.n_open == 1 && m.n_close == 1 && m.n_connect == 1);
     CHECK(m.conn_client == 20 && m.conn_port == 1);
-    CHECK(m.n_sent == 38);
+    CHECK(m.n_sent == 168);
     /* exactly the table, in order */
     const ff802_mixer_entry *t = ff802_mixer_init_table();
-    for (unsigned i = 0; i < 38u; i++) {
+    for (unsigned i = 0; i < 168u; i++) {
         uint8_t want[12];
         CHECK(ff802_rme_sysex_reg(t[i].addr, t[i].value, want) == FF802_OK);
         CHECK_BYTES(m.sent[i], want, 12);
     }
     /* 1 ms between messages, no waiting for card or port */
-    CHECK(m.n_sleep == 37 && m.slept_ms == 37);
-    CHECK(strstr(r.detail, "38 registers sent to MIDI port 20:1") != NULL);
+    CHECK(m.n_sleep == 167 && m.slept_ms == 167);
+    CHECK(strstr(r.detail, "168 registers sent to MIDI port 20:1") != NULL);
     CHECK(strcmp(ff802_mixer_outcome_str(r.outcome), "done") == 0);
     CHECK(!ff802_mixer_outcome_failed(r.outcome));
 
@@ -75,7 +75,7 @@ static void test_done(void)
     fake_midi m2;
     fake_midi_init(&m2, 1, 20);
     CHECK(run(&fx, &m2, &r) == FF802_MIXER_DONE);
-    CHECK(m2.n_sent == 38 && memcmp(m.sent, m2.sent, sizeof m.sent) == 0);
+    CHECK(m2.n_sent == 168 && memcmp(m.sent, m2.sent, sizeof m.sent) == 0);
     fx_done(&fx);
 }
 
@@ -96,8 +96,8 @@ static void test_waits(void)
     m.on_sleep = appear_on_third_sleep;
     m.ports_after_lists = 2;
     CHECK(run(&fx, &m, &r) == FF802_MIXER_DONE);
-    CHECK(m.n_list == 3 && m.n_sent == 38);
-    CHECK(m.slept_ms == 300 + 200 + 37);
+    CHECK(m.n_list == 3 && m.n_sent == 168);
+    CHECK(m.slept_ms == 300 + 200 + 167);
     fx_done(&fx);
 }
 
@@ -215,7 +215,7 @@ static void test_errors(void)
     m.send_err_at = 7;
     CHECK(run(&fx, &m, &r) == FF802_MIXER_INCOMPLETE);
     CHECK(r.written == 6 && m.n_sent == 6 && m.n_send_calls == 7 && m.n_close == 1);
-    CHECK(strstr(r.detail, "register 7 of 38 (0x4124)") != NULL);
+    CHECK(strstr(r.detail, "register 7 of 168 (0x4124)") != NULL);
     CHECK(strstr(r.detail, "6 written, nothing retried") != NULL);
 
     /* fails at the first Input 9 message: the whole v2 part (26) is written */
@@ -223,15 +223,29 @@ static void test_errors(void)
     m.send_err_at = 27;
     CHECK(run(&fx, &m, &r) == FF802_MIXER_INCOMPLETE);
     CHECK(r.written == 26 && m.n_sent == 26 && m.n_send_calls == 27);
-    CHECK(strstr(r.detail, "register 27 of 38 (0x4008)") != NULL);
+    CHECK(strstr(r.detail, "register 27 of 168 (0x4008)") != NULL);
     CHECK(strstr(r.detail, "26 written, nothing retried") != NULL);
 
-    /* fails at the last message: 37 written, no retry */
+    /* fails at the last v3 message: 37 written, no retry */
     fake_midi_init(&m, 1, 20);
     m.send_err_at = 38;
     CHECK(run(&fx, &m, &r) == FF802_MIXER_INCOMPLETE);
     CHECK(r.written == 37 && m.n_send_calls == 38);
-    CHECK(strstr(r.detail, "register 38 of 38 (0x42C8)") != NULL);
+    CHECK(strstr(r.detail, "register 38 of 168 (0x42C8)") != NULL);
+
+    /* fails at the first new v4 message: the whole v3 part (38) is written */
+    fake_midi_init(&m, 1, 20);
+    m.send_err_at = 39;
+    CHECK(run(&fx, &m, &r) == FF802_MIXER_INCOMPLETE);
+    CHECK(r.written == 38 && m.n_send_calls == 39);
+    CHECK(strstr(r.detail, "register 39 of 168 (0x4021)") != NULL);
+
+    /* fails at the very last message: 167 written */
+    fake_midi_init(&m, 1, 20);
+    m.send_err_at = 168;
+    CHECK(run(&fx, &m, &r) == FF802_MIXER_INCOMPLETE);
+    CHECK(r.written == 167 && m.n_send_calls == 168);
+    CHECK(strstr(r.detail, "register 168 of 168 (0x42EA)") != NULL);
 
     /* the first message fails */
     fake_midi_init(&m, 1, 20);
@@ -317,7 +331,7 @@ static void test_dry_run_confirm_settle(void)
     CHECK(ff802_mixer_run(fx.paths.sysfs_root, &d, &f, &o, NULL, &r) == FF802_MIXER_ABORTED);
     CHECK(g_confirm_calls == 1 && m.n_connect == 0 && m.n_send_calls == 0 && m.n_close == 1);
 
-    /* confirmation given before anything is sent; then 38 + settle */
+    /* confirmation given before anything is sent; then 168 + settle */
     fake_midi_init(&m, 1, 20);
     f = fake_midi_factory(&m);
     o = fast();
@@ -327,8 +341,8 @@ static void test_dry_run_confirm_settle(void)
     o.settle_ms = 200;
     g_confirm_calls = 0;
     CHECK(ff802_mixer_run(fx.paths.sysfs_root, &d, &f, &o, NULL, &r) == FF802_MIXER_DONE);
-    CHECK(g_confirm_calls == 1 && m.n_sent == 38 && m.n_close == 1);
-    CHECK(m.n_sleep == 38 && m.slept_ms == 37u * 10u + 200u);
+    CHECK(g_confirm_calls == 1 && m.n_sent == 168 && m.n_close == 1);
+    CHECK(m.n_sleep == 168 && m.slept_ms == 167u * 10u + 200u);
 
     /* a build without writes is refused before asking */
     fake_midi_init(&m, 1, 20);
@@ -346,22 +360,22 @@ static void test_dry_run_confirm_settle(void)
 static void test_messages(void)
 {
     const ff802_mixer_entry *t = ff802_mixer_init_table();
-    for (unsigned i = 0; i < 38u; i++) {
+    for (unsigned i = 0; i < 168u; i++) {
         uint8_t a[12], b[12];
         CHECK(ff802_mixer_init_message(i, a) == FF802_OK);
         CHECK(ff802_rme_sysex_reg(t[i].addr, t[i].value, b) == FF802_OK);
         CHECK_BYTES(a, b, 12);
     }
     uint8_t c[12];
-    CHECK(ff802_mixer_init_message(38, c) == FF802_ERR_ADDR_RANGE);
+    CHECK(ff802_mixer_init_message(168, c) == FF802_ERR_ADDR_RANGE);
 }
 
 
-/* passes = 2 (the service): the same 38 messages again after repeat_ms */
+/* passes = 2 (the service): the same 168 messages again after repeat_ms */
 static fixture *g_fx2;
 static void reconnect_in_pause(fake_midi *m)
 {
-    if (m->n_sleep == 38)           /* 37 gaps, then the pause before pass 2 */
+    if (m->n_sleep == 168)          /* 167 gaps, then the pause before pass 2 */
         fx_ff802_cc(g_fx2, 20);
 }
 
@@ -382,36 +396,43 @@ static void test_two_passes(void)
 
     fake_midi_init(&m, 1, 20);
     CHECK(run2(&fx, &m, &r) == FF802_MIXER_DONE);
-    CHECK(m.n_sent == 76 && m.n_connect == 1 && m.n_close == 1);
-    for (unsigned i = 0; i < 38u; i++)
-        CHECK_BYTES(m.sent[i], m.sent[38u + i], FF802_MIXER_SYSEX_SIZE);
-    CHECK(r.written == 38 && r.passes_done == 2);
-    CHECK(m.slept_ms == 37 + 500 + 37);
-    CHECK(strstr(r.detail, "38 registers sent to MIDI port 20:1") != NULL &&
+    CHECK(m.n_sent == 336 && m.n_connect == 1 && m.n_close == 1);
+    for (unsigned i = 0; i < 168u; i++)
+        CHECK_BYTES(m.sent[i], m.sent[168u + i], FF802_MIXER_SYSEX_SIZE);
+    CHECK(r.written == 168 && r.passes_done == 2);
+    CHECK(m.slept_ms == 167 + 500 + 167);
+    CHECK(strstr(r.detail, "168 registers sent to MIDI port 20:1") != NULL &&
           strstr(r.detail, "twice") != NULL);
 
     /* the default (manual run) is one pass */
     fake_midi_init(&m, 1, 20);
-    CHECK(run(&fx, &m, &r) == FF802_MIXER_DONE && m.n_sent == 38 && r.passes_done == 1);
+    CHECK(run(&fx, &m, &r) == FF802_MIXER_DONE && m.n_sent == 168 && r.passes_done == 1);
     ff802_mixer_options d;
     ff802_mixer_default_options(&d);
     CHECK(d.passes == 1 && d.repeat_ms == FF802_MIXER_REPEAT_MS && FF802_MIXER_REPEAT_MS == 5000u);
 
     /* pass 2 fails at its 7th message: incomplete, pass 1 complete, no retry */
     fake_midi_init(&m, 1, 20);
-    m.send_err_at = 45;
+    m.send_err_at = 175;
     CHECK(run2(&fx, &m, &r) == FF802_MIXER_INCOMPLETE);
-    CHECK(r.written == 38 && r.passes_done == 1 && m.n_send_calls == 45 && m.n_close == 1);
-    CHECK(strstr(r.detail, "pass 2: sending register 7 of 38 (0x4124) failed") != NULL);
+    CHECK(r.written == 168 && r.passes_done == 1 && m.n_send_calls == 175 && m.n_close == 1);
+    CHECK(strstr(r.detail, "pass 2: sending register 7 of 168 (0x4124) failed") != NULL);
     CHECK(strstr(r.detail, "pass 1 complete, nothing retried") != NULL);
     CHECK(ff802_mixer_outcome_failed(r.outcome));
+
+    /* pass 2 fails at its last message (Playback 11 -> Phones 12): incomplete */
+    fake_midi_init(&m, 1, 20);
+    m.send_err_at = 336;
+    CHECK(run2(&fx, &m, &r) == FF802_MIXER_INCOMPLETE);
+    CHECK(r.written == 168 && r.passes_done == 1 && m.n_send_calls == 336 && m.n_sent == 335);
+    CHECK(strstr(r.detail, "pass 2: sending register 168 of 168 (0x42EA) failed") != NULL);
 
     /* the unit reconnects during the pause: pass 2 skipped, pass 1 counts */
     fake_midi_init(&m, 1, 20);
     g_fx2 = &fx;
     m.on_sleep = reconnect_in_pause;
     CHECK(run2(&fx, &m, &r) == FF802_MIXER_DONE);
-    CHECK(m.n_sent == 38 && r.passes_done == 1);
+    CHECK(m.n_sent == 168 && r.passes_done == 1);
     CHECK(strstr(r.detail, "pass 2 skipped") != NULL);
     fx_done(&fx);
 }

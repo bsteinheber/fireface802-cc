@@ -424,14 +424,14 @@ static void test_mixer_in_cc_branch(void)
     /* on, automation off: done, independent of the mode file */
     mixer_file(&fx, "on\n");
     CHECK(run_mixer(&fx, &c, &m, 19, &r) == FF802_AUTO_CC_ACTIVE);
-    CHECK(r.mixer_ran && r.mixer.outcome == FF802_MIXER_DONE && r.mixer.written == 38);
-    CHECK(m.n_sent == 38 && c.n_create == 0 && ff802_auto_result_exit_code(&r) == 0);
+    CHECK(r.mixer_ran && r.mixer.outcome == FF802_MIXER_DONE && r.mixer.written == 168);
+    CHECK(m.n_sent == 168 && c.n_create == 0 && ff802_auto_result_exit_code(&r) == 0);
     CHECK(r.mixer_event_seq == 0 && !fx_exists(&fx, "run/ff802-cc-auto/mixer-event"));
     fx_read(&fx, "run/ff802-cc-auto/mixer-result", buf, sizeof buf);
-    CHECK(strstr(buf, "outcome=done\n") != NULL && strstr(buf, "written=38/38\n") != NULL);
-    CHECK(strstr(buf, "written=38/38\nconfig=ff802-mixer-init-v3\nentries=38\n"
-                      "checksum=0xEC858A44\nbase=ff802-mixer-init-v2\nbase_entries=26\n"
-                      "base_checksum=0xC97A359C\n") != NULL);
+    CHECK(strstr(buf, "outcome=done\n") != NULL && strstr(buf, "written=168/168\n") != NULL);
+    CHECK(strstr(buf, "written=168/168\nconfig=ff802-mixer-init-v4\nentries=168\n"
+                      "checksum=0xC43D2879\nbase=ff802-mixer-init-v3\nbase_entries=38\n"
+                      "base_checksum=0xEC858A44\n") != NULL);
     CHECK(strstr(buf, "port=" PORT "\nbusnum=3\ndevnum=19\n") != NULL);
     CHECK(strstr(buf, "midi_port=20:1 Fireface 802 (24047128) Port 2\n") != NULL);
     fx_read(&fx, "run/ff802-cc-auto/last-result", buf, sizeof buf);
@@ -444,7 +444,7 @@ static void test_mixer_in_cc_branch(void)
     CHECK(r.mixer.outcome == FF802_MIXER_INCOMPLETE && ff802_auto_result_exit_code(&r) == 4);
     CHECK(r.mixer_event_seq >= 1);
     fx_read(&fx, "run/ff802-cc-auto/mixer-event", buf, sizeof buf);
-    CHECK(strstr(buf, "kind=mixer-failed\n") != NULL && strstr(buf, "(2 of 38 registers)") != NULL);
+    CHECK(strstr(buf, "kind=mixer-failed\n") != NULL && strstr(buf, "(2 of 168 registers)") != NULL);
 
     /* no MIDI backend in the program: exit 3 */
     CHECK(run_mixer(&fx, &c, NULL, 19, &r) == FF802_AUTO_CC_ACTIVE);

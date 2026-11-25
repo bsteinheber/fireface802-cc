@@ -129,8 +129,8 @@ long ff802_auto_write_mixer_event(const ff802_auto_paths *p,
 
 /*
  * <run_dir>/mixer-result: time, outcome, port, busnum, devnum,
- * written=<n>/38, config (FF802_MIXER_INIT_ID), entries (38), checksum,
- * base (FF802_MIXER_INIT_V2_ID), base_entries (26), base_checksum
+ * written=<n>/168, config (FF802_MIXER_INIT_ID), entries (168), checksum,
+ * base (FF802_MIXER_INIT_V3_ID), base_entries (38), base_checksum
  * (of the compiled-in table, 0x%08X), card, midi_port, detail. Strings
  * are sanitised.
  */

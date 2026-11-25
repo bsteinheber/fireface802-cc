@@ -4,7 +4,7 @@
  *
  * Pure protocol layer: no I/O, no allocation, no MIDI or USB access.
  *
- * The list (configuration ff802-mixer-init-v3) has exactly 38 entries, in
+ * The list (configuration ff802-mixer-init-v4) has exactly 168 entries, in
  * the order they are sent:
  *
  *   1..2    two unwanted crossed routings switched off (value 0x0000):
@@ -15,11 +15,18 @@
  *           register 0x1E00 + ((k-1) << 8)
  *   27..38  Input 9 (Mic/Inst 9) -> Hardware Output k at 30 % linear
  *           (value 0x2666), register 0x4000 | (k-1) << 6 | 8
+ *   39..168 the other 130 Playback p -> Output o routings within the
+ *           12 x 12 playback matrix (p, o = 1..12, p != o, without the two
+ *           of 1..2) switched off (value 0x0000), by output, then playback
  *
- * Entries 1..26 are the previous configuration ff802-mixer-init-v2,
- * unchanged and in the same order; their own checksum (0xC97A359C) is
- * checked as well. The same mono signal goes to both channels of each
- * output pair (the unit has no pan register: one value per output).
+ * Entries 1..38 are the previous configuration ff802-mixer-init-v3 and
+ * entries 1..26 the configuration ff802-mixer-init-v2, unchanged and in the
+ * same order; their own checksums (0xEC858A44, 0xC97A359C) are checked as
+ * well. Together, the 12 x 12 matrix of Playback 1..12 -> Output 1..12 is
+ * completely defined: 12 routings at 0 dB, 132 off. Playback 13..30 and
+ * Outputs 13..30 (AES, ADAT) are not part of the list. The same mono
+ * signal of Input 9 goes to both channels of each output pair (the unit
+ * has no pan register: one value per output).
  *
  * k = 1..8 are Analog 1..8, k = 9..12 Phones 9..12. The matrix register of
  * Playback p -> Output o is 0x4000 | (o-1) << 6 | (0x20 + p-1), of
@@ -37,13 +44,14 @@
  * (D3). The CC mode routes Playback 1/2 also to Phones 9/10; entries 1..2
  * remove exactly these two crossed routings (docs/mixer_routing.md).
  *
- * Order: first switch off (that only lowers levels), then the routings,
- * output volumes, then Input 9 last: an interrupted run leaves the output
- * volumes as they were, and the v2 part is complete before anything new
- * is sent. Nothing else is in the list: no other crossed routings, no
- * other inputs, no input gain, no mute, no pan, no outputs 13..30, no control room, no special
- * registers (0x3D44, 0x3F00, 0x3F97, 0x3F99). The list is a constant; no
- * address is computed at run time.
+ * Order: the tested v3 part first (crossed routings 1..2 off, routings,
+ * output volumes, Input 9), then the 130 further crossed routings off:
+ * a run interrupted after message 38 has set exactly the v3 list, and the
+ * v3 part is sent exactly as before. Nothing else is in the list: no
+ * playback 13..30, no other inputs, no input gain, no mute, no pan, no
+ * outputs 13..30, no control room, no special registers (0x3D44, 0x3F00,
+ * 0x3F97, 0x3F99). The list is a constant; no address is computed at run
+ * time.
  *
  * SysEx of one register write (12 bytes):
  *
@@ -68,7 +76,10 @@ extern "C" {
 #define FF802_MIXER_CROSS_COUNT   2u   /* crossed routings switched off */
 #define FF802_MIXER_INPUT9_COUNT 12u   /* Input 9 -> Output 1..12 */
 #define FF802_MIXER_INIT_V2_COUNT 26u  /* 2 + 12 routings + 12 volumes */
-#define FF802_MIXER_INIT_COUNT   38u   /* v2 (26) + 12 Input 9 routings */
+#define FF802_MIXER_INIT_V3_COUNT 38u  /* v2 + 12 Input 9 routings */
+#define FF802_MIXER_CROSS_EXTRA_COUNT 130u /* v4: the other crossed playback routings */
+#define FF802_MIXER_PLAYBACK_MATRIX 144u   /* 12 x 12: 12 routings + 132 off */
+#define FF802_MIXER_INIT_COUNT  168u   /* v3 (38) + 130 crossed routings off */
 #define FF802_MIXER_SYSEX_SIZE   12u
 
 #define FF802_MIXER_ROUTE_0DB    0x9000u   /* mixer gain 1.0 */
@@ -79,9 +90,11 @@ extern "C" {
 
 /*
  * FNV-1a (32 bit) over address and value (little-endian) of the entries:
- * all 38 (v3), and the first 26 alone (v2, unchanged since 0.2.0~dev3).
+ * all 168 (v4), the first 38 alone (v3, tested 0.2.0~dev6) and the first
+ * 26 alone (v2, unchanged since 0.2.0~dev3).
  */
-#define FF802_MIXER_INIT_CHECKSUM    0xEC858A44u
+#define FF802_MIXER_INIT_CHECKSUM    0xC43D2879u
+#define FF802_MIXER_INIT_V3_CHECKSUM 0xEC858A44u
 #define FF802_MIXER_INIT_V2_CHECKSUM 0xC97A359Cu
 
 /*
@@ -90,8 +103,11 @@ extern "C" {
  *   v1  24 entries (12 routings, 12 volumes)
  *   v2  26 entries (v1 + Playback 1/2 -> Phones 9/10 off, sent first)
  *   v3  38 entries (v2 unchanged + Input 9 -> Output 1..12 at 0x2666)
+ *   v4  168 entries (v3 unchanged + the other 130 crossed playback
+ *       routings of the 12 x 12 matrix off)
  */
-#define FF802_MIXER_INIT_ID    "ff802-mixer-init-v3"
+#define FF802_MIXER_INIT_ID    "ff802-mixer-init-v4"
+#define FF802_MIXER_INIT_V3_ID "ff802-mixer-init-v3"
 #define FF802_MIXER_INIT_V2_ID "ff802-mixer-init-v2"
 
 typedef enum ff802_mixer_kind {
@@ -114,6 +130,9 @@ const ff802_mixer_entry *ff802_mixer_init_table(void);
 
 /* Checksum of the table as compiled in (see FF802_MIXER_INIT_CHECKSUM). */
 uint32_t ff802_mixer_init_checksum(void);
+
+/* Checksum of its first FF802_MIXER_INIT_V3_COUNT entries (the v3 list). */
+uint32_t ff802_mixer_init_v3_checksum(void);
 
 /* Checksum of its first FF802_MIXER_INIT_V2_COUNT entries (the v2 list). */
 uint32_t ff802_mixer_init_v2_checksum(void);
@@ -145,7 +164,7 @@ void ff802_mixer_entry_label(const ff802_mixer_entry *e, char *buf, size_t size)
 ff802_status ff802_rme_sysex_reg(uint16_t addr, uint16_t value,
                                  uint8_t out[FF802_MIXER_SYSEX_SIZE]);
 
-/* The SysEx message of entry index (0..37) of the table, e.g. for display. */
+/* The SysEx message of entry index (0..167) of the table, e.g. for display. */
 ff802_status ff802_mixer_init_message(unsigned index, uint8_t out[FF802_MIXER_SYSEX_SIZE]);
 
 #ifdef __cplusplus
